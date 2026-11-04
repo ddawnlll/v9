@@ -14,8 +14,14 @@ Invariants:
 - Price evidence must be point-in-time: a quote whose ``available_at_ns`` is
   later than the evaluation clock cannot be used, even if its event time is old.
 - A touched limit price is not a fill. Without book depth the fill certainty is
-  ``UNKNOWN``; with bid/ask it is at best ``TOUCHED_ONLY``.
-- Unknown venue status blocks every new entry (fail closed).
+  ``UNKNOWN``; with bid/ask it is at best ``TOUCHED_ONLY``. A resting post-only
+  order is never touched by the current quote, so it stays ``UNKNOWN``.
+- A ``POST_ONLY`` proposal rests on the passive side (bid for a buy, ask for a
+  sell); if it would execute on arrival it is ``BLOCKED``, never reported as a
+  touch.
+- Unknown venue status blocks every new entry (fail closed). The safety inputs
+  of :func:`evaluate_entry` have no permissive default: omitting them evaluates
+  as unknown/stale/absent, so an unqualified call can never be ``ENTRY_READY``.
 """
 
 from __future__ import annotations
@@ -35,7 +41,7 @@ ZERO = Decimal("0")
 
 
 class EntryMode(StrEnum):
-    """The five RFC §8.3 entry decisions plus a not-yet-valid state."""
+    """The five RFC §8.3 entry decisions plus non-decision states."""
 
     MARKET_NOW = "MARKET_NOW"
     LIMIT_WAIT = "LIMIT_WAIT"
@@ -43,6 +49,7 @@ class EntryMode(StrEnum):
     WAIT_BELIEF = "WAIT_BELIEF"
     CANCEL_STALE = "CANCEL_STALE"
     NOT_YET_VALID = "NOT_YET_VALID"
+    BLOCKED = "BLOCKED"
 
 
 class OrderPolicy(StrEnum):
@@ -84,6 +91,7 @@ class EntryReason(StrEnum):
     FUTURE_QUOTE = "FUTURE_QUOTE"
     VENUE_UNKNOWN = "VENUE_UNKNOWN"
     BELIEF_STALE = "BELIEF_STALE"
+    POST_ONLY_WOULD_CROSS = "POST_ONLY_WOULD_CROSS"
 
 
 class MarketQuote(BaseModel):
@@ -200,33 +208,31 @@ class EntryIntent(BaseModel):
         }
 
 
-def make_intent_id(
-    *,
-    decision_id: str,
-    opportunity_id: str,
-    instrument_id: str,
-    side: str,
-    order_policy: OrderPolicy | str,
-    valid_after_ns: int,
-    expires_at_ns: int,
-    acceptable_price_low: Decimal | str,
-    acceptable_price_high: Decimal | str,
-    revision: int,
-) -> str:
-    """Deterministic proposal identity. No wall clock, no randomness."""
-    payload = {
-        "decision_id": decision_id,
-        "opportunity_id": opportunity_id,
-        "instrument_id": instrument_id,
-        "side": side,
-        "order_policy": OrderPolicy(order_policy).value,
-        "valid_after_ns": valid_after_ns,
-        "expires_at_ns": expires_at_ns,
-        "acceptable_price_low": str(acceptable_price_low),
-        "acceptable_price_high": str(acceptable_price_high),
-        "revision": revision,
-    }
+_PENDING_INTENT_ID: Final[str] = "pending-identity"
+
+
+def make_intent_id(record: EntryIntent) -> str:
+    """Deterministic identity over the whole proposal record.
+
+    No wall clock, no randomness, no hand-picked field list: the canonical JSON
+    of the record *minus* ``intent_id`` is hashed, so every field that defines
+    the proposal contributes. Two proposals that differ only in
+    ``size_policy_id``, ``structural_stop_ref``, ``venue_version``,
+    ``policy_version`` or ``kill_conditions`` therefore mint different ids, and
+    an identical record always reproduces its own id.
+
+    Lifecycle and bookkeeping fields are part of the record and therefore of
+    the digest: :func:`cancel` re-stamps the id so an intent's id always equals
+    the digest of its own content.
+    """
+    payload = record.model_dump(mode="json")
+    del payload["intent_id"]
     return _digest(payload)
+
+
+def _stamp_identity(record: EntryIntent) -> EntryIntent:
+    """Return a copy whose ``intent_id`` is derived from its own content."""
+    return record.model_copy(update={"intent_id": make_intent_id(record)})
 
 
 def build_intent(
@@ -249,20 +255,8 @@ def build_intent(
     kill_conditions: tuple[str, ...] = (),
     revision: int = 0,
 ) -> EntryIntent:
-    intent_id = make_intent_id(
-        decision_id=decision_id,
-        opportunity_id=opportunity_id,
-        instrument_id=instrument_id,
-        side=side,
-        order_policy=order_policy,
-        valid_after_ns=valid_after_ns,
-        expires_at_ns=expires_at_ns,
-        acceptable_price_low=acceptable_price_low,
-        acceptable_price_high=acceptable_price_high,
-        revision=revision,
-    )
-    return EntryIntent(
-        intent_id=intent_id,
+    proposal = EntryIntent(
+        intent_id=_PENDING_INTENT_ID,
         decision_id=decision_id,
         opportunity_id=opportunity_id,
         instrument_id=instrument_id,
@@ -282,6 +276,7 @@ def build_intent(
         created_ns=created_ns,
         revision=revision,
     )
+    return _stamp_identity(proposal)
 
 
 class EntryEvaluation(BaseModel):
@@ -308,6 +303,7 @@ class EntryEvaluation(BaseModel):
 
 
 def _reference_price(intent: EntryIntent, quote: MarketQuote) -> Decimal | None:
+    """The taker-side price the market is currently showing on this side."""
     if intent.side == "LONG":
         return quote.ask if quote.ask is not None else quote.mark
     return quote.bid if quote.bid is not None else quote.mark
@@ -318,11 +314,45 @@ def evaluate_entry(
     quote: MarketQuote | None,
     *,
     now_ns: int,
-    venue_status: VenueOrderStatus = VenueOrderStatus.ACCEPTED,
-    belief_stale: bool = False,
-    belief_available: bool = True,
+    venue_status: VenueOrderStatus | str = VenueOrderStatus.UNKNOWN,
+    belief_stale: bool = True,
+    belief_available: bool = False,
 ) -> EntryEvaluation:
-    """Evaluate a proposal without creating any native side effect."""
+    """Evaluate a proposal without creating any native side effect.
+
+    Safety inputs carry no permissive default. Omitting ``venue_status`` reads
+    as ``UNKNOWN``; omitting belief freshness reads as stale/absent. The
+    unqualified call is therefore guaranteed not to return ``ENTRY_READY``.
+    """
+    if not isinstance(belief_stale, bool) or not isinstance(belief_available, bool):
+        # Unreadable freshness is a contradiction, never fresh-enough evidence.
+        return EntryEvaluation(
+            intent_id=intent.intent_id,
+            revision=intent.revision,
+            evaluated_ns=now_ns,
+            mode=EntryMode.BLOCKED,
+            reason=EntryReason.DATA_CONTRADICTORY,
+            fill_certainty=FillCertainty.NOT_APPLICABLE,
+            friction_status=intent.friction_status,
+        )
+    try:
+        venue = (
+            venue_status
+            if isinstance(venue_status, VenueOrderStatus)
+            else VenueOrderStatus(venue_status)
+        )
+    except (TypeError, ValueError):
+        # An unlisted venue reading is schema-invalid, so it blocks rather than
+        # being coerced into a permissive state.
+        return EntryEvaluation(
+            intent_id=intent.intent_id,
+            revision=intent.revision,
+            evaluated_ns=now_ns,
+            mode=EntryMode.BLOCKED,
+            reason=EntryReason.VENUE_UNKNOWN,
+            fill_certainty=FillCertainty.NOT_APPLICABLE,
+            friction_status=intent.friction_status,
+        )
 
     def result(
         mode: EntryMode,
@@ -351,7 +381,7 @@ def evaluate_entry(
         return result(EntryMode.NOT_YET_VALID, EntryReason.ENTRY_NOT_YET_VALID)
     if now_ns >= intent.expires_at_ns:
         return result(EntryMode.CANCEL_STALE, EntryReason.ENTRY_EXPIRED)
-    if venue_status is VenueOrderStatus.UNKNOWN:
+    if venue is VenueOrderStatus.UNKNOWN:
         return result(EntryMode.CANCEL_STALE, EntryReason.VENUE_UNKNOWN)
     if belief_stale:
         return result(EntryMode.WAIT_BELIEF, EntryReason.BELIEF_STALE)
@@ -370,9 +400,7 @@ def evaluate_entry(
     if reference < intent.acceptable_price_low or reference > intent.acceptable_price_high:
         return result(EntryMode.SKIP_PRICE, EntryReason.PRICE_OUTSIDE_BAND, reference=reference)
 
-    friction = (
-        FrictionStatus.OBSERVED if quote.has_spread else FrictionStatus.MISSING
-    )
+    friction = FrictionStatus.OBSERVED if quote.has_spread else FrictionStatus.MISSING
     if intent.order_policy is OrderPolicy.MARKET:
         if not quote.has_spread:
             # A market entry without an observed touch cannot be priced honestly.
@@ -387,6 +415,37 @@ def evaluate_entry(
             EntryReason.ENTRY_READY,
             reference=reference,
             certainty=FillCertainty.NOT_APPLICABLE,
+            friction=friction,
+        )
+    if intent.order_policy is OrderPolicy.POST_ONLY:
+        # A post-only order must rest on the passive side: a buy joins the bid,
+        # a sell joins the ask. It never takes the opposite touch.
+        passive = quote.bid if intent.side == "LONG" else quote.ask
+        opposite = quote.ask if intent.side == "LONG" else quote.bid
+        if passive is None or opposite is None:
+            # Without both touches, passivity cannot be proven: fail closed.
+            return result(
+                EntryMode.WAIT_BELIEF,
+                EntryReason.DATA_MISSING,
+                reference=reference,
+                friction=friction,
+            )
+        crosses = passive >= opposite if intent.side == "LONG" else passive <= opposite
+        if crosses:
+            # The order would execute on arrival; a post-only order cannot rest.
+            return result(
+                EntryMode.BLOCKED,
+                EntryReason.POST_ONLY_WOULD_CROSS,
+                reference=reference,
+                limit=passive,
+                friction=friction,
+            )
+        return result(
+            EntryMode.LIMIT_WAIT,
+            EntryReason.ENTRY_READY,
+            reference=reference,
+            limit=passive,
+            certainty=FillCertainty.UNKNOWN,
             friction=friction,
         )
     certainty = FillCertainty.TOUCHED_ONLY if quote.has_spread else FillCertainty.UNKNOWN
@@ -447,12 +506,15 @@ def cancel(intent: EntryIntent, reason: str) -> EntryIntent:
     """Cancel a proposal by creating a terminal copy; no native cancel is sent."""
     if not reason:
         raise ValueError("cancel reason is required")
-    return intent.model_copy(
+    cancelled = intent.model_copy(
         update={
             "state": ProposalState.CANCELLED,
             "cancel_reasons": (*intent.cancel_reasons, reason),
         }
     )
+    # The record changed, so its identity is re-derived: an intent's id always
+    # equals the digest of its own content.
+    return _stamp_identity(cancelled)
 
 
 def is_duplicate(first: EntryIntent, second: EntryIntent) -> bool:
