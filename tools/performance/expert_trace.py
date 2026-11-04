@@ -12,7 +12,7 @@ import time
 from types import FrameType
 from typing import Any
 
-from v8_next.experts.registry import CANONICAL_28_EXPERTS, get_expert, observe_expert, observe_spec
+from v8_next.experts.registry import CANONICAL_28_EXPERTS, _DISPATCHERS, get_expert, observe_expert, observe_spec
 
 
 def _stats(values: list[float]) -> dict[str, float | int]:
@@ -34,10 +34,15 @@ def _entry_expert(frame: FrameType) -> str:
 class ExpertTrace:
     def __init__(self) -> None:
         self.codes = {name: get_expert(name).observer_fn.__code__ for name in CANONICAL_28_EXPERTS}
-        # The ensemble dispatches through observe_spec(spec, ...); observe_expert
-        # remains the public by-name entry point. Track either, so the trace does
-        # not depend on which one the hot path uses.
-        self.entry_codes = {observe_spec.__code__, observe_expert.__code__}
+        # The ensemble dispatches through one precomputed closure per expert
+        # (observe_all_28); observe_spec(spec, ...) remains the reference for
+        # the by-name path and observe_expert the public entry point. Track
+        # all three, so the trace does not depend on which one the hot path
+        # uses. Dispatcher closures carry their expert id as a real local
+        # (`expert_id` default arg), so entry attribution is unchanged.
+        self.entry_codes = {observe_spec.__code__, observe_expert.__code__} | {
+            dispatch.__code__ for dispatch in _DISPATCHERS
+        }
         self.samples: dict[str, list[tuple[float, float, float]]] = {
             name: [] for name in CANONICAL_28_EXPERTS
         }

@@ -57,6 +57,7 @@ from v8_next.domain.market import (
 from v8_next.domain.positioning import PositioningReading
 from v8_next.economics.decisions import (
     Opportunity,
+    Stance,
     StanceKind,
     opportunity_at,
     opportunity_record,
@@ -655,9 +656,18 @@ class ExpertEnsembleStrategy(Strategy):
                 opportunity_id=(record.opportunity_id if record is not None else None),
             )
             raise
-        supports = [s for s in stances if s.kind == StanceKind.SUPPORT]
-        contradicts = [s for s in stances if s.kind == StanceKind.CONTRADICT]
-        abstains = [s for s in stances if s.kind == StanceKind.ABSTAIN]
+        supports: list[Stance] = []
+        contradicts: list[Stance] = []
+        abstains: list[Stance] = []
+        for stance in stances:
+            # Single pass: the three comprehensions below used to walk the
+            # 28-wide panel three times per bar.
+            if stance.kind == StanceKind.SUPPORT:
+                supports.append(stance)
+            elif stance.kind == StanceKind.CONTRADICT:
+                contradicts.append(stance)
+            else:
+                abstains.append(stance)
 
         # 7. Evaluate Consensus & Admission
         is_supported = (
