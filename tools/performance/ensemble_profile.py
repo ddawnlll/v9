@@ -33,10 +33,13 @@ def main() -> None:
     parser.add_argument("--end-ms", type=int)
     parser.add_argument("--profile", type=Path)
     parser.add_argument("--expert-timings", action="store_true", help="instrument nested expert calls")
+    parser.add_argument("--stage-trace", action="store_true", help="trace replay phase boundaries")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.bars < 1:
         parser.error("--bars must be positive")
+    if args.stage_trace and (args.profile or args.expert_timings):
+        parser.error("--stage-trace must run separately from other instrumentation")
     from v8_next.adapters.expert_strategy import ExpertStrategyConfig, run_expert_strategy_backtest
     from v8_next.domain.market import Candle
 
@@ -94,7 +97,15 @@ def main() -> None:
         config_args.update(max_contradiction_tolerance=28, bracket_stop_pct=Decimal("0.02"),
                            bracket_target_pct=Decimal("0.05"))
     config = ExpertStrategyConfig(**config_args)
-    result = run_expert_strategy_backtest(candles, config)
+    stages = []
+    if args.stage_trace:
+        from stage_trace import StageTrace
+
+        with StageTrace(run_expert_strategy_backtest) as trace:
+            result = run_expert_strategy_backtest(candles, config)
+        stages = trace.durations()
+    else:
+        result = run_expert_strategy_backtest(candles, config)
     if profiler:
         profiler.disable()
         profiler.dump_stats(str(args.profile))
@@ -116,6 +127,8 @@ def main() -> None:
         "peak_rss_bytes": usage.ru_maxrss if platform.system() == "Darwin" else usage.ru_maxrss * 1024,
         "profiled": bool(profiler),
         "expert_timing_instrumented": args.expert_timings,
+        "stage_trace_instrumented": args.stage_trace,
+        "stages": stages,
         "experts": {
             name: {
                 "count": len(samples),
