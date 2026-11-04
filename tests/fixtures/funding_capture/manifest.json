@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "claim_status": "NO_ECONOMIC_CLAIM",
+  "symbol": "BTCUSDT",
+  "artifacts": [
+    {
+      "path": "instruments.json",
+      "sha256": "bb2c73f6f1482ac294a5382aef14ac5173c053c0cc927c32cc393f9069bddd51",
+      "source_url": "https://fapi.binance.com/fapi/v1/exchangeInfo",
+      "request_time_ns": 1788872400000000000,
+      "received_time_ns": 1788872500000000000,
+      "historical_available_time_ns": null,
+      "historical_pit_status": "UNKNOWN"
+    },
+    {
+      "path": "bars.json",
+      "sha256": "3e6ed1fb4cb776ea777b45be6b8b4bf3df18b179eb140ee23f1bc6e7eab5e391",
+      "source_url": "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1h",
+      "request_time_ns": 1788872500000000000,
+      "received_time_ns": 1788872560500000000,
+      "historical_available_time_ns": null,
+      "historical_pit_status": "UNKNOWN"
+    },
+    {
+      "path": "quote.json",
+      "sha256": "3c416620c5a7b9bb5027b5f633ed49a054f6b6e78d27682febef42b65ef4766e",
+      "source_url": "https://fapi.binance.com/fapi/v1/ticker/bookTicker?symbol=BTCUSDT",
+      "request_time_ns": 1788872560900000000,
+      "received_time_ns": 1788872560959620000,
+      "historical_available_time_ns": null,
+      "historical_pit_status": "UNKNOWN"
+    },
+    {
+      "path": "funding.json",
+      "sha256": "4ab5eee280ca6c1ad6e4884d2f08d6f2923b9f62f3f8cfe112f04db5dba40fc9",
+      "source_url": "https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT",
+      "request_time_ns": 1788872560000000000,
+      "received_time_ns": 1788872560100000000,
+      "historical_available_time_ns": null,
+      "historical_pit_status": "UNKNOWN"
+    },
+    {
+      "path": "funding_schedule.json",
+      "sha256": "eabb2b386b11a7e00d945dade2d890b247c4726c768022efb0fc7f3a400ab122",
+      "source_url": "https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT",
+      "request_time_ns": 1788872550000000000,
+      "received_time_ns": 1788872555000000000,
+      "historical_available_time_ns": null,
+      "historical_pit_status": "UNKNOWN"
+    }
+  ]
+}

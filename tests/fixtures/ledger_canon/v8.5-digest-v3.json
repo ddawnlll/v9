@@ -1,0 +1,64 @@
+{
+  "digest_version": "v8.5-digest-v3",
+  "entry_hash": "85ce98debe5c4dc2e7a456459ab3e49350421cce73d7df1417cf8f79c300f614",
+  "fixture_ledger_sha256": "657b2183871675d7a75ae8f1df4fd98d3529733d8856155579a775d3bfb3dccc",
+  "fixture_source": "artifacts/benchmarks/benchmark_ledger.jsonl entry 12 (verbatim, read-only)",
+  "parent_entry_hash": "e5d285a94ae678d9673cca6c90520fec5ba9c12e5a14f1d14720980211bb7ee6",
+  "receipt": {
+    "artifact_bindings": [
+      {
+        "bytes": 676,
+        "path": "/Users/hootie/src/v8/artifacts/benchmarks/canonical_dataset_588d668b.json",
+        "role": "canonical_dataset",
+        "sha256_hex": "9ee66d7fd23dfcb1c05128a1b471cced25507a3d34f0bd76bc0f953d35033b07"
+      },
+      {
+        "bytes": 36433,
+        "path": "/Users/hootie/src/v8/artifacts/benchmarks/economic_receipt_588d668b.json",
+        "role": "economic_receipt",
+        "sha256_hex": "6d4630d4c816c9aebae24621261cbbdce25cf3aa2df830d4424ce52e738caf7d"
+      },
+      {
+        "bytes": 4631,
+        "path": "/Users/hootie/src/v8/artifacts/benchmarks/portfolio_closed_588d668b.jsonl",
+        "role": "engine_closed_trades",
+        "sha256_hex": "63161deddfbda286cc90af920b2a4df29ea15e75c779534f741ba11b438a2850"
+      },
+      {
+        "bytes": 4763,
+        "path": "/Users/hootie/src/v8/artifacts/benchmarks/portfolio_P_trades_588d668b.jsonl",
+        "role": "engine_trades",
+        "sha256_hex": "a3dc42bc42385bff3428123e0dca6038328e5a8b5c3a7a97ed333ce303f6d256"
+      },
+      {
+        "bytes": 22692169,
+        "path": "/Users/hootie/src/v8/research/tape/quad-1h-12m/tape.jsonl",
+        "role": "market_tape",
+        "sha256_hex": "695eaec7d726b20c70e3a4d836e69206015d522753381e92f2fb2406414220e1"
+      }
+    ],
+    "capability_score": 9.5,
+    "case_id": "BC-D153-CANONICAL-01",
+    "computed_at_timestamp_ns": 1753128000000000000,
+    "coverage_factor": 0.6,
+    "digest_version": "v8.5-digest-v3",
+    "economic_evidence_digest": "bd903cd6c0cb55a808c8414d818355ac93c00c08ab4ad45cdb7a6256d35ea067",
+    "economic_receipt_path": "/Users/hootie/src/v8/artifacts/benchmarks/economic_receipt_588d668b.json",
+    "gates": {
+      "g0_identity": "PASS",
+      "g1_causal_pit": "PASS",
+      "g2_determinism_ledger": "PASS",
+      "g3_benchmark_coverage": "UNKNOWN",
+      "g4_structural_robustness": "UNKNOWN",
+      "g5_statistical_credibility": "UNKNOWN",
+      "g6_protected_oos": "UNKNOWN",
+      "g7_generalization": "UNKNOWN",
+      "g8_prospective_shadow": "MISSING",
+      "g9_live_realization": "MISSING"
+    },
+    "input_binding": "",
+    "policy_id": "pol_28_expert_ensemble",
+    "receipt_digest": "c8888b7c8cbb50d6fe8c8ddc12da051233cc986c67d6ac4ebe36bf1ea44c6873"
+  },
+  "sequence_number": 12
+}

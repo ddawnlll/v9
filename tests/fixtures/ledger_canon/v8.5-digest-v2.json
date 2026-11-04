@@ -1,0 +1,40 @@
+{
+  "digest_version": "v8.5-digest-v2",
+  "entry_hash": "67759520d81f8fba8407d0f68336d40c1714c04f16536f9ac1146ef17e8ba03b",
+  "fixture_ledger_sha256": "657b2183871675d7a75ae8f1df4fd98d3529733d8856155579a775d3bfb3dccc",
+  "fixture_source": "artifacts/benchmarks/benchmark_ledger.jsonl entry 0 (verbatim, read-only)",
+  "parent_entry_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "receipt": {
+    "artifact_bindings": [
+      {
+        "bytes": 154,
+        "path": "/Users/hootie/src/v8/artifacts/benchmarks/BC-D153-CANONICAL-01_trades.jsonl",
+        "role": "native_trades",
+        "sha256_hex": "ce5a7f433e19b4744997cfc78e7e56fb39f82797feb8ac2b87eb47c0027413e0"
+      }
+    ],
+    "capability_score": 12.7,
+    "case_id": "BC-D153-CANONICAL-01",
+    "computed_at_timestamp_ns": 1753128000000000000,
+    "coverage_factor": 0.6,
+    "digest_version": "v8.5-digest-v2",
+    "economic_evidence_digest": "",
+    "economic_receipt_path": "",
+    "gates": {
+      "g0_identity": "PASS",
+      "g1_causal_pit": "PASS",
+      "g2_determinism_ledger": "PASS",
+      "g3_benchmark_coverage": "PASS",
+      "g4_structural_robustness": "PASS",
+      "g5_statistical_credibility": "PASS",
+      "g6_protected_oos": "PASS",
+      "g7_generalization": "PASS",
+      "g8_prospective_shadow": "NOT_APPLICABLE",
+      "g9_live_realization": "PASS"
+    },
+    "input_binding": "",
+    "policy_id": "pol_28_expert_ensemble",
+    "receipt_digest": "5e12587f5ee921e72879f465af7a33010ea79244f03c64de2b20622a91e24ea3"
+  },
+  "sequence_number": 0
+}

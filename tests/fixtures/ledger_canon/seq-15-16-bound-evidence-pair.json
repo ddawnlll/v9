@@ -1,0 +1,81 @@
+{
+  "entries": [
+    {
+      "entry_hash": "93cf5c986a3557eafb64537abe5badc1b1d260ce2ae336b3a109373ea08554cd",
+      "parent_entry_hash": "b324a3ab0adf9eb3f1807d94944dd383cc782ece59f5394ade3edaefe538f0a6",
+      "receipt": {
+        "artifact_bindings": [
+          {
+            "bytes": 478,
+            "path": "/Users/hootie/src/v8/artifacts/benchmarks/BC-D153-CANONICAL-01_15_trades.jsonl",
+            "role": "native_trades",
+            "sha256_hex": "4e0fb8f10c555765811696b4fc218ab2f6de92c70c438aa409c6de49ec49634f"
+          }
+        ],
+        "capability_score": 6.2,
+        "case_id": "BC-D153-CANONICAL-01",
+        "computed_at_timestamp_ns": 1751778000000000000,
+        "coverage_factor": 0.6,
+        "digest_version": "v8.5-digest-v4",
+        "economic_evidence_digest": "",
+        "economic_receipt_path": "",
+        "gates": {
+          "g0_identity": "BLOCKED",
+          "g1_causal_pit": "UNKNOWN",
+          "g2_determinism_ledger": "PASS",
+          "g3_benchmark_coverage": "UNKNOWN",
+          "g4_structural_robustness": "UNKNOWN",
+          "g5_statistical_credibility": "UNKNOWN",
+          "g6_protected_oos": "UNKNOWN",
+          "g7_generalization": "UNKNOWN",
+          "g8_prospective_shadow": "MISSING",
+          "g9_live_realization": "MISSING"
+        },
+        "input_binding": "ea6f9b14935d6b167d37912fbd5f1bae1c471816db60829efa4cd348293e1d8f",
+        "policy_id": "pol_28_expert_ensemble",
+        "receipt_digest": "578a12fc3bdf1854552be09f2ed3e898667016c5988f959cd1c005c0f89a7604"
+      },
+      "sequence_number": 15
+    },
+    {
+      "entry_hash": "b9bbd95e28795c82f252ef5893c066c96d2228c24a21dd6423baf3ee8336513d",
+      "parent_entry_hash": "93cf5c986a3557eafb64537abe5badc1b1d260ce2ae336b3a109373ea08554cd",
+      "receipt": {
+        "artifact_bindings": [
+          {
+            "bytes": 478,
+            "path": "/Users/hootie/src/v8/artifacts/benchmarks/BC-D153-CANONICAL-01_16_trades.jsonl",
+            "role": "native_trades",
+            "sha256_hex": "4e0fb8f10c555765811696b4fc218ab2f6de92c70c438aa409c6de49ec49634f"
+          }
+        ],
+        "capability_score": 11.1,
+        "case_id": "BC-D153-CANONICAL-01",
+        "computed_at_timestamp_ns": 1751778000000000000,
+        "coverage_factor": 0.6,
+        "digest_version": "v8.5-digest-v4",
+        "economic_evidence_digest": "",
+        "economic_receipt_path": "",
+        "gates": {
+          "g0_identity": "BLOCKED",
+          "g1_causal_pit": "UNKNOWN",
+          "g2_determinism_ledger": "PASS",
+          "g3_benchmark_coverage": "UNKNOWN",
+          "g4_structural_robustness": "UNKNOWN",
+          "g5_statistical_credibility": "UNKNOWN",
+          "g6_protected_oos": "UNKNOWN",
+          "g7_generalization": "UNKNOWN",
+          "g8_prospective_shadow": "MISSING",
+          "g9_live_realization": "MISSING"
+        },
+        "input_binding": "ea6f9b14935d6b167d37912fbd5f1bae1c471816db60829efa4cd348293e1d8f",
+        "policy_id": "pol_28_expert_ensemble",
+        "receipt_digest": "a4bd4d48a9962e92f914083821c919d5dbeedbd6a7eecfab8950c0c03f713bd7"
+      },
+      "sequence_number": 16
+    }
+  ],
+  "fixture_ledger_sha256": "df1892416fda28f487cc9ba7680bb0e97631a5c79c7a834a4e1cc396ac88b7d7",
+  "fixture_source": "/Users/hootie/src/v8/artifacts/benchmarks/benchmark_ledger.jsonl entries 15 and 16 (verbatim, read-only)",
+  "note": "#408 counter-evidence: both receipts are bound to byte-identical evidence (case, policy, input binding, gate vector, artifact sha256s, timestamp) and publish different capability scores"
+}

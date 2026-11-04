@@ -1,0 +1,10 @@
+{
+  "fixtures": {
+    "v8.5-digest-v2": "29fde03af9395318b6774b688e2cae715dab4332d7201ed47efe49ce7d0444fd",
+    "v8.5-digest-v3": "681f3f714a1fdb02f413d216095187ad726f9f891a3a66c35805e0f91d89bf12",
+    "v8.5-digest-v4": "7d933aa81fbd15c76af529d9ce4a2b8aa22de3417d4a06e1c01f39910af3084a"
+  },
+  "ledger": "artifacts/benchmarks/benchmark_ledger.jsonl",
+  "ledger_sha256": "657b2183871675d7a75ae8f1df4fd98d3529733d8856155579a775d3bfb3dccc",
+  "note": "digests are the historical producers' own; extracted read-only, never re-derived or re-written"
+}
