@@ -18,6 +18,68 @@ STOP_FIRST_CONTRACT = (
     "observed intrabar sequence."
 )
 
+#: Extra exclusion applied to the entry timestamp before a bar may count as
+#: post-entry. Zero by default: the native fills of a bar-close replay are
+#: stamped at the bar's end, which is exactly the eligibility boundary.
+INTRABAR_EXCLUSION_NS: int = 0
+
+#: Documented eligibility rule for every MFE/MAE measurement.
+POST_ENTRY_ELIGIBILITY = (
+    "POST_ENTRY_ONLY: a bar contributes to MFE/MAE only when its start is at or after "
+    "the entry timestamp plus INTRABAR_EXCLUSION_NS. The entry bar's high/low were "
+    "produced before the position existed, and intrabar entry timing is not recoverable "
+    "from an OHLC tape, so the containing bar is never counted. Mutating the entry bar's "
+    "future high/low therefore cannot change any measured excursion."
+)
+
+
+def entry_eligibility_boundary(
+    opened_ns: int, *, intrabar_exclusion_ns: int = INTRABAR_EXCLUSION_NS
+) -> int:
+    """First instant at which a bar may carry genuinely post-entry excursion."""
+    return opened_ns + intrabar_exclusion_ns
+
+
+def _bar_start_ns(candles: Sequence[Any], index: int) -> int | None:
+    """Nominal bar start; contiguous tapes use the previous bar's end as fallback.
+
+    An unknown start (first bar of a tape that carries no ``start_ns``) returns
+    ``None`` so the caller can fail closed instead of guessing.
+    """
+    start = getattr(candles[index], "start_ns", None)
+    if start is not None:
+        return int(start)
+    if index > 0:
+        return int(candles[index - 1].end_ns)
+    return None
+
+
+def post_entry_window(
+    candles: Sequence[Any],
+    *,
+    opened_ns: int,
+    exit_ns: int | None = None,
+    intrabar_exclusion_ns: int = INTRABAR_EXCLUSION_NS,
+) -> list[Any]:
+    """Bars strictly after the entry eligibility boundary and not past the exit.
+
+    Pure: the input sequence is never mutated and the returned bars are the
+    caller's own objects. A bar whose start cannot be established is excluded
+    (it may contain the entry instant), never included on a guess.
+    """
+    boundary = entry_eligibility_boundary(
+        opened_ns, intrabar_exclusion_ns=intrabar_exclusion_ns
+    )
+    window: list[Any] = []
+    for index, candle in enumerate(candles):
+        if exit_ns is not None and int(candle.end_ns) > exit_ns:
+            break
+        start_ns = _bar_start_ns(candles, index)
+        if start_ns is None or start_ns < boundary:
+            continue
+        window.append(candle)
+    return window
+
 
 def _dec(value: Any) -> float | None:
     if value is None or value == "":
@@ -161,6 +223,12 @@ def stop_first_path(
     favourable excursion of that same bar, so MAE is capped at the stop distance
     and the bar's high/low cannot inflate MFE beyond it. Without a stop the raw
     OHLC extremes are returned instead (no contract can be applied).
+
+    Bars come from :func:`post_entry_window`, so the entry bar and any bar that
+    may contain the entry instant are never measured. A bar covering both the
+    stop and the target is a tie the tape cannot resolve: the declared contract
+    still labels it ``STOP_FIRST`` but ``same_bar_stop_and_target`` records that
+    the intrabar sequence is not identified.
     """
     if stop is None:
         return None
@@ -170,17 +238,12 @@ def stop_first_path(
     exit_price = None
     exit_ns_path = None
     bars_measured = 0
-    for candle in candles:
+    same_bar_tie = False
+    window = post_entry_window(
+        candles, opened_ns=opened_ns, exit_ns=exit_ns
+    )
+    for candle in window:
         bar_end = int(candle.end_ns)
-        # The entry bar is excluded: the position opens at (or after) that
-        # bar's close, so its high/low were produced BEFORE the position
-        # existed. Counting them as post-entry excursion is look-ahead and
-        # inflates MFE on every campaign. Intrabar entry timing is not
-        # recoverable from a bar tape, so this is the conservative contract.
-        if bar_end <= opened_ns:
-            continue
-        if exit_ns is not None and bar_end > exit_ns:
-            break
         bars_measured += 1
         high = float(candle.high)
         low = float(candle.low)
@@ -189,6 +252,8 @@ def stop_first_path(
         stop_hit = low <= stop if direction > 0 else high >= stop
         target_hit = target is not None and (high >= target if direction > 0 else low <= target)
         if stop_hit:
+            if target_hit:
+                same_bar_tie = True
             # Stop-first: the stop fills before any favourable excursion here.
             mae = min(mae, stop - entry if direction > 0 else entry - stop)
             mfe = max(mfe, 0.0)
@@ -206,6 +271,11 @@ def stop_first_path(
             break
         mfe = max(mfe, bar_mfe)
         mae = min(mae, bar_mae)
+    eligibility = {
+        "eligibility_boundary_ns": entry_eligibility_boundary(opened_ns),
+        "same_bar_stop_and_target": same_bar_tie,
+        "tie_resolution": "STOP_FIRST_DECLARED" if same_bar_tie else None,
+    }
     if bars_measured == 0:
         return {
             "mfe_price": None,
@@ -214,6 +284,7 @@ def stop_first_path(
             "exit_price": None,
             "exit_ns": None,
             "bars_measured": 0,
+            **eligibility,
         }
     return {
         "mfe_price": mfe,
@@ -222,6 +293,7 @@ def stop_first_path(
         "exit_price": exit_price,
         "exit_ns": exit_ns_path,
         "bars_measured": bars_measured,
+        **eligibility,
     }
 
 
@@ -313,6 +385,12 @@ def compute_trade_metrics(
         for c in candles
         if c.end_ns >= (facts.opened_ns or 0) and (exit_ns is None or c.end_ns <= exit_ns)
     ]
+    eligible = post_entry_window(
+        candles, opened_ns=facts.opened_ns or 0, exit_ns=exit_ns
+    )
+    row["entry_eligibility_rule"] = POST_ENTRY_ELIGIBILITY
+    row["entry_eligibility_boundary_ns"] = entry_eligibility_boundary(facts.opened_ns or 0)
+    row["entry_bars_excluded"] = max(0, len(window) - len(eligible))
     if window:
         contract = stop_first_path(
             candles=candles,
@@ -323,32 +401,43 @@ def compute_trade_metrics(
             opened_ns=facts.opened_ns or 0,
             exit_ns=exit_ns,
         )
-        if contract is not None and contract["outcome"] == "ENTRY_BAR_ONLY":
-            row["mfe_price"] = row["mae_price"] = None
-            row["mfe_r"] = row["mae_r"] = None
+        excursion: tuple[float, float] | None = None
+        if contract is not None:
+            row["same_bar_stop_and_target"] = bool(contract["same_bar_stop_and_target"])
+            row["tie_resolution"] = contract["tie_resolution"]
             row["path_model_applied"] = "STOP_FIRST"
+            if contract["outcome"] == "ENTRY_BAR_ONLY":
+                row["path_model_outcome"] = "ENTRY_BAR_ONLY"
+                row["metric_unavailable_reason"] = "NO_POST_ENTRY_BAR"
+                row["measured_window_bars"] = 0
+            else:
+                row["path_model_outcome"] = contract["outcome"]
+                row["path_model_exit_price"] = contract["exit_price"]
+                row["path_model_exit_ns"] = contract["exit_ns"]
+                row["mae_capped_by_stop"] = contract["outcome"] == "STOP_FIRST"
+                excursion = (contract["mfe_price"], contract["mae_price"])
+        elif eligible:
+            # No protective stop: raw extremes, still from post-entry bars only.
+            highs = [float(c.high) for c in eligible]
+            lows = [float(c.low) for c in eligible]
+            if direction > 0:
+                excursion = (max(highs) - entry, min(lows) - entry)
+            else:
+                excursion = (entry - min(lows), entry - max(highs))
+            row["path_model_applied"] = "NONE_NO_STOP"
+            row["same_bar_stop_and_target"] = False
+            row["tie_resolution"] = None
+        else:
+            # No stop AND no post-entry bar: the entry bar's extrema are not
+            # evidence of anything that happened after the position existed.
+            row["path_model_applied"] = "NONE_NO_STOP"
             row["path_model_outcome"] = "ENTRY_BAR_ONLY"
             row["metric_unavailable_reason"] = "NO_POST_ENTRY_BAR"
             row["measured_window_bars"] = 0
-        elif contract is not None:
-            mfe_price = contract["mfe_price"]
-            mae_price = contract["mae_price"]
-            row["path_model_applied"] = "STOP_FIRST"
-            row["path_model_outcome"] = contract["outcome"]
-            row["path_model_exit_price"] = contract["exit_price"]
-            row["path_model_exit_ns"] = contract["exit_ns"]
-            row["mae_capped_by_stop"] = contract["outcome"] == "STOP_FIRST"
-        else:
-            highs = [float(c.high) for c in window]
-            lows = [float(c.low) for c in window]
-            if direction > 0:
-                mfe_price = max(highs) - entry
-                mae_price = min(lows) - entry
-            else:
-                mfe_price = entry - min(lows)
-                mae_price = entry - max(highs)
-            row["path_model_applied"] = "NONE_NO_STOP"
-        if contract is None or contract["outcome"] != "ENTRY_BAR_ONLY":
+            row["same_bar_stop_and_target"] = False
+            row["tie_resolution"] = None
+        if excursion is not None:
+            mfe_price, mae_price = excursion
             row["mfe_price"] = round(mfe_price, 10)
             row["mae_price"] = round(mae_price, 10)
             row["mfe_r"] = round(mfe_price / risk_price, 10) if risk_price else None
@@ -356,6 +445,9 @@ def compute_trade_metrics(
             row["holding_bars"] = len(window)
             row["holding_duration_ns"] = (exit_ns or window[-1].end_ns) - facts.opened_ns
             row["measured_window_bars"] = max(0, len(window) - 1)
+        else:
+            row["mfe_price"] = row["mae_price"] = None
+            row["mfe_r"] = row["mae_r"] = None
     else:
         row["mfe_price"] = row["mae_price"] = None
         row["mfe_r"] = row["mae_r"] = None
