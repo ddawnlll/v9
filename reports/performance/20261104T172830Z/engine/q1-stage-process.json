@@ -1,0 +1,21 @@
+{
+  "command": [
+    "/work/.venv/bin/python",
+    "/work/tools/performance/ensemble_profile.py",
+    "--tape",
+    "/tape/q1",
+    "--bars",
+    "2160",
+    "--stage-trace",
+    "--output",
+    "/out/q1-stage.json"
+  ],
+  "child_wall_s": 1.9174455429999853,
+  "child_user_cpu_s": 1.8680949999999998,
+  "child_system_cpu_s": 0.219959,
+  "child_peak_rss_bytes": 254976000,
+  "returncode": 0,
+  "stdout": "{\"bars\": 2160, \"decisions\": 2160, \"expert_timing_instrumented\": false, \"experts\": {}, \"fills\": 1, \"first_start_ns\": 1735689600000000000, \"fixture\": null, \"fixture_s\": 0.03627483299999312, \"imports_s\": 0.1272697510000853, \"last_end_ns\": 1743465600000000000, \"orders\": 3, \"peak_rss_bytes\": 254976000, \"pid\": 93, \"pre_output_s\": 1.859697585000049, \"production_backtest_s\": 1.6961530009999706, \"profiled\": false, \"stage_trace_instrumented\": true, \"stages\": [{\"phase\": \"function_entry\", \"rss_end_bytes\": 161271808, \"rss_start_bytes\": 161271808, \"wall_s\": 4.654099996059813e-05}, {\"phase\": \"instrument_setup\", \"rss_end_bytes\": 162058240, \"rss_start_bytes\": 161271808, \"wall_s\": 0.00011266699993939255}, {\"phase\": \"bar_conversion\", \"rss_end_bytes\": 162582528, \"rss_start_bytes\": 162058240, \"wall_s\": 0.002992583000036575}, {\"phase\": \"execution_profile\", \"rss_end_bytes\": 162582528, \"rss_start_bytes\": 162582528, \"wall_s\": 1.3749999993706297e-05}, {\"phase\": \"engine_init\", \"rss_end_bytes\": 200253440, \"rss_start_bytes\": 162582528, \"wall_s\": 0.061418042000013884}, {\"phase\": \"venue_setup\", \"rss_end_bytes\": 200646656, \"rss_start_bytes\": 200253440, \"wall_s\": 6.708299997626455e-05}, {\"phase\": \"instrument_add\", \"rss_end_bytes\": 201170944, \"rss_start_bytes\": 200646656, \"wall_s\": 5.0041999998029496e-05}, {\"phase\": \"data_add\", \"rss_end_bytes\": 209735680, \"rss_start_bytes\": 201170944, \"wall_s\": 0.0003460000000359287}, {\"phase\": \"strategy_setup\", \"rss_end_bytes\": 210784256, \"rss_start_bytes\": 209735680, \"wall_s\": 0.0014935420000483646}, {\"phase\": \"engine_run\", \"rss_end_bytes\": 251039744, \"rss_start_bytes\": 210784256, \"wall_s\": 1.6202431669998987}, {\"phase\": \"economic_state\", \"rss_end_bytes\": 251039744, \"rss_start_bytes\": 251039744, \"wall_s\": 0.00010408299999653536}, {\"phase\": \"report_import\", \"rss_end_bytes\": 251039744, \"rss_start_bytes\": 251039744, \"wall_s\": 0.0001527920001080929}, {\"phase\": \"native_reports\", \"rss_end_bytes\": 252723200, \"rss_start_bytes\": 251039744, \"wall_s\": 0.006152749999955631}, {\"phase\": \"fill_report\", \"rss_end_bytes\": 252723200, \"rss_start_bytes\": 252723200, \"wall_s\": 0.001159000000029664}, {\"phase\": \"result_assembly\", \"rss_end_bytes\": 252723200, \"rss_start_bytes\": 252723200, \"wall_s\": 2.2291999925982964e-05}, {\"phase\": \"engine_dispose\", \"rss_end_bytes\": 252723200, \"rss_start_bytes\": 252723200, \"wall_s\": 5.6416000006720424e-05}], \"system_cpu_s\": 0.21709099999999998, \"user_cpu_s\": 1.8275329999999999, \"workload\": \"historical tape; availability and provenance require independent verification\"}\n",
+  "stderr": "",
+  "measurement_write_included": false
+}

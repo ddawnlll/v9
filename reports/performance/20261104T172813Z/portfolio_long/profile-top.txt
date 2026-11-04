@@ -1,0 +1,60 @@
+Wed Nov  4 17:26:47 2026    /out/profile.pstats
+
+         37849784 function calls (37844273 primitive calls) in 9.832 seconds
+
+   Ordered by: cumulative time
+   List reduced from 2637 to 50 due to restriction <50>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.005    0.005   11.737   11.737 /work/src/v8_next/adapters/portfolio_backtest.py:308(run_portfolio_backtest)
+        1    0.100    0.100   11.305   11.305 {method 'run' of 'nautilus_trader.backtest.BacktestEngine' objects}
+    21600    0.311    0.000   11.205    0.001 /work/src/v8_next/adapters/expert_strategy.py:471(on_bar)
+    21600    0.071    0.000    6.451    0.000 /work/src/v8_next/experts/registry.py:669(observe_all_28)
+   626400    0.158    0.000    6.369    0.000 /work/src/v8_next/experts/registry.py:685(<genexpr>)
+   604800    0.786    0.000    6.211    0.000 /work/src/v8_next/experts/registry.py:605(observe_expert)
+    21600    1.020    0.000    2.893    0.000 /work/src/v8_next/domain/market.py:147(from_ordered_prefix)
+    21630    0.012    0.000    2.850    0.000 /usr/local/lib/python3.12/functools.py:982(__get__)
+    21600    0.036    0.000    2.835    0.000 /work/src/v8_next/domain/market.py:101(continuous)
+    21706    1.198    0.000    2.800    0.000 {built-in method builtins.all}
+   583200    0.117    0.000    2.438    0.000 /work/src/v8_next/experts/common.py:7(context_reason)
+    21600    0.014    0.000    2.384    0.000 /work/src/v8_next/experts/bollinger.py:68(observe_bollinger_breakout)
+ 23338800    1.602    0.000    1.602    0.000 /work/src/v8_next/domain/market.py:103(<genexpr>)
+    43200    1.207    0.000    1.207    0.000 /work/src/v8_next/domain/market.py:82(__post_init__)
+   583200    0.321    0.000    0.889    0.000 /work/src/v8_next/experts/common.py:22(directional_stance)
+   604800    0.495    0.000    0.845    0.000 /work/src/v8_next/economics/decisions.py:63(stance_record)
+    21600    0.012    0.000    0.646    0.000 /work/src/v8_next/economics/decisions.py:91(opportunity_at)
+   302400    0.197    0.000    0.487    0.000 /work/src/v8_next/economics/decisions.py:321(stance_with)
+    43202    0.009    0.000    0.426    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/series.py:4720(to_list)
+    43202    0.417    0.000    0.417    0.000 {method 'to_list' of 'builtins.PySeries' objects}
+  6771832    0.409    0.000    0.409    0.000 {built-in method builtins.getattr}
+    86402    0.175    0.000    0.353    0.000 /usr/local/lib/python3.12/dataclasses.py:1540(replace)
+     5410    0.235    0.000    0.235    0.000 {method 'add_data' of 'nautilus_trader.backtest.BacktestEngine' objects}
+    21600    0.013    0.000    0.149    0.000 /work/src/v8_next/experts/divergence.py:76(observe_divergence)
+    21600    0.013    0.000    0.146    0.000 /work/src/v8_next/experts/pandf.py:94(observe_pandf)
+    21600    0.013    0.000    0.141    0.000 /work/src/v8_next/experts/climax.py:43(observe_volume_climax)
+    365/8    0.001    0.000    0.112    0.014 <frozen importlib._bootstrap>:1349(_find_and_load)
+    363/8    0.001    0.000    0.112    0.014 <frozen importlib._bootstrap>:1304(_find_and_load_unlocked)
+    348/5    0.000    0.000    0.111    0.022 <frozen importlib._bootstrap>:911(_load_unlocked)
+    290/5    0.000    0.000    0.111    0.022 <frozen importlib._bootstrap_external>:993(exec_module)
+   825/13    0.000    0.000    0.111    0.009 <frozen importlib._bootstrap>:480(_call_with_frames_removed)
+    397/5    0.005    0.000    0.111    0.022 {built-in method builtins.exec}
+    43324    0.010    0.000    0.098    0.000 /work/.venv/lib/python3.12/site-packages/polars/dataframe/frame.py:1308(__getitem__)
+        1    0.000    0.000    0.090    0.090 /work/.venv/lib/python3.12/site-packages/pandas/__init__.py:1(<module>)
+    21600    0.012    0.000    0.089    0.000 /work/src/v8_next/experts/reclaim.py:36(observe_breakout_retest)
+    43324    0.019    0.000    0.088    0.000 /work/.venv/lib/python3.12/site-packages/polars/_utils/getitem.py:128(get_df_item_by_key)
+923286/922933    0.074    0.000    0.088    0.000 {built-in method builtins.len}
+    21600    0.012    0.000    0.087    0.000 /work/src/v8_next/experts/failed_moves.py:79(observe_failed_move)
+    21600    0.012    0.000    0.086    0.000 /work/src/v8_next/experts/confluence.py:62(observe_confluence)
+    21600    0.012    0.000    0.086    0.000 /work/src/v8_next/experts/measuring.py:65(observe_measuring)
+    21600    0.012    0.000    0.086    0.000 /work/src/v8_next/experts/positioning.py:13(observe_funding)
+    21600    0.012    0.000    0.085    0.000 /work/src/v8_next/experts/profile.py:114(observe_profile)
+    21600    0.012    0.000    0.085    0.000 /work/src/v8_next/experts/candlestick.py:119(observe_candlestick)
+    21600    0.011    0.000    0.085    0.000 /work/src/v8_next/experts/momentum.py:31(observe_obv_adl)
+    21600    0.012    0.000    0.085    0.000 /work/src/v8_next/experts/levels.py:67(observe_floor_pivot)
+    21600    0.012    0.000    0.085    0.000 /work/src/v8_next/experts/breakouts.py:65(observe_volume_breakout)
+    21600    0.011    0.000    0.084    0.000 /work/src/v8_next/experts/ichimoku.py:8(observe_ichimoku)
+    21600    0.011    0.000    0.083    0.000 /work/src/v8_next/experts/gaps.py:63(observe_gap)
+    21600    0.011    0.000    0.083    0.000 /work/src/v8_next/experts/positioning.py:61(observe_open_interest)
+    68/40    0.000    0.000    0.067    0.002 {built-in method builtins.__import__}
+
+

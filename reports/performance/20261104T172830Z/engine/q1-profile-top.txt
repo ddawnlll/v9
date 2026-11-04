@@ -1,0 +1,60 @@
+Wed Nov  4 17:27:30 2026    /out/q1.pstats
+
+         8536351 function calls (8528902 primitive calls) in 2.836 seconds
+
+   Ordered by: cumulative time
+   List reduced from 2481 to 50 due to restriction <50>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.003    0.003    3.032    3.032 /work/src/v8_next/adapters/expert_strategy.py:1502(run_expert_strategy_backtest)
+        1    0.011    0.011    2.913    2.913 {method 'run' of 'nautilus_trader.backtest.BacktestEngine' objects}
+     2160    0.038    0.000    2.902    0.001 /work/src/v8_next/adapters/expert_strategy.py:471(on_bar)
+     2160    0.008    0.000    2.149    0.001 /work/src/v8_next/experts/registry.py:669(observe_all_28)
+    62640    0.017    0.000    2.140    0.000 /work/src/v8_next/experts/registry.py:685(<genexpr>)
+    60480    0.082    0.000    2.123    0.000 /work/src/v8_next/experts/registry.py:605(observe_expert)
+    17021    0.042    0.000    1.001    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/utils.py:97(wrapper)
+    17379    0.028    0.000    0.790    0.000 /work/.venv/lib/python3.12/site-packages/polars/dataframe/frame.py:10588(select_seq)
+    21054    0.014    0.000    0.695    0.000 /work/.venv/lib/python3.12/site-packages/polars/lazyframe/frame.py:2236(_collect_eager)
+    21054    0.028    0.000    0.679    0.000 /work/.venv/lib/python3.12/site-packages/polars/lazyframe/engine.py:415(collect)
+    21054    0.561    0.000    0.561    0.000 {method 'collect' of 'builtins.PyLazyFrame' objects}
+     1107    0.011    0.000    0.468    0.000 /work/src/v8_next/experts/patterns.py:12(pattern_pivots)
+      369    0.007    0.000    0.346    0.001 /work/src/v8_next/experts/features.py:192(significant_swings)
+      358    0.027    0.000    0.325    0.001 /work/src/v8_next/experts/features.py:152(wilder_rsi)
+     2160    0.003    0.000    0.308    0.000 /work/src/v8_next/economics/decisions.py:91(opportunity_at)
+      369    0.001    0.000    0.306    0.001 /work/src/v8_next/experts/fibonacci.py:28(fib_impulse)
+     3232    0.117    0.000    0.289    0.000 {built-in method builtins.all}
+     2160    0.099    0.000    0.286    0.000 /work/src/v8_next/domain/market.py:147(from_ordered_prefix)
+     2283    0.001    0.000    0.277    0.000 /usr/local/lib/python3.12/functools.py:982(__get__)
+     2160    0.004    0.000    0.275    0.000 /work/src/v8_next/domain/market.py:101(continuous)
+     2160    0.001    0.000    0.251    0.000 /work/src/v8_next/experts/confluence.py:62(observe_confluence)
+      123    0.001    0.000    0.241    0.002 /work/src/v8_next/experts/confluence.py:43(confluence_legs)
+     2160    0.002    0.000    0.177    0.000 /work/src/v8_next/experts/divergence.py:76(observe_divergence)
+      123    0.002    0.000    0.161    0.001 /work/src/v8_next/experts/divergence.py:24(divergence_setup)
+  2333880    0.155    0.000    0.155    0.000 /work/src/v8_next/domain/market.py:103(<genexpr>)
+     2160    0.003    0.000    0.146    0.000 /work/src/v8_next/experts/reversion.py:44(observe_rsi_reversion)
+     3675    0.007    0.000    0.144    0.000 /work/.venv/lib/python3.12/site-packages/polars/dataframe/frame.py:10498(select)
+     2160    0.002    0.000    0.135    0.000 /work/src/v8_next/experts/pandf.py:94(observe_pandf)
+     2160    0.001    0.000    0.131    0.000 /work/src/v8_next/experts/measuring.py:65(observe_measuring)
+     2160    0.001    0.000    0.131    0.000 /work/src/v8_next/experts/trend.py:31(observe_trend_depth)
+     2160    0.002    0.000    0.127    0.000 /work/src/v8_next/experts/reclaim.py:36(observe_breakout_retest)
+     2160    0.001    0.000    0.124    0.000 /work/src/v8_next/experts/failed_moves.py:79(observe_failed_move)
+      123    0.000    0.000    0.122    0.001 /work/src/v8_next/experts/measuring.py:23(measuring_setup)
+      123    0.003    0.000    0.121    0.001 /work/src/v8_next/experts/patterns.py:44(pattern_structures)
+      123    0.008    0.000    0.119    0.001 /work/src/v8_next/experts/pandf.py:59(pandf_setup)
+     4320    0.117    0.000    0.117    0.000 /work/src/v8_next/domain/market.py:82(__post_init__)
+      123    0.000    0.000    0.115    0.001 /work/src/v8_next/experts/failed_moves.py:22(failed_move)
+     2160    0.001    0.000    0.108    0.000 /work/src/v8_next/experts/fibonacci.py:82(observe_fib_projection)
+     2160    0.001    0.000    0.107    0.000 /work/src/v8_next/experts/fibonacci.py:55(observe_fib_retracement)
+    21054    0.015    0.000    0.106    0.000 /work/.venv/lib/python3.12/site-packages/polars/_utils/parse/expr.py:86(parse_into_list_of_expressions)
+    17379    0.010    0.000    0.105    0.000 /work/.venv/lib/python3.12/site-packages/polars/lazyframe/frame.py:5178(select_seq)
+      123    0.037    0.000    0.103    0.001 /work/src/v8_next/experts/pandf.py:20(columns)
+     2579    0.002    0.000    0.101    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/series.py:4428(arg_true)
+5158/2579    0.008    0.000    0.099    0.000 /work/.venv/lib/python3.12/site-packages/polars/functions/lazy.py:2430(arg_where)
+    361/9    0.001    0.000    0.099    0.011 <frozen importlib._bootstrap>:1349(_find_and_load)
+    361/9    0.001    0.000    0.099    0.011 <frozen importlib._bootstrap>:1304(_find_and_load_unlocked)
+    346/6    0.000    0.000    0.098    0.016 <frozen importlib._bootstrap>:911(_load_unlocked)
+    288/6    0.000    0.000    0.098    0.016 <frozen importlib._bootstrap_external>:993(exec_module)
+   821/15    0.000    0.000    0.098    0.007 <frozen importlib._bootstrap>:480(_call_with_frames_removed)
+    347/6    0.003    0.000    0.098    0.016 {built-in method builtins.exec}
+
+

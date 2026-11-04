@@ -48,6 +48,8 @@ def main() -> None:
     if args.tape:
         if args.fixture != "flat":
             parser.error("--fixture is only available without --tape")
+        if args.tape.is_dir() and (args.start_ms is not None or args.end_ms is not None):
+            parser.error("directory loader does not apply window bounds; isolate archives first")
         from v8_next.evaluation.gate_resolution import load_tape_candles
 
         candles = tuple(load_tape_candles(args.tape, limit=args.bars, instrument=args.instrument,
@@ -115,6 +117,8 @@ def main() -> None:
         "workload": workload,
         "fixture": args.fixture if not args.tape else None,
         "bars": len(candles),
+        "first_start_ns": candles[0].start_ns,
+        "last_end_ns": candles[-1].end_ns,
         "decisions": result["decisions_count"],
         "orders": len(result["order_events"]),
         "fills": len(result["fill_records"]),

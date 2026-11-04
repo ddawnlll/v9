@@ -20,12 +20,13 @@ from pathlib import Path
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--measurement", required=True, type=Path)
+    parser.add_argument("--script", choices=("ensemble", "portfolio", "research"), default="ensemble")
     parser.add_argument("args", nargs=argparse.REMAINDER)
     parsed = parser.parse_args()
     child_args = parsed.args
     if child_args and child_args[0] == "--":
         child_args = child_args[1:]
-    script = Path(__file__).with_name("ensemble_profile.py")
+    script = Path(__file__).with_name(f"{parsed.script}_profile.py")
     command = [sys.executable, str(script), *child_args]
     before = resource.getrusage(resource.RUSAGE_CHILDREN)
     start = time.perf_counter()
