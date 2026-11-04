@@ -133,9 +133,10 @@ that fails on base and passes after.
 - **Fix.** `verified_findings` counts `kind='FINDING' AND outcome='VERIFIED'`; a draft publish
   maps to the new `FindingOutcome.PENDING_REVIEW`; `completed_issues` counts distinct
   `issue_id` over `OUTCOME` rows whose outcome is in `COMPLETION_OUTCOMES`
-  (`VERIFIED`, `PENDING_REVIEW`); `pending_review` is its own reported count; and the aggregate
-  raises if `verified_findings > findings` (a query that could only break by a future edit
-  reintroducing the join).
+  (`VERIFIED`, `PENDING_REVIEW`); `pending_review` is its own reported count. The
+  `verified_findings <= findings` invariant is asserted in the tests rather than at runtime:
+  the two counts now come from disjoint predicates, so a runtime check could never fire and
+  would be an unexercised guard.
 - **Tests.** `test_efficiency_counts_a_campaign` (now `verified_findings == 1 == findings`),
   `test_verified_findings_never_exceeds_recorded_findings` (2 OUTCOME-VERIFIED/PENDING_REVIEW
   rows + 1 FINDING → `verified_findings=0`, `findings=1`, `completed_issues=2`,

@@ -610,11 +610,6 @@ class ResearchMemory:
         accepted_prs = _reported_accepted(int(totals["pr_n"]), int(totals["pr_ok"]))
         verified_findings = int(verified_row["n"])
         findings = int(findings_row["n"])
-        if verified_findings > findings:  # pragma: no cover - the query makes this impossible
-            raise ValueError(
-                "MEMORY: verified findings exceed recorded findings; the aggregate is "
-                "counting a non-FINDING row"
-            )
         per_hour = not_measured()
         if isinstance(cpu_hours.value, float) and cpu_hours.value > 0:
             per_hour = measured(verified_findings / cpu_hours.value)
