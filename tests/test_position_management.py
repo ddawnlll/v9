@@ -15,7 +15,19 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from v8_next.adapters.protection_invariants import (
+    BracketInvariantChecker,
+    Direction,
+    OrderRole,
+    ProtectionEvent,
+    ProtectionEventKind,
+    Side,
+)
+from v8_next.adapters.protection_invariants import (
+    ProtectionState as NativeProtectionState,
+)
 from v8_next.domain.decision import DecisionAction, ReasonCode, VenueOrderStatus
+from v8_next.domain.protection import ProtectionState as DomainProtectionState
 from v8_next.economics import management as management_module
 from v8_next.economics.legality import PositionPresence
 from v8_next.economics.management import (
@@ -538,7 +550,12 @@ def test_break_even_level_is_below_mark_only() -> None:
 
 @pytest.mark.parametrize(
     "state",
-    [ProtectionState.UNKNOWN, ProtectionState.REJECTED, ProtectionState.GAP],
+    [
+        ProtectionState.UNKNOWN,
+        ProtectionState.REJECTED,
+        ProtectionState.GAP,
+        ProtectionState.PARTIAL,
+    ],
 )
 def test_unreadable_or_refused_protection_is_never_reported_protected(
     state: ProtectionState,
@@ -571,6 +588,93 @@ def test_stop_rejection_carries_the_venue_and_risk_reasons() -> None:
         ReasonCode.POSITION_EXIT_REQUIRED,
     )
     assert decision.protected is False
+
+
+def test_partial_protection_is_fail_closed_never_hold_never_protected() -> None:
+    """A live stop that covers less than the position must force EXIT, not HOLD."""
+
+    decision = manage(
+        evaluation(), protection_state=ProtectionState.PARTIAL, protective_stop_price=None
+    )
+
+    assert decision.protection_state is ProtectionState.PARTIAL
+    assert decision.protected is False
+    assert decision.fail_closed is True
+    assert decision.admission_ok is False
+    assert decision.advisory.action is DecisionAction.EXIT
+    assert decision.advisory.action is not DecisionAction.HOLD
+    assert ReasonCode.RISK_DENIED in decision.advisory.reason_codes
+
+    proposal = decision.proposals[0]
+    assert proposal.kind is ProtectiveKind.PROTECTIVE_ADD
+    assert proposal.reason is ReasonCode.RISK_DENIED
+
+
+def test_protection_state_is_one_shared_enum_not_two_vocabularies() -> None:
+    assert management_module.ProtectionState is DomainProtectionState
+    assert NativeProtectionState is DomainProtectionState
+    assert ProtectionState is DomainProtectionState
+
+
+def test_a_partial_verdict_from_the_native_checker_needs_no_translation() -> None:
+    checker = BracketInvariantChecker()
+    checker.apply_all(
+        (
+            ProtectionEvent(
+                kind=ProtectionEventKind.ORDER_SUBMITTED,
+                ts_ns=1,
+                client_order_id="E-1",
+                position_id="P-1",
+                role=OrderRole.ENTRY,
+                side=Side.BUY,
+                quantity=D("2"),
+                reduce_only=False,
+                direction=Direction.LONG,
+            ),
+            ProtectionEvent(
+                kind=ProtectionEventKind.FILL,
+                ts_ns=2,
+                client_order_id="E-1",
+                position_id="P-1",
+                role=OrderRole.ENTRY,
+                side=Side.BUY,
+                price=D("100"),
+                quantity=D("2"),
+                filled_quantity=D("1"),
+                reduce_only=False,
+                direction=Direction.LONG,
+            ),
+            ProtectionEvent(
+                kind=ProtectionEventKind.ORDER_SUBMITTED,
+                ts_ns=3,
+                client_order_id="S-1",
+                position_id="P-1",
+                role=OrderRole.STOP,
+                side=Side.SELL,
+                price=D("95"),
+                quantity=D("0.5"),
+                reduce_only=True,
+            ),
+            ProtectionEvent(
+                kind=ProtectionEventKind.ACK,
+                ts_ns=4,
+                client_order_id="S-1",
+                position_id="P-1",
+                role=OrderRole.STOP,
+                side=Side.SELL,
+                price=D("95"),
+                quantity=D("0.5"),
+                reduce_only=True,
+            ),
+        )
+    )
+    assert checker.state is ProtectionState.PARTIAL
+
+    # The producer's verdict is the consumer's argument: same object, no adapter.
+    decision = manage(evaluation(), protection_state=checker.state, protective_stop_price=None)
+    assert decision.protection_state is ProtectionState.PARTIAL
+    assert decision.fail_closed is True
+    assert decision.advisory.action is DecisionAction.EXIT
 
 
 def test_unprotected_position_proposes_restoring_the_original_stop() -> None:

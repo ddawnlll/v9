@@ -431,8 +431,10 @@ def resolve_metadata(
 
     Rules, all fail closed:
 
-    * records available after ``as_of_ns`` are invisible;
-    * one ``metadata_version`` carrying two different term sets is contradictory evidence;
+    * records available after ``as_of_ns`` are invisible — they are excluded *before*
+      any contradiction scan, so a future record cannot change an as-of verdict;
+    * one ``metadata_version`` carrying two different term sets among the records
+      available at ``as_of_ns`` is contradictory evidence;
     * two different term sets sharing the newest availability stamp leave the as-of version
       ambiguous — ``CONTRACT_CHANGED`` (never "pick one");
     * otherwise the newest available version wins (deterministic tie-break on the version
@@ -452,6 +454,10 @@ def resolve_metadata(
 
     terms_by_version: dict[str, set[str]] = {}
     for record in records:
+        if record.available_at > as_of_ns:
+            # A record the decision could not have seen cannot make the as-of
+            # terms contradictory; it is not evidence at this instant.
+            continue
         terms_by_version.setdefault(record.metadata_version, set()).add(record.contract_digest)
     if any(len(digests) > 1 for digests in terms_by_version.values()):
         return MetadataResolution(

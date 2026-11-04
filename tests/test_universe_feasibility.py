@@ -215,6 +215,54 @@ def test_same_version_with_two_term_sets_is_contract_changed() -> None:
     assert verdict.reasons == (UniverseReason.CONTRADICTORY_METADATA_VERSION,)
 
 
+def test_future_record_reusing_the_version_label_cannot_flip_an_as_of_verdict() -> None:
+    """The audit's reproduction: a not-yet-knowable record must not contradict the past."""
+    as_of = T0 + 10
+    available = _meta(metadata_version="v1", available_at=T0, quote_volume_as_of_ns=T0)
+    future = _meta(
+        metadata_version="v1",
+        available_at=T0 + 110,
+        tick_size=Decimal("0.05"),
+        quote_volume_as_of_ns=T0,
+    )
+
+    verdict = eligibility(available, as_of_ns=as_of, history=(available, future))
+    assert verdict.status is EligibilityStatus.ELIGIBLE
+    assert verdict.reasons == (UniverseReason.ELIGIBLE,)
+    resolution = resolve_metadata((available, future), as_of_ns=as_of)
+    assert resolution.status is ResolutionStatus.RESOLVED
+    assert resolution.record is not None
+    assert resolution.record.available_at == T0
+
+
+def test_contradiction_scan_is_bounded_by_the_as_of_instant() -> None:
+    as_of = T0 + 10
+    first = _meta(metadata_version="v1", available_at=T0, quote_volume_as_of_ns=T0)
+    at_cut = _meta(
+        metadata_version="v1",
+        available_at=as_of,
+        tick_size=Decimal("0.05"),
+        quote_volume_as_of_ns=T0,
+    )
+    one_nanosecond_late = _meta(
+        metadata_version="v1",
+        available_at=as_of + 1,
+        tick_size=Decimal("0.05"),
+        quote_volume_as_of_ns=T0,
+    )
+
+    # A contradiction among records the decision *could* see is still fail-closed.
+    at_cut_verdict = eligibility(first, as_of_ns=as_of, history=(first, at_cut))
+    assert at_cut_verdict.status is EligibilityStatus.CONTRACT_CHANGED
+    assert at_cut_verdict.reasons == (UniverseReason.CONTRADICTORY_METADATA_VERSION,)
+
+    # One nanosecond later it is future evidence and cannot poison the verdict.
+    assert (
+        eligibility(first, as_of_ns=as_of, history=(first, one_nanosecond_late)).status
+        is EligibilityStatus.ELIGIBLE
+    )
+
+
 def test_stale_version_supplied_against_history_is_contract_changed() -> None:
     v1 = _meta(metadata_version="v1", available_at=T0 - SECOND)
     v2 = _meta(metadata_version="v2", available_at=T0 + SECOND, tick_size=Decimal("0.02"))

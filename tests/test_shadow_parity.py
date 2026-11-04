@@ -21,17 +21,20 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from v8_next.belief import BeliefStatus, MarketBeliefV1, UncertaintyState
 from v8_next.domain.decision import (
     DecisionAction,
     OpportunityLifecycle,
     ReasonCode,
     VenueOrderStatus,
 )
+from v8_next.domain.observation import QualityState
 from v8_next.economics.legality import LegalActionTable, PositionPresence
-from v8_next.economics.policy import CapacityState
+from v8_next.economics.policy import CapacityState, TraderDecisionPolicy
 from v8_next.evaluation import shadow_parity as sp
 from v8_next.evaluation.resource_baseline import GateStatus
-from v8_next.telemetry.decisions import DecisionReceipt
+from v8_next.telemetry.decisions import DecisionLedger, DecisionReceipt, ReceiptInputs
+from v8_next.telemetry.identity import canonical_digest
 
 NS = 1_000_000_000
 M15 = 15 * 60 * NS
@@ -242,8 +245,50 @@ def _script() -> sp.ReplayScript:
 SCRIPT = _script()
 
 
-def _capture(state: sp.PolicyState) -> sp.ReplaySignature:
-    return sp.capture_replay(SCRIPT, policy_state=state)
+class RecordingNativeSession:
+    """A native sink the shadow pass can actually reach.
+
+    Its digest is a content digest of every ``submit``/``cancel`` it has observed,
+    so an injected adaptive step that touches the sink changes the digest and the
+    zero-mutation gate can observe it. This is the double that makes
+    :class:`sp.ShadowMutationError` reachable; a fixture digest alone never could.
+    """
+
+    def __init__(self, label: str = "paper-session-1") -> None:
+        self._label = label
+        self._calls: list[tuple[str, str]] = []
+        self.digest_calls = 0
+
+    @property
+    def calls(self) -> tuple[tuple[str, str], ...]:
+        return tuple(self._calls)
+
+    def digest(self) -> str:
+        self.digest_calls += 1
+        return canonical_digest(
+            "test.native-session.v1",
+            {"label": self._label, "calls": [list(call) for call in self._calls]},
+        )
+
+    def submit(self, intent: object) -> None:
+        self._calls.append(("submit", str(intent)))
+
+    def cancel(self, client_order_id: str) -> None:
+        self._calls.append(("cancel", client_order_id))
+
+
+def _capture(
+    state: sp.PolicyState,
+    *,
+    session: RecordingNativeSession | None = None,
+) -> sp.ReplaySignature:
+    if state == sp.POLICY_OFF:
+        return sp.capture_replay(SCRIPT, policy_state=state)
+    return sp.capture_replay(
+        SCRIPT,
+        policy_state=state,
+        native_session=session if session is not None else RecordingNativeSession(),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -332,11 +377,248 @@ def test_shadow_decisions_are_verified_advisory_and_legal() -> None:
     assert hold.action is DecisionAction.HOLD
 
 
+# --------------------------------------------------------------------------- #
+# unreadable belief is never presented as fresh
+# --------------------------------------------------------------------------- #
+def _requests() -> list[sp.DecisionRequest]:
+    """The policy request for every cut, assembled exactly as the shadow pass does."""
+    previous: MarketBeliefV1 | None = None
+    requests: list[sp.DecisionRequest] = []
+    for cut in sorted(SCRIPT.cuts, key=lambda row: row.decision_time_ns):
+        belief, _view = sp._belief_at(SCRIPT, cut, previous)
+        previous = belief
+        requests.append(sp._decision_request(SCRIPT, cut, belief))
+    return requests
+
+
+def _unreadable(belief: MarketBeliefV1) -> MarketBeliefV1:
+    """The same belief, but its aggregate quality is unreadable while a regime is named.
+
+    ``uncertainty`` is left at its original (permissive) band on purpose: the
+    ``BELIEF_*`` gate alone must block new risk, not the uncertainty ladder.
+    """
+    payload = belief.model_dump()
+    payload.update(
+        {
+            "status": BeliefStatus.UNKNOWN,
+            "quality": QualityState.CONTRADICTORY,
+            "origin": "UPDATED",
+            "transition": None,
+            "version_hash": "",
+        }
+    )
+    return MarketBeliefV1.model_validate(payload)
+
+
+def test_unknown_belief_can_never_enter_or_bare_hold() -> None:
+    policy = TraderDecisionPolicy()
+    previous: MarketBeliefV1 | None = None
+    entry_cut = SCRIPT.cuts[1]
+    for cut in sorted(SCRIPT.cuts, key=lambda row: row.decision_time_ns):
+        belief, _view = sp._belief_at(SCRIPT, cut, previous)
+        previous = belief
+        if cut is not entry_cut:
+            continue
+        fresh_request = sp._decision_request(SCRIPT, cut, belief)
+        assert policy.evaluate(fresh_request).action is DecisionAction.ENTER
+
+        unknown = _unreadable(belief)
+        assert sp._belief_view(unknown).stale is True
+        assert sp._belief_view(unknown).abstain is False
+        decision = policy.evaluate(sp._decision_request(SCRIPT, cut, unknown))
+        assert decision.action not in {DecisionAction.ENTER, DecisionAction.HOLD}
+        belief_reasons = [
+            code for code in decision.reason_codes if code.value.startswith("BELIEF_")
+        ]
+        assert belief_reasons, decision.reason_codes
+        assert ReasonCode.BELIEF_STALE in decision.reason_codes
+
+
+def test_unknown_belief_on_an_open_position_cannot_hold() -> None:
+    policy = TraderDecisionPolicy()
+    previous: MarketBeliefV1 | None = None
+    open_cut = SCRIPT.cuts[2]
+    for cut in sorted(SCRIPT.cuts, key=lambda row: row.decision_time_ns):
+        belief, _view = sp._belief_at(SCRIPT, cut, previous)
+        previous = belief
+        if cut is not open_cut:
+            continue
+        assert policy.evaluate(sp._decision_request(SCRIPT, cut, belief)).action is (
+            DecisionAction.HOLD
+        )
+
+        unknown = _unreadable(belief)
+        decision = policy.evaluate(sp._decision_request(SCRIPT, cut, unknown))
+        assert decision.action is not DecisionAction.HOLD
+        assert ReasonCode.BELIEF_STALE in decision.reason_codes
+
+
+def _belief_with(belief: MarketBeliefV1, **updates: object) -> MarketBeliefV1:
+    """The same belief content under a different status/quality (revalidated)."""
+    payload = belief.model_dump()
+    payload.update({"version_hash": "", **updates})
+    return MarketBeliefV1.model_validate(payload)
+
+
+def test_every_non_fresh_status_is_unusable_and_abstain_keeps_its_branch() -> None:
+    previous: MarketBeliefV1 | None = None
+    belief, _view = sp._belief_at(SCRIPT, SCRIPT.cuts[2], previous)
+    assert belief.status is BeliefStatus.FRESH, belief.status
+
+    fresh = sp._belief_view(belief)
+    assert (fresh.stale, fresh.abstain) == (False, False)
+
+    stale = sp._belief_view(
+        _belief_with(
+            belief,
+            status=BeliefStatus.STALE,
+            quality=QualityState.STALE,
+            uncertainty=UncertaintyState.UNKNOWN,
+        )
+    )
+    assert (stale.stale, stale.abstain) == (True, False)
+
+    unknown = sp._belief_view(_unreadable(belief))
+    assert (unknown.stale, unknown.abstain) == (True, False)
+
+    abstained = sp._belief_view(
+        _belief_with(
+            belief,
+            status=BeliefStatus.ABSTAIN,
+            quality=QualityState.MISSING,
+            uncertainty=UncertaintyState.UNKNOWN,
+            regime_label="UNKNOWN",
+            regime_candidate="UNKNOWN",
+            candidate_streak=0,
+            missing_inputs=("bars",),
+            transition=None,
+        )
+    )
+    assert (abstained.stale, abstained.abstain) == (False, True)
+
+
+# --------------------------------------------------------------------------- #
+# receipts carry the constraints that shaped the decision
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    ("code", "field"),
+    (
+        ("VENUE_UNKNOWN", "constraints"),
+        ("POSITION_OPEN", "reason_codes"),
+        ("SCALE_IN_DISABLED", "reason_codes"),
+    ),
+)
+def test_receipt_carries_the_provenance_that_shaped_the_decision(code: str, field: str) -> None:
+    receipts = sp.shadow_decisions(SCRIPT)
+    requests = _requests()
+    policy = TraderDecisionPolicy()
+    assert len(receipts) == len(requests)
+
+    matched: list[DecisionReceipt] = []
+    for receipt, request in zip(receipts, requests, strict=True):
+        explanation = policy.explain(request)
+        # The receipt's active-constraint tuple is the policy's, not a placeholder.
+        assert receipt.constraints == explanation.constraints
+        assert receipt.reason_codes == explanation.reason_codes
+        if code in getattr(receipt, field):
+            matched.append(receipt)
+
+    assert len(matched) == 1, (code, [tuple(getattr(r, field)) for r in receipts])
+
+
+def test_receipt_digest_covers_the_constraint_set() -> None:
+    decision = TraderDecisionPolicy().evaluate(_requests()[3])
+
+    plain = DecisionLedger()
+    plain.append(decision, ReceiptInputs())
+    constrained = DecisionLedger()
+    constrained.append(decision, ReceiptInputs(constraints=("VENUE_UNKNOWN",)))
+
+    unconstrained_receipt = plain.receipts()[0]
+    constrained_receipt = constrained.receipts()[0]
+    assert unconstrained_receipt.constraints == ()
+    assert constrained_receipt.constraints == ("VENUE_UNKNOWN",)
+    assert constrained_receipt.digest != unconstrained_receipt.digest
+    assert constrained_receipt.verify() and unconstrained_receipt.verify()
+
+
 def test_shadow_replay_is_deterministic_across_repeats() -> None:
     first = _capture(sp.POLICY_SHADOW)
     second = _capture(sp.POLICY_SHADOW)
     assert sp.pin(first) == sp.pin(second)
     assert first.decision_ids == second.decision_ids
+
+
+# --------------------------------------------------------------------------- #
+# the zero-native-mutation gate observes a real sink
+# --------------------------------------------------------------------------- #
+def test_shadow_capture_requires_an_observable_native_sink() -> None:
+    with pytest.raises(sp.ShadowParityError) as missing:
+        sp.capture_replay(SCRIPT, policy_state=sp.POLICY_SHADOW)
+    assert missing.value.code == "SHADOW_SINK_MISSING"
+
+    class MuteSession:
+        def digest(self) -> str:
+            return "not-a-digest"
+
+        def submit(self, intent: object) -> None:  # pragma: no cover - never reached
+            raise AssertionError("a shadow pass must not submit")
+
+        def cancel(self, client_order_id: str) -> None:  # pragma: no cover - never reached
+            raise AssertionError("a shadow pass must not cancel")
+
+    with pytest.raises(sp.ShadowParityError) as malformed:
+        sp.capture_replay(SCRIPT, policy_state=sp.POLICY_SHADOW, native_session=MuteSession())
+    assert malformed.value.code == "SHADOW_SINK_MALFORMED"
+    assert malformed.value.reasons == ("SHADOW_SINK_MALFORMED:before",)
+
+
+def test_clean_shadow_pass_reads_the_sink_twice_and_leaves_it_alone() -> None:
+    session = RecordingNativeSession()
+    shadow = sp.capture_replay(SCRIPT, policy_state=sp.POLICY_SHADOW, native_session=session)
+
+    # The gate provably observed the sink, before and after the pass.
+    assert session.digest_calls == 2
+    assert session.calls == ()
+    assert shadow.decisions is not None
+    assert len(shadow.decision_ids) == len(SCRIPT.cuts)
+
+
+def test_mutating_adaptive_step_is_caught_by_the_native_sink_gate() -> None:
+    """The gate fails: an adaptive step that submits is detected, not argued away."""
+
+    def mutating_step(
+        events: sp.ReplayScript, session: sp.NativeSession
+    ) -> tuple[DecisionReceipt, ...]:
+        session.submit({"action": "ENTER"})
+        return sp.shadow_decisions(events)
+
+    session = RecordingNativeSession()
+    with pytest.raises(sp.ShadowMutationError) as caught:
+        sp.capture_replay(
+            SCRIPT,
+            policy_state=sp.POLICY_SHADOW,
+            native_session=session,
+            shadow_step=mutating_step,
+        )
+    assert caught.value.reasons == ("DIGEST_DRIFT:native_session",)
+    assert session.calls == (("submit", "{'action': 'ENTER'}"),)
+
+
+def test_cancelling_adaptive_step_is_caught_by_the_native_sink_gate() -> None:
+    def cancelling_step(
+        events: sp.ReplayScript, session: sp.NativeSession
+    ) -> tuple[DecisionReceipt, ...]:
+        session.cancel("O-1")
+        return sp.shadow_decisions(events)
+
+    with pytest.raises(sp.ShadowMutationError):
+        sp.capture_replay(
+            SCRIPT,
+            policy_state=sp.POLICY_SHADOW,
+            native_session=RecordingNativeSession(),
+            shadow_step=cancelling_step,
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -369,7 +651,9 @@ def test_reordered_fixture_keeps_native_digests_and_decision_ids_stable() -> Non
     sp.assert_pinned(shuffled_off, sp.pin(baseline))
 
     shadow = _capture(sp.POLICY_SHADOW)
-    shuffled_shadow = sp.capture_replay(reordered, policy_state=sp.POLICY_SHADOW)
+    shuffled_shadow = sp.capture_replay(
+        reordered, policy_state=sp.POLICY_SHADOW, native_session=RecordingNativeSession()
+    )
     assert shuffled_shadow.decision_ids == shadow.decision_ids
     assert sp.pin(shuffled_shadow) == sp.pin(shadow)
     sp.assert_shadow_unmutated(shuffled_off, shuffled_shadow)
@@ -561,7 +845,9 @@ def test_shadow_helper_refuses_non_shadow_or_foreign_streams() -> None:
 def test_shadow_without_cuts_is_not_evidence() -> None:
     no_cuts = SCRIPT.model_copy(update={"cuts": ()})
     with pytest.raises(sp.ShadowNotExercised):
-        sp.capture_replay(no_cuts, policy_state=sp.POLICY_SHADOW)
+        sp.capture_replay(
+            no_cuts, policy_state=sp.POLICY_SHADOW, native_session=RecordingNativeSession()
+        )
     # A policy-off capture needs no cuts: it never evaluates the adaptive chain.
     assert sp.capture_replay(no_cuts, policy_state=sp.POLICY_OFF).native_missing() == ()
 
@@ -592,7 +878,9 @@ def test_capture_refuses_foreign_inputs_and_foreign_cut_instruments() -> None:
     foreign_cut = SCRIPT.cuts[0].model_copy(update={"instrument_id": "ETHUSDT-PERP.BINANCE"})
     foreign = SCRIPT.model_copy(update={"cuts": (foreign_cut, *SCRIPT.cuts[1:])})
     with pytest.raises(sp.ShadowParityError) as mismatch:
-        sp.capture_replay(foreign, policy_state=sp.POLICY_SHADOW)
+        sp.capture_replay(
+            foreign, policy_state=sp.POLICY_SHADOW, native_session=RecordingNativeSession()
+        )
     assert mismatch.value.code == "CUT_INSTRUMENT_MISMATCH"
     # A policy-off capture has no adaptive chain, so it never reads the cut's instrument.
     assert sp.capture_replay(foreign, policy_state=sp.POLICY_OFF).native_missing() == ()

@@ -28,6 +28,14 @@ Field semantics, pinned by construction (unknown values raise ``ValueError``):
 * ``reduce_only`` is the order's native reduce-only flag. Protective legs are expected
   to carry it; a protective leg that can add risk is an invariant violation.
 
+Protection vocabulary
+---------------------
+:class:`ProtectionState` is not defined here: it is the canonical
+:class:`v8_next.domain.protection.ProtectionState`, imported and re-exported so the
+producer of a verdict and its consumer (``v8_next.economics.management``) cannot
+drift into two vocabularies. ``PARTIAL`` in particular must survive the join: it is
+the state that forces a protective resize downstream.
+
 Invariants
 ----------
 1. The live, acknowledged stop quantity MUST equal the actual filled position quantity.
@@ -82,6 +90,7 @@ from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Final
 
+from v8_next.domain.protection import ProtectionState
 from v8_next.telemetry.identity import canonical_digest
 
 __all__ = [
@@ -99,23 +108,6 @@ __all__ = [
 
 #: Exact decimal zero. Money and quantities are ``Decimal`` only; floats are rejected.
 ZERO: Final[Decimal] = Decimal("0")
-
-
-class ProtectionState(StrEnum):
-    """The protection verdict for one native position."""
-
-    #: Open position, correctly sized, acknowledged, reduce-only protection.
-    PROTECTED = "PROTECTED"
-    #: Open position with no live loss protection (or a flat position).
-    UNPROTECTED = "UNPROTECTED"
-    #: Protection exists but its quantity does not equal the filled position quantity.
-    PARTIAL = "PARTIAL"
-    #: A protective order was rejected; nothing rejected may be read as protection.
-    REJECTED = "REJECTED"
-    #: A protective order, its side, its price or the position itself is unreadable.
-    UNKNOWN = "UNKNOWN"
-    #: A protective order is live but has no venue acknowledgement.
-    GAP = "GAP"
 
 
 class ProtectionEventKind(StrEnum):
