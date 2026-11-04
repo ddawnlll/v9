@@ -1,8 +1,11 @@
 """Native-backed causal feature calculations, with explicit warmup and seeds."""
 
 import math
+from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
+from functools import wraps
+from typing import Any
 
 import polars as pl
 
@@ -39,11 +42,15 @@ class _LazyBundle:
     close/high/low/volume access builds once; the other 27 readers reuse.
     """
 
-    __slots__ = ("frame", "built")
+    __slots__ = ("frame", "built", "memo")
 
     def __init__(self, frame: CausalFrame) -> None:
         self.frame = frame
         self.built: BarFeatureBundle | None = None
+        #: Per-bar indicator memo, keyed by (function, argument identity).
+        #: Cleared with the bundle, so no value outlives the bar it was
+        #: computed from -- causal availability is unchanged by construction.
+        self.memo: dict[tuple[Any, ...], Any] = {}
 
     def get(self) -> BarFeatureBundle:
         built = self.built
@@ -76,6 +83,41 @@ def build_bar_features(frame: CausalFrame) -> BarFeatureBundle:
         lows_finite=bool(lows.is_finite().all()),
         volumes_finite=bool(volumes.is_finite().all()),
     )
+
+
+_MISS = object()
+
+
+def per_bar_memo[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    """Compute a pure indicator once per bar, however many experts ask for it.
+
+    The cache lives on the per-bar bundle that ``observe_all_28`` installs, so a
+    value can never be reused across bars: the key includes the identity of the
+    first argument (a series owned by that bar's bundle) and the remaining
+    arguments, and the whole mapping dies with the bar. Outside a bundle the
+    function runs unwrapped, so direct callers (tests, research scripts) see the
+    unsimplified path.
+
+    Only pure functions returning immutable values may use this: a cached value
+    is returned to every later caller in the same bar.
+    """
+    name = function.__name__
+
+    @wraps(function)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        lazy = _ACTIVE_LAZY.get()
+        if lazy is None or not args:
+            return function(*args, **kwargs)
+        key = (name, id(args[0]), args[1:], tuple(sorted(kwargs.items())))
+        memo = lazy.memo
+        cached: Any = memo.get(key, _MISS)
+        if cached is _MISS:
+            cached = function(*args, **kwargs)
+            memo[key] = cached
+        result: R = cached
+        return result
+
+    return wrapper
 
 
 def _bundled(frame: CausalFrame) -> BarFeatureBundle | None:
@@ -149,6 +191,7 @@ def volume_series(frame: CausalFrame) -> pl.Series:
     return s
 
 
+@per_bar_memo
 def wilder_rsi(closes: pl.Series, period: int = 14) -> tuple[float | None, ...]:
     """SMA seed over period deltas, then Wilder EMA through Polars.
 
@@ -179,6 +222,7 @@ def wilder_rsi(closes: pl.Series, period: int = 14) -> tuple[float | None, ...]:
     return (None,) * period + tuple(float(v) for v in values)
 
 
+@per_bar_memo
 def trend_emas(frame: CausalFrame) -> tuple[float, float]:
     closes = close_series(frame)
     if len(closes) < 20:
@@ -189,6 +233,7 @@ def trend_emas(frame: CausalFrame) -> tuple[float, float]:
     )
 
 
+@per_bar_memo
 def significant_swings(frame: CausalFrame, strength: int = 10) -> tuple[int | None, int | None]:
     """Latest strict, confirmed pivots with bar range >= current mean range14.
 
@@ -222,6 +267,7 @@ def significant_swings(frame: CausalFrame, strength: int = 10) -> tuple[int | No
     return found[0], found[1]
 
 
+@per_bar_memo
 def macd_line(frame: CausalFrame) -> float:
     """Source 34-bar availability; first-close EMA12 minus EMA26."""
     if len(frame.candles) < 34:
@@ -354,6 +400,7 @@ def wilder_atr_series(
     return [None] * period + [numeric(v) for v in smoothed]
 
 
+@per_bar_memo
 def mean_range(frame: CausalFrame, period: int = 14) -> float:
     """Vectorized mean high-low range over the latest period bars."""
     if len(frame.candles) < period:

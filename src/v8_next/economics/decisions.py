@@ -72,7 +72,12 @@ def stance_record(stance: Stance) -> dict[str, Any]:
     field, with no recursion and no copy. ``test_perf_hot_paths`` pins that
     equality for all 28 canonical experts.
     """
-    return {name: getattr(stance, name) for name in STANCE_FIELDS}
+    # ``dict(stance.__dict__)`` is one C-level copy of the field mapping the
+    # generated ``__init__`` filled in field order, instead of ten ``getattr``
+    # plus ten inserts per stance on a path that runs 28 times per bar. Field
+    # order and values are unchanged; ``test_perf_hot_paths`` pins equality with
+    # ``dataclasses.asdict`` and ``test_performance_parity`` pins the ordering.
+    return dict(stance.__dict__)
 
 
 def opportunity_record(opportunity: Opportunity) -> dict[str, Any]:
@@ -330,9 +335,12 @@ def stance_with(
     flat frozen record, so rebuilding it from its own instance dict is equivalent --
     pinned field-by-field against ``replace`` by ``test_perf_hot_paths``.
     """
-    metadata: dict[str, Any] = {}
+    values = stance.__dict__.copy()
     if variant_id is not None:
-        metadata["variant_id"] = variant_id
+        values["variant_id"] = variant_id
     if version is not None:
-        metadata["version"] = version
-    return type(stance)(**{**stance.__dict__, **metadata})
+        values["version"] = version
+    cls = type(stance)
+    stamped = cls.__new__(cls)
+    stamped.__dict__.update(values)
+    return stamped

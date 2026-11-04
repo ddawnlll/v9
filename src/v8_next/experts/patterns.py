@@ -7,8 +7,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from v8_next.domain.market import CausalFrame
+from v8_next.experts.features import per_bar_memo
 
 
+@per_bar_memo
 def pattern_pivots(frame: CausalFrame, *, high: bool, strength: int = 3) -> tuple[int, ...]:
     if strength < 1:
         raise ValueError("positive pivot strength required")
