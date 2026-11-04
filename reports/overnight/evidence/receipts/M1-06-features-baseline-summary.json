@@ -1,0 +1,59 @@
+{
+  "parity": null,
+  "receipt": {
+    "cache": null,
+    "code_sha": "e0871451c949ce563487d9e0b8072b30f30176c3",
+    "cold": {
+      "max_wall_s": 4.554001625001547,
+      "median_wall_s": 4.554001625001547,
+      "min_wall_s": 4.554001625001547,
+      "p95_wall_s": 4.554001625001547,
+      "refusal_reason": null,
+      "repetitions": 1,
+      "status": "MEASURED"
+    },
+    "consumers": 2,
+    "issue_id": "M1-06",
+    "memory": {
+      "peak_rss_bytes": 178372608,
+      "refusal_reason": null,
+      "ru_maxrss_raw": 178372608,
+      "ru_maxrss_unit": "bytes",
+      "status": "MEASURED"
+    },
+    "mode": "baseline",
+    "notes": [
+      "values_digest compares the five shared specs bar by bar against the unbundled full-prefix kernels."
+    ],
+    "reads": 21210,
+    "receipt_version": "v9.resource-baseline.1",
+    "refusals": {},
+    "runtime": {
+      "nautilus_trader": "2.0.0rc4",
+      "numpy": "2.5.3",
+      "polars": "1.44.1",
+      "pydantic": "2.13.5",
+      "python": "3.12.12"
+    },
+    "tape": {
+      "bars": 2160,
+      "bytes": 1340416,
+      "instrument_id": "BTCUSDT-PERP.BINANCE",
+      "path": "research/tape/btcusdt-1h-2025Q1/tape.jsonl",
+      "refusal_reason": null,
+      "sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7",
+      "status": "MEASURED"
+    },
+    "values_digest": "abf8b0c0b8c39419135a61d8d97b402cc1ba419758f9ac95a036944d934f06db",
+    "warm": {
+      "max_wall_s": 4.653707374993246,
+      "median_wall_s": 4.584498875003192,
+      "min_wall_s": 4.534832334000384,
+      "p95_wall_s": 4.653707374993246,
+      "refusal_reason": null,
+      "repetitions": 5,
+      "status": "MEASURED"
+    },
+    "workload": "shared feature values (5 specs), per-bar reads over real tape"
+  }
+}

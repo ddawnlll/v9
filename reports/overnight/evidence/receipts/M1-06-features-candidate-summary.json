@@ -1,0 +1,72 @@
+{
+  "parity": "PASS",
+  "receipt": {
+    "cache": {
+      "bars_observed": 0,
+      "computations": 10605,
+      "entries": 512,
+      "estimated_bytes": 3483648,
+      "evictions": 10093,
+      "extensions": 2120,
+      "hits": 10605,
+      "invalidations": 0,
+      "max_entries": 512,
+      "misses": 10605,
+      "reseeds": 0,
+      "version": "v9.feature-cache.1"
+    },
+    "code_sha": "e0871451c949ce563487d9e0b8072b30f30176c3",
+    "cold": {
+      "max_wall_s": 0.8112652080017142,
+      "median_wall_s": 0.8112652080017142,
+      "min_wall_s": 0.8112652080017142,
+      "p95_wall_s": 0.8112652080017142,
+      "refusal_reason": null,
+      "repetitions": 1,
+      "status": "MEASURED"
+    },
+    "consumers": 2,
+    "issue_id": "M1-06",
+    "memory": {
+      "peak_rss_bytes": 194461696,
+      "refusal_reason": null,
+      "ru_maxrss_raw": 194461696,
+      "ru_maxrss_unit": "bytes",
+      "status": "MEASURED"
+    },
+    "mode": "candidate",
+    "notes": [
+      "values_digest compares the five shared specs bar by bar against the unbundled full-prefix kernels."
+    ],
+    "reads": 21210,
+    "receipt_version": "v9.resource-baseline.1",
+    "refusals": {},
+    "runtime": {
+      "nautilus_trader": "2.0.0rc4",
+      "numpy": "2.5.3",
+      "polars": "1.44.1",
+      "pydantic": "2.13.5",
+      "python": "3.12.12"
+    },
+    "tape": {
+      "bars": 2160,
+      "bytes": 1340416,
+      "instrument_id": "BTCUSDT-PERP.BINANCE",
+      "path": "research/tape/btcusdt-1h-2025Q1/tape.jsonl",
+      "refusal_reason": null,
+      "sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7",
+      "status": "MEASURED"
+    },
+    "values_digest": "abf8b0c0b8c39419135a61d8d97b402cc1ba419758f9ac95a036944d934f06db",
+    "warm": {
+      "max_wall_s": 0.8047899160010274,
+      "median_wall_s": 0.7994567499990808,
+      "min_wall_s": 0.7945221660047537,
+      "p95_wall_s": 0.8047899160010274,
+      "refusal_reason": null,
+      "repetitions": 5,
+      "status": "MEASURED"
+    },
+    "workload": "shared feature values (5 specs), per-bar reads over real tape"
+  }
+}
