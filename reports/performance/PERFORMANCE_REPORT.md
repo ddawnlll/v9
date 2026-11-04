@@ -26,7 +26,12 @@ real Binance hourly tape from the monograph's BTC development window, 2025-01-01
 | Maximum RAM (OS high-water mark) | **240.7 MiB** single leg; **546.9 MiB** ten legs |
 | Average CPU utilisation | **53.2 %** of the 2-vCPU quota (single leg); **50.9 %** (ten legs) |
 | Bars/s throughput | **772.8 bars/s** single leg; **1,573.4 leg-bars/s** over ten legs (21,600 bars in 13.7 s) |
-| Five largest bottlenecks | 1) per-expert full-history indicator recomputation 62.5 %; 2) full-prefix `CausalFrame` construction with cache re-validation 19.5 %; 3) full-prefix `continuous` scan 18.2 %; 4) full-prefix `__post_init__` validation 9.1 % (self); 5) per-expert dispatch/scan-helper machinery 16.9 % (self, combined) |
+| Five largest bottlenecks (pre-optimisation) | 1) per-expert full-history indicator recomputation 62.5 %; 2) full-prefix `CausalFrame` construction with cache re-validation 19.5 %; 3) full-prefix `continuous` scan 18.2 %; 4) full-prefix `__post_init__` validation 9.1 % (self); 5) per-expert dispatch/scan-helper machinery 16.9 % (self, combined) |
+
+> **After optimisation (§12)**: the same workloads now run **1.70×** (single leg) and **2.36×**
+> (ten legs) faster with byte-identical output, and ten-leg peak RSS is 9.8 % lower. Those figures
+> were measured on the host after the measurement container was removed, so they are a *ratio*, not
+> a revision of the table above — see §12.1.
 
 Three findings dominate everything else:
 
@@ -414,3 +419,107 @@ regenerated into a temporary directory by `reproduce.sh`; only their text summar
 Prior investigation directories (`reports/performance/20261104T1*/`) are retained unchanged as
 branch history and are cited where this report relies on them (the allocation snapshot in §3 and the
 Goose predicate comparison in §8).
+
+---
+
+## 12. Optimisation results — same output, less compute
+
+Sections 1–11 benchmark the system as it was. This section records what was then changed, what it
+bought, and what had to be rejected because it could not be proved byte-identical.
+
+**Hard constraint**: every change had to leave the backtest output bit-identical — decisions, fills,
+opened/closed positions, opportunity-book transitions and audit events. That is enforced by a frozen
+digest gate, not by inspection: `parity_capture.py` replays the unmodified production adapters and
+hashes every section; the baselines in `parity/baseline/` were captured from commit `bfa7613`
+**before** any optimisation and are never regenerated from optimised code. `parity_diff.py` fails
+closed on any divergence. B0 and B1 compare 16 sections including the full audit stream (2,742 and
+7,995 events); B3 compares 30 sections covering 21,600 decisions.
+
+### 12.1 Measurement basis — read this before comparing numbers
+
+The A/B below was measured **on the host** (Apple M3 Pro, macOS, native, no container), each stage
+back to back in a single session with one discarded warm-up and three fresh processes per workload
+per stage. The 2 vCPU / 4 GiB container used in §1–§11 was deleted at the user's request, so the
+absolute figures here are **not** comparable with §1–§11 and must not be mixed with them: only the
+ratios are meaningful, and they are host ratios. Container measurements remain the only
+constrained-resource and memory-timeline evidence.
+
+Workloads are the same real tape: B1 = BTCUSDT Jan–Mar 2025 (2,160 bars), B3 = ten symbols
+Jan–Mar 2025 (21,600 leg-bars) with funding settlements.
+
+### 12.2 What changed
+
+| # | Change | Mechanism | Parity argument |
+|---|---|---|---|
+| 1 | Incremental causal frame | `extend_causal_frame` appends one candle to the previous frame; continuity is carried forward (`_continuous_hint`) instead of rescanned; anything doubtful returns `None` and the old full path runs | the fast path only accepts the exact next candle of the caller-owned prefix; `tests/test_domain_frame_incremental.py` pins that it never invents a verdict on duplicate/overlapping/late/regressed/mismatched input |
+| 2 | Leaner dispatch | per-spec cached witness version string, cached 28 canonical specs, `observe_spec` entry point, single-allocation stance stamping, positional `Stance` construction with cached family versions | same fields, same values, same ordering; only the number of allocations changed |
+| 3 | Per-bar indicator memo | `per_bar_memo` caches pure indicator results on the per-bar bundle that `observe_all_28` installs and clears; key carries the bar-owned series identity plus arguments, so a value cannot outlive its prefix | measured duplicates only: 368 of 492 (bar, indicator) pairs were recomputing an identical result; outside a bundle nothing is cached; `tests/test_experts_bar_memo.py` pins value equality and no cross-bar reuse |
+| 4 | Cheaper records | `stance_record` is one `dict` copy instead of ten `getattr`; `stance_with` stamps from the instance dict | identical field order and values |
+
+### 12.3 Attribution (host, 3 fresh processes per cell, medians)
+
+| Stage | B1 wall | B1 cumulative | B3 wall | B3 cumulative | B3 peak RSS |
+|---|---|---|---|---|---|
+| `bfa7613` pre-optimisation | 1.804 s | 1.00× | 9.045 s | 1.00× | 459.3 MiB |
+| `278d404` incremental frame | 1.424 s | 1.27× | 5.271 s | 1.72× | 460.4 MiB |
+| `bc68f49` dispatch | 1.354 s | 1.33× | 4.621 s | 1.96× | 414.1 MiB |
+| `87fc4df` indicator memo + records | **1.059 s** | **1.70×** | **3.836 s** | **2.36×** | 414.5 MiB |
+
+Net: single leg **1.70×** (1.804 → 1.059 s, min 1.055 / max 1.076), ten legs **2.36×**
+(9.045 → 3.836 s, min 3.784 / max 3.846), ten-leg peak RSS **−9.8 %** (459.3 → 414.5 MiB) because
+per-stance version strings are now shared instead of rebuilt. Reproduce with
+`reports/performance/reproduce_optimization.sh` (no Docker). Raw per-run JSON:
+`evidence/optimized/optimization_attribution.csv`.
+
+Same machine, profiled ten-leg run: **12.013 s → 5.646 s** of profiled time and **45.7 M → 18.2 M**
+function calls. The three pre-optimisation hotspots — `__post_init__` 1.468 s, the continuity
+generator 1.384 s (23.3 M calls), `from_ordered_prefix` 1.067 s, `builtins.all` 0.820 s — are gone
+from the profile entirely; `extend_causal_frame` costs 0.202 s inclusive.
+
+### 12.4 Hotspot ranking after the work
+
+| Rank | Component | Self time | Share of profiled total |
+|---|---|---|---|
+| 1 | `decisions.py:stance_record` (604,800 calls) | 0.465 s | 8.2 % |
+| 2 | `registry.py:_with_witness` (604,800 calls) | 0.391 s | 6.9 % |
+| 3 | `expert_strategy.py:on_bar` self | 0.311 s | 5.5 % |
+| 4 | `PyLazyFrame.collect` (22,272 calls, 38,186 before) | 0.299 s | 5.3 % |
+| 5 | `registry.py:observe_spec` self | 0.271 s | 4.8 % |
+| 6 | `common.py:directional_stance` self | 0.239 s | 4.2 % |
+| 7 | native `BacktestEngine.add_data` | 0.232 s | 4.1 % |
+
+What remains is **per-stance bookkeeping on bars where nothing happens**, not computation: the
+engine evaluates all 28 experts on all 21,600 bars while only ~5.7 % of bars (123 of 2,160 per leg)
+ever open an opportunity. The next order-of-magnitude win is not a faster version of this loop but
+a proven no-op fast path (or dropping to 27 experts' worth of work when nothing is in play); it
+changes what the audit stream contains unless it is proved equivalent, so it was **not** attempted
+here.
+
+### 12.5 Rejected, with reason
+
+- **Incremental indicator state over the appended bar** (the "maintain RSI/ATR/pivots from the
+  previous bar" half of the §7 item 2 proposal). Polars `ewm_mean` and `rolling_*` results depend on
+  the exact window handed to them; a bounded-tail reimplementation is not provably bit-identical for
+  every warm-up and null path, and after the memo the entire Polars block is 1.0 s of a 5.6 s
+  profiled run. Risk outweighed the measurable gain, so only the duplicate-work half shipped.
+- **Skipping expert bodies on no-opportunity bars**: experts may compute before their
+  `context_reason` guard returns, so an external guard could change what is recorded. Diverges by
+  construction; not attempted.
+- **Goose / Rust rewrite, engine replacement, streaming or bounded-history redesign**: out of scope
+  by the task's stated boundaries, and §5/#10 already shows native engine work at ~4 %.
+- Note also that §7's headline hypothesis — "62.5 % is per-expert full-history indicator
+  recomputation" — did not survive the measurement: `observe_all_28`'s inclusive time was dominated
+  by dispatch and stance construction, and indicators are requested well under once per bar on quiet
+  bars. The dispatch and per-bar-sharing fixes address the real cost; the 2.36× measured is close to
+  the 2.7× Amdahl ceiling that hypothesis was credited with only because both touched the same
+  inclusive slice.
+
+### 12.6 Gates
+
+| Gate | Result |
+|---|---|
+| Parity B0 / B1 / B3 vs `bfa7613` baselines | PASS — 16 / 16 / 30 sections byte-identical |
+| Test suite | 1,089 passed, 66 skipped, 506 deselected |
+| `ruff check src tests tools` | clean |
+| `mypy src` | clean (208 files) |
+| New tests | `test_performance_parity.py`, `test_domain_frame_incremental.py`, `test_experts_bar_memo.py` |

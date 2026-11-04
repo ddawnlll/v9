@@ -1,0 +1,13 @@
+rank,component,self_s,pct_of_profiled_total,inclusive_s,calls,profiled_total_s,workload
+1,v8_next/economics/decisions.py:63(stance_record),0.465,8.2,0.465,604800,5.646,B3
+2,v8_next/experts/registry.py:619(_with_witness),0.391,6.9,0.734,604800,5.646,B3
+3,v8_next/adapters/expert_strategy.py:480(on_bar),0.311,5.5,5.728,21600,5.646,B3
+4,~:0(<method 'collect' of 'builtins.PyLazyFrame' objects>),0.299,5.3,0.299,22272,5.646,B3
+5,v8_next/experts/registry.py:640(observe_spec),0.271,4.8,4.398,604800,5.646,B3
+6,v8_next/experts/common.py:36(directional_stance),0.239,4.2,0.909,583200,5.646,B3
+7,~:0(<method 'add_data' of 'nautilus_trader.backtest.BacktestEngine' objects>),0.232,4.1,0.232,5390,5.646,B3
+8,v8_next/economics/decisions.py:326(stance_with),0.201,3.6,0.315,302400,5.646,B3
+9,~:0(<method 'update' of 'dict' objects>),0.172,3.0,0.172,908091,5.646,B3
+10,/opt/homebrew/Cellar/python@3.12/3.12.12_2/Frameworks/Python.framework/Versions/3.12/lib/python3.12/dataclasses.py:1540(replace),0.162,2.9,0.311,88246,5.646,B3
+11,v8_next/experts/registry.py:724(<genexpr>),0.114,2.0,4.512,626400,5.646,B3
+12,~:0(<built-in method __new__ of type object at 0x1037460e8>),0.110,1.9,0.111,1201422,5.646,B3

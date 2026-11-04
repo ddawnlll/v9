@@ -57,16 +57,28 @@
       "POLARS_MAX_THREADS": "2",
       "OMP_NUM_THREADS": "2",
       "OPENBLAS_NUM_THREADS": "2"
-    }
+    },
+    "status": "deleted after measurement at the user's request; the recorded cpu.max/memory.max and the zero OOM/throttle counters describe the environment as it was during measurement"
   },
   "dataset": {
     "source_root": "/Users/hootie/src/v8/research/tape/multi-1h-4y (git-ignored sibling checkout)",
     "window": "2025-01-01T00:00Z..2025-04-01T00:00Z (the monograph's BTC development window)",
     "instruments": [
-      "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-      "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "LTCUSDT"
+      "BTCUSDT",
+      "ETHUSDT",
+      "BNBUSDT",
+      "SOLUSDT",
+      "XRPUSDT",
+      "ADAUSDT",
+      "DOGEUSDT",
+      "AVAXUSDT",
+      "LINKUSDT",
+      "LTCUSDT"
     ],
-    "channels": ["1h klines", "fundingRate"],
+    "channels": [
+      "1h klines",
+      "fundingRate"
+    ],
     "bar_counts": {
       "single_leg_1_month": 744,
       "single_leg_3_months": 2160,
@@ -85,5 +97,53 @@
     "memory_sampling": "parent samples /proc/<pid>/statm, status and stat about every 100 ms; median observed gap 0.101 s, max 0.110 s",
     "warmup": "the first process in a fresh container is measurably slower (4.29 s vs 2.79 s for the same B1 workload); it is retained as the max of the B0/B1/B3 triples and called out as cold-start",
     "instrumented_runs": "sys.monitoring stage trace, cProfile and tracemalloc runs are reported separately and never used as baseline timings"
+  },
+  "optimization_measurement": {
+    "measured_on": "host (Apple M3 Pro, macOS, native .venv), not the container",
+    "why": "the 2 vCPU / 4 GiB Linux measurement container and its images were deleted at the user's request after the benchmark in sections 1-11 was complete",
+    "comparability": "ratios only; absolute values are NOT comparable with the container measurements in this file",
+    "protocol": "each stage checked out as a git worktree at its commit, PYTHONPATH pointing at that worktree's src, one discarded warm-up per workload, then three fresh processes per workload per stage, interleaved within a single session",
+    "stages": {
+      "bfa7613": "pre-optimisation",
+      "278d404": "incremental causal frame + carried continuity",
+      "bc68f49": "witness/stance dispatch",
+      "87fc4df": "per-bar indicator memo + cheaper stance records"
+    },
+    "result": {
+      "B1": {
+        "wall_s": {
+          "before": 1.804,
+          "after": 1.059
+        },
+        "speedup": 1.7,
+        "peak_rss_mib": {
+          "before": 187.4,
+          "after": 183.9
+        }
+      },
+      "B3": {
+        "wall_s": {
+          "before": 9.045,
+          "after": 3.836
+        },
+        "speedup": 2.36,
+        "peak_rss_mib": {
+          "before": 459.3,
+          "after": 414.5
+        }
+      },
+      "profiled_B3_total_s": {
+        "before": 12.013,
+        "after": 5.646
+      },
+      "profiled_B3_calls": {
+        "before": 45676402,
+        "after": 18211978
+      }
+    },
+    "parity": "B0/B1/B3 byte-identical to the pre-optimisation manifests (16/16/30 sections)",
+    "reproduce": "reports/performance/reproduce_optimization.sh",
+    "artifacts": "evidence/optimized/ (optimization_attribution.csv, hotspots_after_b1.csv, hotspots_after_b3.csv, pre-b3-self-full.txt, after-b1-self.txt, after-b1-cum.txt, after-b3-self.txt, after-b3-cum.txt, gates.txt)",
+    "memory_timeline_note": "the 100 ms /proc-based timeline in memory_timeline.csv is Linux-only and could not be re-run locally; local RSS figures are the child's ru_maxrss reported by run_process.py"
   }
 }

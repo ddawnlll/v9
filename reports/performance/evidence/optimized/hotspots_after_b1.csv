@@ -1,0 +1,13 @@
+rank,component,self_s,pct_of_profiled_total,inclusive_s,calls,profiled_total_s,workload
+1,~:0(<method 'collect' of 'builtins.PyLazyFrame' objects>),0.189,12.3,0.189,12288,1.542,B1
+2,~:0(<built-in method _imp.create_dynamic>),0.094,6.1,0.094,56,1.542,B1
+3,~:0(<method 'read' of '_io.BufferedReader' objects>),0.042,2.7,0.042,293,1.542,B1
+4,v8_next/experts/pandf.py:20(columns),0.041,2.6,0.098,123,1.542,B1
+5,v8_next/experts/registry.py:619(_with_witness),0.040,2.6,0.075,60480,1.542,B1
+6,v8_next/adapters/expert_strategy.py:480(on_bar),0.037,2.4,1.305,2160,1.542,B1
+7,v8_next/economics/decisions.py:63(stance_record),0.031,2.0,0.031,60480,1.542,B1
+8,v8_next/experts/registry.py:640(observe_spec),0.028,1.8,1.133,60480,1.542,B1
+9,/opt/homebrew/Cellar/python@3.12/3.12.12_2/Frameworks/Python.framework/Versions/3.12/lib/python3.12/dataclasses.py:1540(replace),0.028,1.8,0.053,19873,1.542,B1
+10,~:0(<built-in method builtins.isinstance>),0.026,1.7,0.036,304537,1.542,B1
+11,v8_next/experts/common.py:36(directional_stance),0.025,1.6,0.092,58320,1.542,B1
+12,~:0(<method 'run' of 'nautilus_trader.backtest.BacktestEngine' objects>),0.022,1.4,1.328,1,1.542,B1

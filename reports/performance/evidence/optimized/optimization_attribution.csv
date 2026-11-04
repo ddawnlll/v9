@@ -1,0 +1,9 @@
+stage,git_sha,change,workload,repetitions,median_wall_s,min_wall_s,max_wall_s,median_user_cpu_s,median_peak_rss_mib,stage_speedup,cumulative_speedup
+before,bfa7613,pre-optimisation,B1,3,1.804,1.784,1.818,1.851,187.4,1.00,1.00
+before,bfa7613,pre-optimisation,B3,3,9.045,9.005,9.210,9.134,459.3,1.00,1.00
+frames,278d404,incremental causal frame,B1,3,1.424,1.403,1.453,1.474,187.6,1.27,1.27
+frames,278d404,incremental causal frame,B3,3,5.271,5.239,5.330,5.364,460.4,1.72,1.72
+dispatch,bc68f49,witness/stance dispatch,B1,3,1.354,1.349,1.356,1.407,182.8,1.05,1.33
+dispatch,bc68f49,witness/stance dispatch,B3,3,4.621,4.594,4.647,4.736,414.1,1.14,1.96
+local,87fc4df,per-bar indicator memo + record,B1,3,1.059,1.055,1.076,1.049,183.9,1.28,1.70
+local,87fc4df,per-bar indicator memo + record,B3,3,3.836,3.784,3.846,3.840,414.5,1.20,2.36
