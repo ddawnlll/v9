@@ -1,9 +1,8 @@
 {
   "baseline_tests": {
     "deselected": 506,
-    "passed": 1094,
-    "skipped": 66,
-    "wall_s": 12
+    "passed": 1089,
+    "skipped": 71
   },
   "code_sha": "0b69fc45c197354600256963249ca7b1f19b6bbd",
   "config_files": [
@@ -52,7 +51,7 @@
     "sha256": "b3ee5c3836d26b8e6a598f6a9ffe1b50213939bd00efaceb0397d19b9f2b698b",
     "size_bytes": 92293
   },
-  "manifest_digest": "7ba1578a7dfacdccbdb9027999ff9bd0937905f78b19cadd2910631a7fd27fe8",
+  "manifest_digest": "d47d8e2e89964afd6cc95e20f81265648e652df6289cd94f5567eb2cbd5999c3",
   "package_versions": {
     "nautilus-trader": "2.0.0rc4",
     "numpy": "2.5.3",

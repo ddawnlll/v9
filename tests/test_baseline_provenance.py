@@ -40,7 +40,10 @@ def _manifest(**overrides: object) -> BaselineManifest:
         "generated_ns": PINNED_NS,
         "authorized_datasets": [TAPE],
         "blocked_datasets": {UNPROVISIONED: "NOT_PROVISIONED_OFFLINE"},
-        "baseline_tests": {"passed": 1094, "skipped": 66, "deselected": 506},
+        # Reproducible on a clean checkout of PINNED_SHA: 1089 passed / 71 skipped.
+        # The 5-test delta against the original coordinator run is local untracked
+        # evidence artifacts (docs/evidence/**), not code; see reports/provenance/M0-01.md.
+        "baseline_tests": {"passed": 1089, "skipped": 71, "deselected": 506},
     }
     kwargs.update(overrides)
     return build_manifest(REPO, **kwargs)  # type: ignore[arg-type]
