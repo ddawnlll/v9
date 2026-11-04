@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/work/.venv/bin/python",
+    "/work/tools/performance/ensemble_profile.py",
+    "--tape",
+    "/tape/q1",
+    "--bars",
+    "2160",
+    "--allocations",
+    "/out/allocations.json",
+    "--output",
+    "/out/allocation-summary.json"
+  ],
+  "child_wall_s": 89.91220549899992,
+  "child_user_cpu_s": 89.531865,
+  "child_system_cpu_s": 0.44243899999999997,
+  "child_peak_rss_bytes": 424357888,
+  "returncode": 0,
+  "stdout": "{\"allocations_instrumented\": true, \"bars\": 2160, \"decisions\": 2160, \"expert_timing_instrumented\": false, \"experts\": {}, \"fills\": 1, \"first_start_ns\": 1735689600000000000, \"fixture\": null, \"fixture_s\": 1.7113450839999587, \"imports_s\": 0.576649001000078, \"last_end_ns\": 1743465600000000000, \"orders\": 3, \"peak_rss_bytes\": 424357888, \"pid\": 9, \"pre_output_s\": 85.57525045500006, \"production_backtest_s\": 83.28725637000002, \"profiled\": false, \"stage_trace_instrumented\": false, \"stages\": [], \"system_cpu_s\": 0.432428, \"user_cpu_s\": 89.47175, \"workload\": \"historical tape; availability and provenance require independent verification\"}\n",
+  "stderr": "",
+  "measurement_write_included": false
+}

@@ -1,0 +1,14 @@
+{
+  "base_git_sha": "70a315fc63acfdde6d92641a6ee87152ba01df17",
+  "ensemble_profile_measured_sha256": "760cbf592e9f60fc4417a835739b4962171a6d12664f0906c780e0b3dbacf319",
+  "note": "measured file reconstructed by reversing subsequent addition of configurable stack depth; measured stack depth was 10",
+  "trace_scope": "Python tracemalloc begins after imports, ends after replay; excludes untracked native allocations",
+  "container": "aarch64 Linux Docker Desktop on Apple M3 Pro, 2 CPU quota, 4 GiB cgroup",
+  "python": "3.12.16",
+  "nautilus_trader": "2.0.0rc4",
+  "data_sha256": {
+    "BTCUSDT-1h-2025-01.zip": "9ebc05c9b3d5ab3591edf65bc5c7e5dbc2f96c1efc4adc4ea198c651a99a41b1",
+    "BTCUSDT-1h-2025-03.zip": "08043384c3336b0fa3eeee06e113a6f1eceb6d3fbe7b2971e9b9fa83625fdfb9",
+    "BTCUSDT-1h-2025-02.zip": "077d761098eb5f2dbde65457833b9edab41ea6475284a77fcce0d4bec1bfb5cf"
+  }
+}

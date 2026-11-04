@@ -34,16 +34,26 @@ def main() -> None:
     parser.add_argument("--profile", type=Path)
     parser.add_argument("--expert-timings", action="store_true", help="instrument nested expert calls")
     parser.add_argument("--stage-trace", action="store_true", help="trace replay phase boundaries")
+    parser.add_argument("--allocations", type=Path, help="write separate tracemalloc snapshot")
+    parser.add_argument("--allocation-frames", type=int, default=1, help="tracemalloc stack depth")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.bars < 1:
         parser.error("--bars must be positive")
+    if args.allocation_frames < 1:
+        parser.error("--allocation-frames must be positive")
     if args.stage_trace and (args.profile or args.expert_timings):
         parser.error("--stage-trace must run separately from other instrumentation")
+    if args.allocations and (args.stage_trace or args.profile or args.expert_timings):
+        parser.error("--allocations must run separately from other instrumentation")
     from v8_next.adapters.expert_strategy import ExpertStrategyConfig, run_expert_strategy_backtest
     from v8_next.domain.market import Candle
 
     imported = time.perf_counter()
+    if args.allocations:
+        import tracemalloc
+
+        tracemalloc.start(args.allocation_frames)
     hour = 3_600_000_000_000
     if args.tape:
         if args.fixture != "flat":
@@ -112,6 +122,22 @@ def main() -> None:
         profiler.disable()
         profiler.dump_stats(str(args.profile))
     replayed = time.perf_counter()
+    if args.allocations:
+        current, peak = tracemalloc.get_traced_memory()
+        snapshot = tracemalloc.take_snapshot()
+        allocation_summary = {
+            "scope": "live traced Python allocations after replay; native allocations are excluded",
+            "stack_depth": args.allocation_frames,
+            "current_bytes": current,
+            "peak_bytes": peak,
+            "top_lines": [
+                {"location": str(stat.traceback[0]), "bytes": stat.size, "blocks": stat.count}
+                for stat in snapshot.statistics("lineno")[:30]
+            ],
+        }
+        args.allocations.parent.mkdir(parents=True, exist_ok=True)
+        args.allocations.write_text(json.dumps(allocation_summary, indent=2) + "\n")
+        tracemalloc.stop()
     usage = resource.getrusage(resource.RUSAGE_SELF)
     summary = {
         "workload": workload,
@@ -132,6 +158,7 @@ def main() -> None:
         "profiled": bool(profiler),
         "expert_timing_instrumented": args.expert_timings,
         "stage_trace_instrumented": args.stage_trace,
+        "allocations_instrumented": bool(args.allocations),
         "stages": stages,
         "experts": {
             name: {

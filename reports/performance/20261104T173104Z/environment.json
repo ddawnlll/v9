@@ -1,0 +1,26 @@
+{
+  "base_git_sha": "70a315fc63acfdde6d92641a6ee87152ba01df17",
+  "note": "prototype was uncommitted when measured; hashes identify exact files",
+  "source_sha256": {
+    "tools/performance/continuity_compare.py": "856cf8b933d99b85b451648c4166710d32bc29a91f9db2533dcaa09a738333f8",
+    "tools/performance/continuity_bench.goose": "8f1dcf2ab61d7e22d777f5e2ad9967afb73346a511db106bf9436fa1eba8ad92",
+    "src/v8_next/domain/market.py": "e3c1ed23ce488e87498b6867d45a11905758b470314620c41737cecfa4d9c25f",
+    "uv.lock": "b3ee5c3836d26b8e6a598f6a9ffe1b50213939bd00efaceb0397d19b9f2b698b"
+  },
+  "machine": "Apple M3 Pro macOS ARM64; not 2-vCPU Linux VPS",
+  "python": "Python 3.12.12",
+  "goose_release": "v2026.3 macOS arm64",
+  "goose_runtime": "4d3da949e563",
+  "goose_archive_sha256": "2ffaaf46b3edde27aed03fcd9ebe73e9b6639cac30d8a6915f7dc00795b7aedf",
+  "dataset": "BTCUSDT 1h Jan\u2013Mar 2025 development window only",
+  "dataset_archives_sha256": {
+    "BTCUSDT-1h-2025-01.zip": "9ebc05c9b3d5ab3591edf65bc5c7e5dbc2f96c1efc4adc4ea198c651a99a41b1",
+    "BTCUSDT-1h-2025-03.zip": "08043384c3336b0fa3eeee06e113a6f1eceb6d3fbe7b2971e9b9fa83625fdfb9",
+    "BTCUSDT-1h-2025-02.zip": "077d761098eb5f2dbde65457833b9edab41ea6475284a77fcce0d4bec1bfb5cf"
+  },
+  "threads": {
+    "POLARS_MAX_THREADS": "2",
+    "OMP_NUM_THREADS": "2",
+    "OPENBLAS_NUM_THREADS": "2"
+  }
+}
