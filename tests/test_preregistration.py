@@ -47,6 +47,12 @@ def arms(*, control_capital: Decimal = Decimal("10000")) -> tuple[Arm, ...]:
             description="random entry, matched exits",
             matched=matched,
         ),
+        Arm(
+            arm_id="simple",
+            kind=ArmKind.SIMPLE_CONTROL_POLICY,
+            description="simple control policy",
+            matched=matched,
+        ),
     )
 
 
@@ -164,6 +170,18 @@ def test_validation_rejects_control_arm_without_random_entry() -> None:
         preregistration(control_arms=only_baseline).validate()
     assert raised.value.field == "control_arms"
     assert "random-entry" in raised.value.message
+
+
+def test_validation_rejects_control_arms_without_a_simple_policy() -> None:
+    """Random entry is noise; the intervention must also beat a real simple policy."""
+    without_simple = tuple(arm for arm in arms() if arm.kind is not ArmKind.SIMPLE_CONTROL_POLICY)
+    with pytest.raises(PreregistrationError) as raised:
+        preregistration(control_arms=without_simple).validate()
+    assert raised.value.field == "control_arms"
+    assert "simple control policy" in raised.value.message
+
+    # Declaring the arm is enough: the same registration with it validates.
+    assert preregistration().validate() is not None
 
 
 def test_validation_rejects_unmatched_control_arm() -> None:

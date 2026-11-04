@@ -386,6 +386,32 @@ class WorkerRun:
     durable_state: IssueState
 
 
+def _declared_requests(requests: object, *, phase: StepPhase) -> tuple[Capability, ...]:
+    """Normalise a step's declared requests, refusing anything that is not a member.
+
+    Membership is an identity question, not a string comparison: ``"MAIN_MERGE"``
+    compares equal to :attr:`Capability.MAIN_MERGE` but is not a capability, and
+    ``"sealed_oos_access"`` compares equal to nothing at all, so a substring check
+    would silently drop the request. Either case is a specification error in the
+    step and fails closed here, before any run starts.
+    """
+    if isinstance(requests, (str, bytes)) or not isinstance(requests, Iterable):
+        raise TypeError(
+            f"WORKER: step for {phase.value} must declare an iterable of Capability, "
+            f"got {type(requests).__name__}"
+        )
+    declared: list[Capability] = []
+    for request in requests:
+        if not isinstance(request, Capability):
+            raise TypeError(
+                f"WORKER: step for {phase.value} declared {request!r}, which is not a "
+                "Capability member; a capability must name a member of the closed set"
+            )
+        if request not in declared:
+            declared.append(request)
+    return tuple(declared)
+
+
 _DEFAULT_LEASE_TTL_NS: Final[int] = 15 * 60 * 1_000_000_000
 
 
@@ -456,6 +482,9 @@ class BoundedWorker:
                     raise ValueError(
                         f"WORKER: step for {phase.value} reports a different phase"
                     )
+                # Validate the declaration before any run can use it: an unrecognised
+                # request must not wait until the phase it belongs to is reached.
+                _declared_requests(getattr(step, "requests", ()), phase=phase)
         self._queue = queue
         self._worker_id = worker_id.strip()
         self._budget = budget if budget is not None else TaskBudget()
@@ -528,6 +557,18 @@ class BoundedWorker:
                 phase=refusal.phase,
                 receipt=run.receipt,
             ) from None
+        except Exception as exc:
+            # An unexpected failure inside the driver (a mutated declaration, a step
+            # object that is not what it claimed) must not leave the lease held with no
+            # recorded terminal state. The original exception still propagates.
+            self._terminate(
+                lease,
+                progress,
+                terminal=WorkerTerminal.BLOCKED,
+                failure=f"DRIVER_FAILED:{type(exc).__name__}: {exc}",
+                violation=None,
+            )
+            raise
         return self._terminate(
             lease,
             progress,
@@ -555,7 +596,7 @@ class BoundedWorker:
             step = self._steps.get(phase)
             if step is None:
                 return WorkerTerminal.BLOCKED, f"STEP_MISSING:{phase.value}", None
-            self._authorize(phase, step.requests)
+            self._authorize(phase, _declared_requests(getattr(step, "requests", ()), phase=phase))
             context = StepContext(
                 issue_id=lease.issue_id,
                 worker_id=self._worker_id,
@@ -582,13 +623,15 @@ class BoundedWorker:
                 )
             progress.absorb(result)
             progress.phases.append(result)
+            # A failed step still gets its requests audited: the refusal must name the
+            # capability it reached for, even though the run is already ending.
+            self._authorize(phase, result.requests)
             if not result.ok:
                 return (
                     WorkerTerminal.BLOCKED,
                     f"STEP_FAILED:{phase.value}:{result.failure}",
                     None,
                 )
-            self._authorize(phase, result.requests)
             if phase is StepPhase.PREPARE:
                 progress.branch = result.branch
                 progress.base_sha = result.base_sha
@@ -658,7 +701,7 @@ class BoundedWorker:
                 retry_allowed=retry_allowed,
             )
         elif terminal is WorkerTerminal.BLOCKED:
-            self._queue.block(lease.issue_id, failure or "BLOCKED")
+            self._queue.block_lease(lease, failure or "BLOCKED")
             durable = IssueState.BLOCKED
             retry_allowed = False
             receipt = self._receipt(
@@ -751,7 +794,10 @@ class BoundedWorker:
         if self._memory is None:
             return
         outcome = {
-            WorkerTerminal.PUBLISHED_DRAFT: FindingOutcome.VERIFIED,
+            # A draft publish is a hand-off, not a verified finding: the owner has not
+            # reviewed it, so it is recorded as PENDING_REVIEW and never counted as a
+            # verified finding.
+            WorkerTerminal.PUBLISHED_DRAFT: FindingOutcome.PENDING_REVIEW,
             WorkerTerminal.BLOCKED: FindingOutcome.BLOCKED,
             WorkerTerminal.EXHAUSTED: FindingOutcome.EXHAUSTED,
         }[receipt.terminal]

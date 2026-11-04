@@ -45,6 +45,7 @@ from v8_next.factory.lease import MEASURED, NOT_MEASURED, decode_mapping
 from v8_next.telemetry.identity import canonical_digest
 
 __all__ = [
+    "COMPLETION_OUTCOMES",
     "EfficiencyReport",
     "FindingOutcome",
     "MEASURED",
@@ -111,7 +112,9 @@ class FindingOutcome(StrEnum):
 
     ``NO_EDGE`` is the honest answer most of the time: the test was run and the edge is
     not there. ``BLOCKED`` and ``INVALID`` mean the run could not conclude, which is
-    different from a negative result and must not be counted as one.
+    different from a negative result and must not be counted as one. ``PENDING_REVIEW``
+    is a draft publish: the work exists, but nothing is verified until the owner reviews
+    it, so it is not a finding and never counts as one.
     """
 
     VERIFIED = "VERIFIED"
@@ -119,6 +122,15 @@ class FindingOutcome(StrEnum):
     BLOCKED = "BLOCKED"
     INVALID = "INVALID"
     EXHAUSTED = "EXHAUSTED"
+    PENDING_REVIEW = "PENDING_REVIEW"
+
+
+#: Outcomes that mean the issue reached a completed hand-off (a published draft, or a
+#: verified finding recorded against it). ``completed_issues`` counts these, and only on
+#: ``OUTCOME`` rows, so a finding can never inflate it.
+COMPLETION_OUTCOMES: frozenset[FindingOutcome] = frozenset(
+    {FindingOutcome.VERIFIED, FindingOutcome.PENDING_REVIEW}
+)
 
 
 class MeasurementState(StrEnum):
@@ -221,6 +233,7 @@ class EfficiencyReport(BaseModel):
     no_edge: int
     invalid: int
     exhausted: int
+    pending_review: int
     accepted_prs: Measurement
     reported_prs: int
     tokens: Measurement
@@ -564,11 +577,21 @@ class ResearchMemory:
             ).fetchall()
         }
         verified_row = self._db.execute(
-            "SELECT COUNT(*) AS n, COUNT(DISTINCT issue_id) AS completed FROM"
-            " research_events WHERE outcome = ?",
-            (FindingOutcome.VERIFIED.value,),
+            "SELECT COUNT(*) AS n FROM research_events"
+            " WHERE kind = ? AND outcome = ?",
+            (MemoryKind.FINDING.value, FindingOutcome.VERIFIED.value),
         ).fetchone()
         assert verified_row is not None
+        completion_placeholders = ", ".join("?" for _ in COMPLETION_OUTCOMES)
+        completed_row = self._db.execute(
+            "SELECT COUNT(DISTINCT issue_id) AS completed FROM research_events"
+            f" WHERE kind = ? AND outcome IN ({completion_placeholders})",
+            (
+                MemoryKind.OUTCOME.value,
+                *(outcome.value for outcome in sorted(COMPLETION_OUTCOMES)),
+            ),
+        ).fetchone()
+        assert completed_row is not None
         findings_row = self._db.execute(
             "SELECT COUNT(*) AS n FROM research_events WHERE kind = ?",
             (MemoryKind.FINDING.value,),
@@ -586,6 +609,12 @@ class ResearchMemory:
         rss = _aggregate(events, int(totals["rss_n"]), int(totals["rss_max"]))
         accepted_prs = _reported_accepted(int(totals["pr_n"]), int(totals["pr_ok"]))
         verified_findings = int(verified_row["n"])
+        findings = int(findings_row["n"])
+        if verified_findings > findings:  # pragma: no cover - the query makes this impossible
+            raise ValueError(
+                "MEMORY: verified findings exceed recorded findings; the aggregate is "
+                "counting a non-FINDING row"
+            )
         per_hour = not_measured()
         if isinstance(cpu_hours.value, float) and cpu_hours.value > 0:
             per_hour = measured(verified_findings / cpu_hours.value)
@@ -595,12 +624,13 @@ class ResearchMemory:
             attempts=int(attempts_row["attempts"]),
             retries=int(attempts_row["retries"]),
             verified_findings=verified_findings,
-            findings=int(findings_row["n"]),
-            completed_issues=int(verified_row["completed"]),
+            findings=findings,
+            completed_issues=int(completed_row["completed"]),
             blocked=by_outcome.get(FindingOutcome.BLOCKED.value, 0),
             no_edge=by_outcome.get(FindingOutcome.NO_EDGE.value, 0),
             invalid=by_outcome.get(FindingOutcome.INVALID.value, 0),
             exhausted=by_outcome.get(FindingOutcome.EXHAUSTED.value, 0),
+            pending_review=by_outcome.get(FindingOutcome.PENDING_REVIEW.value, 0),
             accepted_prs=accepted_prs,
             reported_prs=int(totals["pr_n"]),
             tokens=tokens,

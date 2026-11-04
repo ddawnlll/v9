@@ -22,7 +22,11 @@ research report must not be able to fake:
 The verdict gate (:func:`assess_verdict`) is the only function in the package
 that returns ``PASS`` for a research claim. It cannot emit ``PASS`` without a
 registered :class:`~v8_next.evaluation.preregistration.Preregistration`, a token
-the ledger actually issued, the registered dataset role, and a corrected test.
+the ledger actually issued, the registered dataset role, a sealed read issued
+*after* the registration was created, a corrected test run at the registered
+alpha, and the :class:`~v8_next.evaluation.preregistration.ExperimentResult` the
+claim rests on — whose gate vector must match the registration field by field and
+whose observed trades/drawdown must satisfy the registered gates.
 ``NO_EDGE``, ``STOP`` and ``INCONCLUSIVE`` are first-class accepted outcomes: they
 are recorded, not converted into a failure or into a permissive default.
 
@@ -33,6 +37,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar, Self
 
@@ -43,7 +48,7 @@ from v8_next.telemetry.identity import canonical_digest
 # ``Preregistration`` imports this module, so the reverse reference is typing-only:
 # at runtime protocol.py never imports preregistration.py and no cycle exists.
 if TYPE_CHECKING:  # keeps the import-time graph acyclic
-    from v8_next.evaluation.preregistration import Preregistration
+    from v8_next.evaluation.preregistration import ExperimentResult, Preregistration
 
 # --- vocabulary --------------------------------------------------------------
 
@@ -273,6 +278,35 @@ class AccessToken(BaseModel):
     issued_ns: int = Field(ge=0)
     authorization_id: str | None = None
 
+    @classmethod
+    def mint(
+        cls,
+        *,
+        seq: int,
+        role: DatasetRole,
+        purpose: str,
+        budget: int,
+        slice_id: str,
+        issued_ns: int,
+        authorization_id: str | None = None,
+    ) -> AccessToken:
+        """Build a token whose ``token_id`` is derived from its content.
+
+        This is the single derivation of a token identity: the ledger uses it to mint,
+        and :meth:`AccessLedger.from_entries` uses it to check that a rehydrated row is
+        the row this ledger would have written.
+        """
+        payload = _token_payload(
+            seq=seq,
+            role=role,
+            purpose=purpose,
+            budget=budget,
+            slice_id=slice_id,
+            issued_ns=issued_ns,
+            authorization_id=authorization_id,
+        )
+        return cls(token_id=canonical_digest("research-access", payload), **payload)
+
     def digest(self) -> str:
         return canonical_digest("research-access-token", self.model_dump(mode="json"))
 
@@ -364,7 +398,7 @@ class AccessLedger:
         budget: int,
         *,
         slice_id: str = "canonical-dataset",
-        issued_ns: int = 0,
+        issued_ns: int | None = None,
         authorization: SealedAuthorization | None = None,
     ) -> AccessToken:
         """Record a read and return its token, or refuse with a typed error.
@@ -372,7 +406,9 @@ class AccessLedger:
         Open roles need only a purpose and a positive budget. ``SEALED_OOS``
         additionally needs an authorization minted by :func:`authorize_sealed`
         whose purpose matches the request and whose authority has not already
-        opened this slice.
+        opened this slice, *and* the instant the read was issued: the verdict
+        gate compares that instant with the registration's ``created_ns``, so a
+        sealed read that cannot say when it happened cannot be evidence.
         """
         if not purpose.strip():
             raise ResearchProtocolError("an access purpose must be declared", field="purpose")
@@ -380,6 +416,16 @@ class AccessLedger:
             raise ResearchProtocolError(
                 "an access budget must be a positive evaluation count", field="budget"
             )
+        if issued_ns is None:
+            if role is DatasetRole.SEALED_OOS:
+                self._check_sealed(purpose, slice_id, authorization)
+                raise SealedAccessError(
+                    "a sealed read must record the instant it was issued "
+                    "(issued_ns), so it can be ordered against the registration",
+                    code="SEALED_READ_WITHOUT_ISSUE_TIME",
+                    field="issued_ns",
+                )
+            issued_ns = 0
         if issued_ns < 0:
             raise ResearchProtocolError("issued_ns must be non-negative", field="issued_ns")
         if not slice_id.strip():
@@ -388,17 +434,17 @@ class AccessLedger:
             self._check_sealed(purpose, slice_id, authorization)
 
         seq = len(self._entries) + 1
-        authorization_id = authorization.authorization_id if authorization is not None else None
-        payload = _token_payload(
+        token = AccessToken.mint(
             seq=seq,
             role=role,
             purpose=purpose,
             budget=budget,
             slice_id=slice_id,
             issued_ns=issued_ns,
-            authorization_id=authorization_id,
+            authorization_id=(
+                authorization.authorization_id if authorization is not None else None
+            ),
         )
-        token = AccessToken(token_id=canonical_digest("research-access", payload), **payload)
         self._entries.append(token)
         return token
 
@@ -452,14 +498,66 @@ class AccessLedger:
         return None
 
     @classmethod
-    def from_entries(cls, entries: Iterable[AccessToken]) -> AccessLedger:
-        """Rehydrate a persisted ledger, refusing entries that prove leakage/reuse."""
+    def from_entries(
+        cls,
+        entries: Iterable[AccessToken],
+        *,
+        authorizations: Iterable[SealedAuthorization] = (),
+    ) -> AccessLedger:
+        """Rehydrate a persisted ledger, refusing entries that prove leakage/reuse.
+
+        Every entry's ``token_id`` is re-derived from its content, so a hand-written
+        row cannot pass itself off as a read this ledger issued. A sealed row must
+        also name an authorization the caller supplies as minted: an
+        ``authorization_id`` is a content digest anyone can compute, so the id
+        alone proves nothing about the grant.
+        """
+        minted: set[str] = set()
+        for authorization in authorizations:
+            if not isinstance(authorization, SealedAuthorization):
+                raise TypeError(
+                    "authorizations must be SealedAuthorization instances minted by "
+                    "authorize_sealed(); a bare id is not authority"
+                )
+            minted.add(authorization.authorization_id)
+
         ledger = cls()
         for entry in entries:
+            if not isinstance(entry, AccessToken):
+                raise TypeError("ledger entries must be AccessToken instances")
             if entry.seq != len(ledger._entries) + 1:
                 raise ResearchProtocolError(
                     "ledger entries must be contiguous and ordered", field="seq"
                 )
+            expected = AccessToken.mint(
+                seq=entry.seq,
+                role=entry.role,
+                purpose=entry.purpose,
+                budget=entry.budget,
+                slice_id=entry.slice_id,
+                issued_ns=entry.issued_ns,
+                authorization_id=entry.authorization_id,
+            )
+            if entry.token_id != expected.token_id:
+                raise ResearchProtocolError(
+                    "ledger entry token id does not re-derive from its content; "
+                    "the row was not issued by this ledger",
+                    code="TOKEN_DIGEST_MISMATCH",
+                    field="token_id",
+                )
+            if entry.role is DatasetRole.SEALED_OOS:
+                if entry.authorization_id is None:
+                    raise SealedAccessError(
+                        "sealed entry without a recorded authorization",
+                        field="authorization_id",
+                    )
+                if entry.authorization_id not in minted:
+                    raise SealedAccessError(
+                        "sealed entry names an authorization this caller cannot prove "
+                        "was minted; a rehydrated ledger needs the mints themselves",
+                        code="UNVERIFIED_AUTHORIZATION",
+                        field="authorization_id",
+                    )
             ledger._entries.append(entry)
         ledger.assert_consistent()
         return ledger
@@ -650,9 +748,21 @@ def multiple_testing(
     than declared is a budget violation, not an adjustment. ``corrected=False``
     is preserved in the report and :meth:`TestingReport.verdict_for` resolves it
     to ``INVALID`` rather than to a permissive ``PASS``.
+
+    ``method`` must be a :class:`CorrectionMethod` member (or ``None``). A plain
+    string such as ``"HOLM"`` compares equal to the member but is not one, so it
+    would otherwise select no adjustment while the report still claimed
+    ``corrected=True``. It is refused instead.
     """
     if not 0.0 < alpha < 1.0:
         raise ResearchProtocolError("alpha must be strictly between 0 and 1", field="alpha")
+    if method is not None and not isinstance(method, CorrectionMethod):
+        raise ResearchProtocolError(
+            f"correction method {method!r} is not a CorrectionMethod member; "
+            "a correction must be a declared member, not a look-alike value",
+            code="CORRECTION_METHOD_NOT_DECLARED",
+            field="method",
+        )
     names = tuple(p_values.keys())
     if len(names) != family.declared_size or set(names) != set(family.hypotheses):
         raise HypothesisBudgetViolation(
@@ -673,12 +783,19 @@ def multiple_testing(
         raw.append(value)
 
     count = len(ordered)
-    if method is CorrectionMethod.BONFERRONI:
+    if method is None:
+        adjusted_values = raw
+    elif method is CorrectionMethod.BONFERRONI:
         adjusted_values = [min(1.0, value * count) for value in raw]
     elif method is CorrectionMethod.HOLM:
         adjusted_values = _holm(raw)
-    else:
-        adjusted_values = raw
+    else:  # pragma: no cover - a new member must be implemented, never silently skipped
+        raise ResearchProtocolError(
+            f"correction method {method} has no implementation; refusing to report "
+            "raw p-values as corrected",
+            code="CORRECTION_METHOD_UNIMPLEMENTED",
+            field="method",
+        )
     adjusted = {name: adjusted_values[index] for index, name in enumerate(ordered)}
     rejected = {name: adjusted[name] <= alpha for name in ordered}
     return TestingReport(
@@ -833,6 +950,9 @@ class VerdictResult(BaseModel):
     preregistration_digest: str
     primary_edge_eligible: bool
     reasons: tuple[str, ...] = ()
+    #: Digest of the experiment result the claim was assessed against (``None`` when the
+    #: claim carried no result, e.g. a preregistered negative outcome).
+    experiment_digest: str | None = None
 
 
 def assess_verdict(
@@ -842,13 +962,22 @@ def assess_verdict(
     token: AccessToken,
     claimed: Verdict,
     testing: TestingReport | None = None,
+    experiment: ExperimentResult | None = None,
 ) -> VerdictResult:
     """Assess one claimed outcome against the preregistration and the ledger.
 
     Refusals that are structural (no registered preregistration, a token the
     ledger never issued, a role substitution, a correction the budget does not
-    declare) raise. Claims that the evidence cannot carry resolve to ``INVALID``.
-    ``NO_EDGE``/``STOP``/``INCONCLUSIVE`` are accepted when preregistered.
+    declare, a sealed read issued before the registration existed) raise. Claims
+    that the evidence cannot carry resolve to ``INVALID``. ``NO_EDGE``/``STOP``/
+    ``INCONCLUSIVE`` are accepted when preregistered.
+
+    ``PASS`` additionally requires the :class:`ExperimentResult` the claim rests
+    on: its gate vector is diffed against the registration
+    (:meth:`Preregistration.compare_against_result`), it must carry the claimed
+    verdict, the test must have run at the registered alpha, and the observed
+    trade count/drawdown must satisfy the registered gates. Without a result there
+    is no evidence to check, so ``PASS`` is refused rather than assumed.
     """
     preregistration.validate()
     digest = preregistration.digest()
@@ -872,6 +1001,15 @@ def assess_verdict(
         raise VerdictRefused(
             "a sealed read must carry a recorded authorization", code="SEALED_WITHOUT_AUTHORITY"
         )
+    created_ns = preregistration.created_ns
+    if token.role is DatasetRole.SEALED_OOS and created_ns is not None:
+        if token.issued_ns < created_ns:
+            raise VerdictRefused(
+                f"sealed read was issued at {token.issued_ns} ns, before the registration "
+                f"was created at {created_ns} ns: the hypothesis was formed after the read",
+                code="POST_HOC_PREREGISTRATION",
+                field="issued_ns",
+            )
     if (
         claimed is not Verdict.PASS
         and claimed is not Verdict.INCONCLUSIVE
@@ -905,6 +1043,28 @@ def assess_verdict(
             preregistration_digest=digest,
             primary_edge_eligible=False,
             reasons=("PASS claimed without a multiple-testing correction",),
+        )
+    if experiment is None:
+        raise VerdictRefused(
+            "PASS requires the ExperimentResult the claim was measured on: its gate "
+            "vector is compared with the registration and its observations are checked "
+            "against the registered gates",
+            code="EXPERIMENT_RESULT_REQUIRED",
+            field="experiment",
+        )
+    preregistration.compare_against_result(experiment)  # raises PostHocGateChange
+    if experiment.verdict is not claimed:
+        raise VerdictRefused(
+            f"the experiment result reports {experiment.verdict}, not the claimed {claimed}",
+            code="RESULT_VERDICT_MISMATCH",
+            field="verdict",
+        )
+    if budget.alpha is not None and Decimal(str(testing.alpha)) != budget.alpha:
+        raise VerdictRefused(
+            f"the test ran at alpha {testing.alpha}, but the registration fixed "
+            f"{budget.alpha}; a wider alpha is a different test",
+            code="ALPHA_MISMATCH",
+            field="alpha",
         )
     if budget.max_hypotheses is None or testing.family_size > budget.max_hypotheses:
         raise VerdictRefused(
@@ -942,6 +1102,38 @@ def assess_verdict(
             preregistration_digest=digest,
             primary_edge_eligible=False,
             reasons=(f"{hypothesis!r} did not survive correction",),
+            experiment_digest=experiment.digest(),
+        )
+    registered = preregistration.gates()
+    if registered.minimum_trades is not None and (
+        experiment.observed_trades < registered.minimum_trades
+    ):
+        return VerdictResult(
+            verdict=Verdict.INVALID,
+            code="GATE_NOT_MET",
+            role=token.role,
+            preregistration_digest=digest,
+            primary_edge_eligible=False,
+            reasons=(
+                f"observed {experiment.observed_trades} trades, below the registered "
+                f"minimum of {registered.minimum_trades}",
+            ),
+            experiment_digest=experiment.digest(),
+        )
+    if registered.max_drawdown is not None and (
+        experiment.observed_drawdown > registered.max_drawdown
+    ):
+        return VerdictResult(
+            verdict=Verdict.INVALID,
+            code="GATE_NOT_MET",
+            role=token.role,
+            preregistration_digest=digest,
+            primary_edge_eligible=False,
+            reasons=(
+                f"observed drawdown {experiment.observed_drawdown}, above the registered "
+                f"maximum of {registered.max_drawdown}",
+            ),
+            experiment_digest=experiment.digest(),
         )
     sealed = token.role is DatasetRole.SEALED_OOS
     return VerdictResult(
@@ -951,9 +1143,13 @@ def assess_verdict(
         preregistration_digest=digest,
         primary_edge_eligible=sealed,
         reasons=(
-            f"corrected by {testing.method} over family {testing.family_name!r}",
+            f"corrected by {testing.method} over family {testing.family_name!r} at "
+            f"alpha {testing.alpha}",
+            f"gates matched and satisfied: {experiment.observed_trades} trades, "
+            f"drawdown {experiment.observed_drawdown}",
             "sealed OOS read" if sealed else f"{token.role} read: no primary OOS edge",
         ),
+        experiment_digest=experiment.digest(),
     )
 
 

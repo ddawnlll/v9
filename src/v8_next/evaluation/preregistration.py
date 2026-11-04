@@ -299,6 +299,12 @@ class Preregistration(BaseModel):
             "control_arms",
             "a random-entry arm with matched exits is required",
         )
+        require(
+            ArmKind.SIMPLE_CONTROL_POLICY in entry_kinds,
+            "control_arms",
+            "a simple control policy arm is required so the intervention is compared "
+            "against a non-V9 policy, not only against noise",
+        )
         reference = intervention.matched if intervention is not None else None
         for arm in self.control_arms:
             label = f"control_arms[{arm.arm_id or '?'}]"

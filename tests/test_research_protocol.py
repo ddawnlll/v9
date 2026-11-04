@@ -51,6 +51,10 @@ MATCHED = MatchedDimensions(
     exit_policy="bracket_2r",
 )
 
+#: When the registration is created. Sealed reads must be issued at or after this instant.
+CREATED_NS = 1_760_000_000_000_000_000
+ISSUED_NS = CREATED_NS + 1_000_000_000
+
 
 def registration(
     *, role: DatasetRole = DatasetRole.SEALED_OOS, **overrides: Any
@@ -70,6 +74,12 @@ def registration(
                 arm_id="random",
                 kind=ArmKind.RANDOM_ENTRY_MATCHED_EXITS,
                 description="random entry",
+                matched=MATCHED,
+            ),
+            Arm(
+                arm_id="simple",
+                kind=ArmKind.SIMPLE_CONTROL_POLICY,
+                description="simple control policy",
                 matched=MATCHED,
             ),
         ),
@@ -95,7 +105,7 @@ def registration(
             alpha=Decimal("0.05"),
             correction=CorrectionMethod.HOLM,
         ),
-        "created_ns": 1_760_000_000_000_000_000,
+        "created_ns": CREATED_NS,
         "code_sha": "a" * 64,
         "config_sha": "b" * 64,
     }
@@ -169,6 +179,7 @@ def test_sealed_authorization_purpose_must_match() -> None:
             "exploratory peek",
             1,
             slice_id="sealed",
+            issued_ns=ISSUED_NS,
             authorization=authorization,
         )
     assert raised.value.field == "purpose"
@@ -184,6 +195,7 @@ def test_sealed_slice_reuse_is_refused_under_same_authorization() -> None:
         "final evaluation",
         1,
         slice_id="sealed",
+        issued_ns=ISSUED_NS,
         authorization=authorization,
     )
     with pytest.raises(SealedReuseViolation) as raised:
@@ -192,6 +204,7 @@ def test_sealed_slice_reuse_is_refused_under_same_authorization() -> None:
             "final evaluation",
             1,
             slice_id="sealed",
+            issued_ns=ISSUED_NS,
             authorization=authorization,
         )
     assert raised.value.code == "SEALED_SLICE_REUSE"
@@ -209,6 +222,7 @@ def test_one_authorization_cannot_open_two_slices() -> None:
         "final evaluation",
         1,
         slice_id="sealed",
+        issued_ns=ISSUED_NS,
         authorization=authorization,
     )
     with pytest.raises(SealedReuseViolation):
@@ -227,7 +241,12 @@ def test_reauthorized_reread_is_recorded_and_permitted() -> None:
     purpose = "final evaluation"
     first = authorize_sealed(granted_by="director", purpose=purpose, reference="prereg H-001")
     ledger.request_access(
-        DatasetRole.SEALED_OOS, purpose, 1, slice_id="sealed", authorization=first
+        DatasetRole.SEALED_OOS,
+        purpose,
+        1,
+        slice_id="sealed",
+        issued_ns=ISSUED_NS,
+        authorization=first,
     )
     second = authorize_sealed(
         granted_by="director",
@@ -236,7 +255,12 @@ def test_reauthorized_reread_is_recorded_and_permitted() -> None:
     )
     assert second.authorization_id != first.authorization_id
     ledger.request_access(
-        DatasetRole.SEALED_OOS, purpose, 1, slice_id="sealed", authorization=second
+        DatasetRole.SEALED_OOS,
+        purpose,
+        1,
+        slice_id="sealed",
+        issued_ns=ISSUED_NS,
+        authorization=second,
     )
 
     (report,) = ledger.reuse_detection()
@@ -257,20 +281,105 @@ def test_persisted_ledger_reuse_is_detected_on_rehydration() -> None:
         "final evaluation",
         1,
         slice_id="sealed",
+        issued_ns=ISSUED_NS,
         authorization=authorization,
     )
-    duplicated = AccessToken(
+    # A genuinely issued second read (content-addressed id) is what reuse detection must
+    # catch; the id is re-derived exactly as the ledger derives it.
+    duplicated = _token(seq=2, token=first, issued_ns=ISSUED_NS)
+    with pytest.raises(SealedReuseViolation):
+        AccessLedger.from_entries(
+            [first, duplicated], authorizations=[authorization]
+        )
+
+
+def _token(*, seq: int, token: AccessToken, issued_ns: int) -> AccessToken:
+    """Rebuild a token whose ``token_id`` re-derives from its content."""
+    return AccessToken.mint(
+        seq=seq,
+        role=token.role,
+        purpose=token.purpose,
+        budget=token.budget,
+        slice_id=token.slice_id,
+        issued_ns=issued_ns,
+        authorization_id=token.authorization_id,
+    )
+
+
+def test_persisted_ledger_refuses_a_hand_written_token_id() -> None:
+    ledger = AccessLedger()
+    authorization = authorize_sealed(
+        granted_by="director", purpose="final evaluation", reference="prereg H-001"
+    )
+    first = ledger.request_access(
+        DatasetRole.SEALED_OOS,
+        "final evaluation",
+        1,
+        slice_id="sealed",
+        issued_ns=ISSUED_NS,
+        authorization=authorization,
+    )
+    forged = AccessToken(
         token_id="forged-second-read",
         seq=2,
         role=first.role,
         purpose=first.purpose,
         budget=1,
         slice_id=first.slice_id,
-        issued_ns=0,
+        issued_ns=ISSUED_NS,
         authorization_id=first.authorization_id,
     )
-    with pytest.raises(SealedReuseViolation):
-        AccessLedger.from_entries([first, duplicated])
+    with pytest.raises(ResearchProtocolError) as raised:
+        AccessLedger.from_entries([first, forged], authorizations=[authorization])
+    assert raised.value.code == "TOKEN_DIGEST_MISMATCH"
+    assert raised.value.field == "token_id"
+
+
+def test_persisted_ledger_refuses_a_sealed_row_without_a_minted_authorization() -> None:
+    ledger = AccessLedger()
+    authorization = authorize_sealed(
+        granted_by="director", purpose="final evaluation", reference="prereg H-001"
+    )
+    read = ledger.request_access(
+        DatasetRole.SEALED_OOS,
+        "final evaluation",
+        1,
+        slice_id="sealed",
+        issued_ns=ISSUED_NS,
+        authorization=authorization,
+    )
+    with pytest.raises(SealedAccessError) as raised:
+        AccessLedger.from_entries([read])
+    assert raised.value.code == "UNVERIFIED_AUTHORIZATION"
+    assert raised.value.field == "authorization_id"
+
+    with pytest.raises(TypeError):
+        AccessLedger.from_entries(  # type: ignore[list-item]
+            [read], authorizations=[authorization.authorization_id]
+        )
+
+
+def test_rehydration_accepts_a_ledger_whose_authorizations_are_supplied() -> None:
+    ledger = AccessLedger()
+    authorization = authorize_sealed(
+        granted_by="director", purpose="final evaluation", reference="prereg H-001"
+    )
+    development = ledger.request_access(
+        DatasetRole.DEVELOPMENT, "explore", 50, slice_id="dev-tape"
+    )
+    sealed = ledger.request_access(
+        DatasetRole.SEALED_OOS,
+        "final evaluation",
+        1,
+        slice_id="sealed",
+        issued_ns=ISSUED_NS,
+        authorization=authorization,
+    )
+    rehydrated = AccessLedger.from_entries(
+        [development, sealed], authorizations=[authorization]
+    )
+    assert rehydrated.entries == ledger.entries
+    assert rehydrated.report().lineage_digest == ledger.report().lineage_digest
 
 
 def test_report_states_consumed_roles_and_lineage() -> None:
@@ -285,6 +394,7 @@ def test_report_states_consumed_roles_and_lineage() -> None:
         "final evaluation",
         1,
         slice_id="sealed",
+        issued_ns=ISSUED_NS,
         authorization=authorization,
     )
 
@@ -465,7 +575,34 @@ def sealed_token(ledger: AccessLedger, purpose: str = "final evaluation") -> Acc
         granted_by="director", purpose=purpose, reference=f"prereg {purpose}"
     )
     return ledger.request_access(
-        DatasetRole.SEALED_OOS, purpose, 1, slice_id="sealed", authorization=authorization
+        DatasetRole.SEALED_OOS,
+        purpose,
+        1,
+        slice_id="sealed",
+        issued_ns=ISSUED_NS,
+        authorization=authorization,
+    )
+
+
+def experiment(
+    registration_: Preregistration,
+    *,
+    trades: int = 120,
+    drawdown: str = "0.11",
+    verdict: Verdict = Verdict.PASS,
+    **gate_overrides: Any,
+) -> ExperimentResult:
+    """The result a claim must carry: matching gates and observations inside them."""
+    gates = registration_.gates().model_copy(update=gate_overrides)
+    return ExperimentResult(
+        experiment_id="exp-1",
+        hypothesis_id=registration_.hypothesis_id,
+        preregistration_digest=registration_.digest(),
+        gates=gates,
+        observed_trades=trades,
+        observed_drawdown=Decimal(drawdown),
+        observed_metric=Decimal("0.03"),
+        verdict=verdict,
     )
 
 
@@ -576,6 +713,7 @@ def test_pass_with_corrected_family_and_sealed_role_is_eligible_for_primary_edge
         token=token,
         claimed=Verdict.PASS,
         testing=testing,
+        experiment=experiment(registration_),
     )
     assert result.verdict is Verdict.PASS
     assert result.code == "PASS_WITH_REGISTERED_PREREGISTRATION"
@@ -594,6 +732,7 @@ def test_development_pass_cannot_claim_primary_oos_edge() -> None:
         token=token,
         claimed=Verdict.PASS,
         testing=testing,
+        experiment=experiment(registration_),
     )
     assert result.verdict is Verdict.PASS
     assert result.primary_edge_eligible is False
@@ -614,6 +753,7 @@ def test_correction_must_match_the_registered_method_and_budget() -> None:
             token=token,
             claimed=Verdict.PASS,
             testing=mismatched,
+            experiment=experiment(registration_),
         )
     assert raised.value.code == "CORRECTION_MISMATCH"
 
@@ -629,6 +769,7 @@ def test_correction_must_match_the_registered_method_and_budget() -> None:
             token=token,
             claimed=Verdict.PASS,
             testing=oversized,
+            experiment=experiment(registration_),
         )
     assert raised.value.code == "HYPOTHESIS_BUDGET_EXCEEDED"
 
@@ -643,6 +784,7 @@ def test_pass_claim_with_no_rejected_hypothesis_is_invalid() -> None:
         token=token,
         claimed=Verdict.PASS,
         testing=testing,
+        experiment=experiment(registration()),
     )
     assert result.verdict is Verdict.INVALID
     assert result.code == "CLAIM_NOT_SUPPORTED"
@@ -660,6 +802,7 @@ def test_registered_hypothesis_outside_the_tested_family_is_invalid() -> None:
         token=token,
         claimed=Verdict.PASS,
         testing=testing,
+        experiment=experiment(registration()),
     )
     assert result.verdict is Verdict.INVALID
     assert result.code == "HYPOTHESIS_NOT_TESTED"
@@ -680,6 +823,7 @@ def test_family_name_must_match_the_registered_budget() -> None:
             token=token,
             claimed=Verdict.PASS,
             testing=testing,
+            experiment=experiment(registration()),
         )
     assert raised.value.code == "FAMILY_MISMATCH"
 
@@ -706,6 +850,7 @@ def test_result_report_separates_development_validation_and_sealed() -> None:
         token=token,
         claimed=Verdict.PASS,
         testing=testing,
+        experiment=experiment(registration_),
     )
     report = build_result_report(
         preregistration=registration_, ledger=ledger, result=result, testing=testing
@@ -755,3 +900,200 @@ def test_foreign_result_digest_is_refused_by_comparison() -> None:
     with pytest.raises(PreregistrationError) as raised:
         registration_.compare_against_result(foreign)
     assert "preregistration_digest" in raised.value.fields
+
+
+def test_a_wide_alpha_test_is_refused_against_the_registered_alpha() -> None:
+    """Registering alpha 0.05 and testing at 0.20 must not produce a sealed PASS."""
+    ledger = AccessLedger()
+    token = sealed_token(ledger)
+    registration_ = registration()
+    wide = multiple_testing({"H-001": 0.12}, family(1), alpha=0.20, method=CorrectionMethod.HOLM)
+    assert wide.rejected["H-001"] is True  # the bypass the refusal closes
+
+    with pytest.raises(VerdictRefused) as raised:
+        assess_verdict(
+            preregistration=registration_,
+            ledger=ledger,
+            token=token,
+            claimed=Verdict.PASS,
+            testing=wide,
+            experiment=experiment(registration_),
+        )
+    assert raised.value.code == "ALPHA_MISMATCH"
+    assert raised.value.field == "alpha"
+
+
+def test_a_plain_string_correction_method_is_refused() -> None:
+    declared = family(5)
+    raw = {name: 0.03 for name in declared.hypotheses}
+    with pytest.raises(ResearchProtocolError) as raised:
+        multiple_testing(raw, declared, alpha=0.05, method="HOLM")  # type: ignore[arg-type]
+    assert raised.value.code == "CORRECTION_METHOD_NOT_DECLARED"
+    assert raised.value.field == "method"
+
+    # The member does adjust the family, so the refusal above is not cosmetic.
+    corrected = multiple_testing(raw, declared, alpha=0.05, method=CorrectionMethod.HOLM)
+    assert corrected.adjusted["H-001"] == pytest.approx(0.15)
+    assert corrected.rejected["H-001"] is False
+
+
+def test_pass_without_an_experiment_result_is_refused() -> None:
+    ledger = AccessLedger()
+    token = sealed_token(ledger)
+    testing = multiple_testing({"H-001": 0.001}, family(1), method=CorrectionMethod.HOLM)
+    with pytest.raises(VerdictRefused) as raised:
+        assess_verdict(
+            preregistration=registration(),
+            ledger=ledger,
+            token=token,
+            claimed=Verdict.PASS,
+            testing=testing,
+        )
+    assert raised.value.code == "EXPERIMENT_RESULT_REQUIRED"
+    assert raised.value.field == "experiment"
+
+
+def test_post_hoc_gate_change_is_refused_even_with_a_significant_test() -> None:
+    ledger = AccessLedger()
+    token = sealed_token(ledger)
+    registration_ = registration()
+    testing = multiple_testing({"H-001": 0.001}, family(1), method=CorrectionMethod.HOLM)
+    loosened = experiment(
+        registration_, minimum_trades=3, max_drawdown=Decimal("0.50")
+    )
+    with pytest.raises(PreregistrationError) as raised:
+        assess_verdict(
+            preregistration=registration_,
+            ledger=ledger,
+            token=token,
+            claimed=Verdict.PASS,
+            testing=testing,
+            experiment=loosened,
+        )
+    assert "minimum_trades" in raised.value.fields
+    assert "max_drawdown" in raised.value.fields
+
+
+def test_an_unmet_observed_gate_invalidates_the_claim() -> None:
+    ledger = AccessLedger()
+    token = sealed_token(ledger)
+    registration_ = registration()
+    testing = multiple_testing({"H-001": 0.001}, family(1), method=CorrectionMethod.HOLM)
+
+    too_few = experiment(registration_, trades=1)
+    result = assess_verdict(
+        preregistration=registration_,
+        ledger=ledger,
+        token=token,
+        claimed=Verdict.PASS,
+        testing=testing,
+        experiment=too_few,
+    )
+    assert result.verdict is Verdict.INVALID
+    assert result.code == "GATE_NOT_MET"
+    assert result.primary_edge_eligible is False
+    assert "minimum of 100" in result.reasons[0]
+
+    too_deep = experiment(registration_, drawdown="0.99")
+    result = assess_verdict(
+        preregistration=registration_,
+        ledger=ledger,
+        token=token,
+        claimed=Verdict.PASS,
+        testing=testing,
+        experiment=too_deep,
+    )
+    assert result.verdict is Verdict.INVALID
+    assert result.code == "GATE_NOT_MET"
+    assert "maximum of 0.20" in result.reasons[0]
+
+
+def test_the_experiment_result_must_report_the_claimed_verdict() -> None:
+    ledger = AccessLedger()
+    token = sealed_token(ledger)
+    registration_ = registration()
+    testing = multiple_testing({"H-001": 0.001}, family(1), method=CorrectionMethod.HOLM)
+    opponent = experiment(registration_, verdict=Verdict.NO_EDGE)
+    with pytest.raises(VerdictRefused) as raised:
+        assess_verdict(
+            preregistration=registration_,
+            ledger=ledger,
+            token=token,
+            claimed=Verdict.PASS,
+            testing=testing,
+            experiment=opponent,
+        )
+    assert raised.value.code == "RESULT_VERDICT_MISMATCH"
+    assert raised.value.field == "verdict"
+
+
+def test_pass_records_the_digest_of_the_result_it_was_assessed_on() -> None:
+    ledger = AccessLedger()
+    token = sealed_token(ledger)
+    registration_ = registration()
+    testing = multiple_testing({"H-001": 0.001}, family(1), method=CorrectionMethod.HOLM)
+    measured = experiment(registration_)
+    result = assess_verdict(
+        preregistration=registration_,
+        ledger=ledger,
+        token=token,
+        claimed=Verdict.PASS,
+        testing=testing,
+        experiment=measured,
+    )
+    assert result.verdict is Verdict.PASS
+    assert result.experiment_digest == measured.digest()
+
+
+def test_a_sealed_read_issued_before_the_registration_is_refused() -> None:
+    """A token issued at 1e30 ns against a registration created at 1.76e18 proves nothing;
+    a token issued *earlier* than the registration is a post-hoc hypothesis."""
+    registration_ = registration()
+    ledger = AccessLedger()
+    authorization = authorize_sealed(
+        granted_by="director", purpose="final evaluation", reference="prereg H-001"
+    )
+    late = ledger.request_access(
+        DatasetRole.SEALED_OOS,
+        "final evaluation",
+        1,
+        slice_id="sealed",
+        issued_ns=CREATED_NS - 1,
+        authorization=authorization,
+    )
+    testing = multiple_testing({"H-001": 0.001}, family(1), method=CorrectionMethod.HOLM)
+    with pytest.raises(VerdictRefused) as raised:
+        assess_verdict(
+            preregistration=registration_,
+            ledger=ledger,
+            token=late,
+            claimed=Verdict.PASS,
+            testing=testing,
+            experiment=experiment(registration_),
+        )
+    assert raised.value.code == "POST_HOC_PREREGISTRATION"
+    assert raised.value.field == "issued_ns"
+
+
+def test_a_sealed_read_without_an_issue_time_is_refused() -> None:
+    ledger = AccessLedger()
+    authorization = authorize_sealed(
+        granted_by="director", purpose="final evaluation", reference="prereg H-001"
+    )
+    with pytest.raises(SealedAccessError) as raised:
+        ledger.request_access(
+            DatasetRole.SEALED_OOS,
+            "final evaluation",
+            1,
+            slice_id="sealed",
+            authorization=authorization,
+        )
+    assert raised.value.code == "SEALED_READ_WITHOUT_ISSUE_TIME"
+    assert raised.value.field == "issued_ns"
+    assert len(ledger) == 0
+
+
+def test_an_open_read_needs_no_issue_time() -> None:
+    ledger = AccessLedger()
+    token = ledger.request_access(DatasetRole.DEVELOPMENT, "explore", 5)
+    assert token.issued_ns == 0

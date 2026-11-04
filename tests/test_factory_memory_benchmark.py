@@ -176,9 +176,13 @@ def test_efficiency_counts_a_campaign(tmp_path: Path) -> None:
     assert report.issues == 3
     assert report.attempts == 4
     assert report.retries == 1
-    assert report.verified_findings == 2
+    # Only the FINDING row is a verified finding; the OUTCOME row that happened to carry
+    # VERIFIED does not get counted twice, so the invariant holds.
+    assert report.verified_findings == 1
     assert report.findings == 1
+    assert report.verified_findings <= report.findings
     assert report.completed_issues == 1
+    assert report.pending_review == 0
     assert report.blocked == 1
     assert report.no_edge == 1
     assert report.invalid == 0
@@ -190,7 +194,7 @@ def test_efficiency_counts_a_campaign(tmp_path: Path) -> None:
     assert report.wall_hours.value == pytest.approx(3_660 / 3_600_000)
     assert report.cpu_hours.value == pytest.approx(1_830 / 3_600_000)
     assert report.findings_per_compute_hour.value == pytest.approx(
-        2 / (1_830 / 3_600_000)
+        1 / (1_830 / 3_600_000)
     )
     assert report.reported_prs == 1
     assert report.accepted_prs.value == 1
@@ -482,3 +486,39 @@ def test_partial_acceptance_is_unmeasured() -> None:
     )
     assert report.treatment.accepted.state is MeasurementState.NOT_MEASURED
     assert report.treatment.tokens_per_accepted_task.state is MeasurementState.NOT_MEASURED
+
+
+def test_verified_findings_never_exceeds_recorded_findings(tmp_path: Path) -> None:
+    """An OUTCOME row that says VERIFIED is not a finding; only FINDING rows are."""
+    memory = _memory(tmp_path)
+    memory.record("i1", MemoryKind.OUTCOME, attempt=1, outcome=FindingOutcome.VERIFIED)
+    memory.record("i2", MemoryKind.OUTCOME, attempt=1, outcome=FindingOutcome.PENDING_REVIEW)
+    memory.record("i2", MemoryKind.FINDING, attempt=1, outcome=FindingOutcome.NO_EDGE)
+
+    report = memory.efficiency()
+    assert report.verified_findings == 0
+    assert report.findings == 1
+    assert report.verified_findings <= report.findings
+    assert report.completed_issues == 2  # both reached a completed hand-off
+    assert report.pending_review == 1
+    memory.close()
+
+
+def test_a_draft_publish_is_recorded_as_pending_review(tmp_path: Path) -> None:
+    """A worker hand-off is review-required, so it is neither verified nor a finding."""
+    memory = _memory(tmp_path)
+    event = memory.record(
+        "i1",
+        MemoryKind.OUTCOME,
+        attempt=1,
+        outcome=FindingOutcome.PENDING_REVIEW,
+        worker_id="w1",
+        pr_url="https://example.invalid/pull/1",
+    )
+    assert event.outcome is FindingOutcome.PENDING_REVIEW
+    report = memory.efficiency()
+    assert report.verified_findings == 0
+    assert report.findings == 0
+    assert report.completed_issues == 1
+    assert report.pending_review == 1
+    memory.close()
