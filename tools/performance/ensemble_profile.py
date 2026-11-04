@@ -19,6 +19,9 @@ from decimal import Decimal
 from pathlib import Path
 
 START = time.perf_counter()
+#: Same instant on the system monotonic clock, so a parent sampler can align
+#: this process's internal phase offsets with its samples.
+START_MONOTONIC = time.monotonic()
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -33,6 +36,7 @@ def main() -> None:
     parser.add_argument("--end-ms", type=int)
     parser.add_argument("--profile", type=Path)
     parser.add_argument("--expert-timings", action="store_true", help="instrument nested expert calls")
+    parser.add_argument("--expert-exclusive", action="store_true", help="profile per-expert self time")
     parser.add_argument("--stage-trace", action="store_true", help="trace replay phase boundaries")
     parser.add_argument("--allocations", type=Path, help="write separate tracemalloc snapshot")
     parser.add_argument("--allocation-frames", type=int, default=1, help="tracemalloc stack depth")
@@ -42,10 +46,12 @@ def main() -> None:
         parser.error("--bars must be positive")
     if args.allocation_frames < 1:
         parser.error("--allocation-frames must be positive")
-    if args.stage_trace and (args.profile or args.expert_timings):
+    if args.stage_trace and (args.profile or args.expert_timings or args.expert_exclusive):
         parser.error("--stage-trace must run separately from other instrumentation")
-    if args.allocations and (args.stage_trace or args.profile or args.expert_timings):
+    if args.allocations and (args.stage_trace or args.profile or args.expert_timings or args.expert_exclusive):
         parser.error("--allocations must run separately from other instrumentation")
+    if args.expert_exclusive and (args.profile or args.expert_timings):
+        parser.error("--expert-exclusive must run separately from other instrumentation")
     from v8_next.adapters.expert_strategy import ExpertStrategyConfig, run_expert_strategy_backtest
     from v8_next.domain.market import Candle
 
@@ -110,12 +116,19 @@ def main() -> None:
                            bracket_target_pct=Decimal("0.05"))
     config = ExpertStrategyConfig(**config_args)
     stages = []
+    exclusive_experts = {}
     if args.stage_trace:
         from stage_trace import StageTrace
 
         with StageTrace(run_expert_strategy_backtest) as trace:
             result = run_expert_strategy_backtest(candles, config)
         stages = trace.durations()
+    elif args.expert_exclusive:
+        from expert_trace import ExpertTrace
+
+        with ExpertTrace() as expert_trace:
+            result = run_expert_strategy_backtest(candles, config)
+        exclusive_experts = expert_trace.results()
     else:
         result = run_expert_strategy_backtest(candles, config)
     if profiler:
@@ -157,6 +170,8 @@ def main() -> None:
         "peak_rss_bytes": usage.ru_maxrss if platform.system() == "Darwin" else usage.ru_maxrss * 1024,
         "profiled": bool(profiler),
         "expert_timing_instrumented": args.expert_timings,
+        "expert_exclusive_instrumented": args.expert_exclusive,
+        "exclusive_experts": exclusive_experts,
         "stage_trace_instrumented": args.stage_trace,
         "allocations_instrumented": bool(args.allocations),
         "stages": stages,
@@ -173,6 +188,7 @@ def main() -> None:
             for name, samples in expert_samples.items()
         },
         "pid": os.getpid(),
+        "start_monotonic_s": START_MONOTONIC,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")

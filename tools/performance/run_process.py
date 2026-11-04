@@ -20,13 +20,24 @@ from pathlib import Path
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--measurement", required=True, type=Path)
-    parser.add_argument("--script", choices=("ensemble", "portfolio", "research"), default="ensemble")
+    parser.add_argument(
+        "--script",
+        default="ensemble",
+        help="measurement script in this directory, with or without .py (ensemble, portfolio, research, portfolio_tape, ...)",
+    )
     parser.add_argument("args", nargs=argparse.REMAINDER)
     parsed = parser.parse_args()
     child_args = parsed.args
     if child_args and child_args[0] == "--":
         child_args = child_args[1:]
-    script = Path(__file__).with_name(f"{parsed.script}_profile.py")
+    stem = Path(parsed.script).stem
+    candidates = [Path(__file__).with_name(stem + ".py")]
+    if stem in ("ensemble", "portfolio", "research"):
+        # Historical names resolved to the *_profile.py harnesses.
+        candidates.insert(0, Path(__file__).with_name(stem + "_profile.py"))
+    script = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if script is None:
+        raise SystemExit(f"measurement script not found: {candidates}")
     command = [sys.executable, str(script), *child_args]
     before = resource.getrusage(resource.RUSAGE_CHILDREN)
     start = time.perf_counter()

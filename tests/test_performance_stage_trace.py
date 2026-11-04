@@ -7,6 +7,7 @@ from v8_next.adapters.expert_strategy import ExpertStrategyConfig, run_expert_st
 from v8_next.domain.market import Candle
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "performance"))
+from expert_trace import ExpertTrace  # noqa: E402
 from stage_trace import StageTrace  # noqa: E402
 
 
@@ -25,6 +26,8 @@ def test_stage_trace_preserves_decisions_and_partitions_the_call() -> None:
     baseline = run_expert_strategy_backtest(candles, cfg)
     with StageTrace(run_expert_strategy_backtest) as trace:
         measured = run_expert_strategy_backtest(candles, cfg)
+    with ExpertTrace() as experts:
+        expert_measured = run_expert_strategy_backtest(candles, cfg)
 
     def signatures(result):
         return [(d["action"], d["support_count"], d["contradict_count"], d["abstain_count"],
@@ -32,7 +35,15 @@ def test_stage_trace_preserves_decisions_and_partitions_the_call() -> None:
                 for d in result["decisions"]]
 
     assert signatures(baseline) == signatures(measured)
+    assert signatures(baseline) == signatures(expert_measured)
     assert len(baseline["fill_records"]) == len(measured["fill_records"]) == 1
+    assert len(expert_measured["fill_records"]) == 1
+    samples = experts.results()
+    assert len(samples) == 28
+    for sample in samples.values():
+        assert sample["inclusive_dispatch"]["count"] == len(candles)
+        assert sample["observer_self"]["total_s"] <= sample["inclusive_dispatch"]["total_s"]
+        assert sample["dispatcher_self"]["total_s"] <= sample["inclusive_dispatch"]["total_s"]
     phases = trace.durations()
     assert len(phases) == 16
     assert all(phase["wall_s"] >= 0 for phase in phases)
