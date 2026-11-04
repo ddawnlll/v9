@@ -500,6 +500,45 @@ class IssueQueue:
                 self._close_event(token, LeaseOutcome.BLOCKED, now, note)
             return IssueState.BLOCKED
 
+    def block_lease(self, lease: Lease, reason: str) -> IssueState:
+        """Block the issue *from the holder of a live lease*; a stale holder is refused.
+
+        :meth:`block` is the owner-escalation door and deliberately carries no lease:
+        it exists so a human can stop an issue nobody owns. A worker must not use that
+        door, because a worker resumed after its lease expired could otherwise clobber
+        the issue a newer worker now legitimately owns. This transition validates the
+        token, the worker and the attempt first, exactly as ``complete``/``fail`` do.
+        """
+        if not isinstance(lease, Lease):
+            raise TypeError("QUEUE: lease must be a Lease")
+        note = _require_text(reason, "reason")
+        now = time.time_ns()
+        with self._write():
+            row = self._db.execute(
+                "SELECT state, token, worker_id, attempts FROM issues WHERE issue_id = ?",
+                (lease.issue_id,),
+            ).fetchone()
+            if row is None:
+                raise UnknownIssueError(lease.issue_id)
+            self._require_live(row, lease)
+            updated = self._db.execute(
+                "UPDATE issues SET state = ?, worker_id = NULL, acquired_ns = NULL,"
+                " expires_ns = NULL, updated_ns = ?, last_error = ?"
+                " WHERE issue_id = ? AND state = ? AND token = ?",
+                (
+                    IssueState.BLOCKED.value,
+                    now,
+                    note,
+                    lease.issue_id,
+                    IssueState.LEASED.value,
+                    lease.token,
+                ),
+            )
+            if updated.rowcount != 1:  # pragma: no cover - guarded by BEGIN IMMEDIATE
+                raise QueueError(f"QUEUE: block lost the race for {lease.issue_id}")
+            self._close_event(lease.token, LeaseOutcome.BLOCKED, now, note)
+            return IssueState.BLOCKED
+
     # -- reads ---------------------------------------------------------------------
 
     def state(self, issue_id: str) -> IssueState:

@@ -15,7 +15,7 @@ from pydantic import ValidationError
 
 from v8_next.factory.lease import MEASURED, IssueState, LeaseOutcome, OwnerReview
 from v8_next.factory.memory import FindingOutcome, MemoryKind, ResearchMemory
-from v8_next.factory.queue import IssueQueue
+from v8_next.factory.queue import IssueQueue, LeaseMismatchError
 from v8_next.factory.worker import (
     FORBIDDEN_CAPABILITIES,
     PHASES,
@@ -208,7 +208,9 @@ def test_happy_path_reaches_published_draft_with_full_receipt(tmp_path: Path) ->
     events = memory.events("i1")
     assert [event.kind for event in events] == [MemoryKind.ATTEMPT, MemoryKind.OUTCOME]
     assert events[0].attempt == 1
-    assert events[-1].outcome is FindingOutcome.VERIFIED
+    # A draft publish requires owner review: it is recorded as PENDING_REVIEW, never as a
+    # verified finding.
+    assert events[-1].outcome is FindingOutcome.PENDING_REVIEW
     assert events[-1].pr_url == PR_URL
 
     # Nothing is left claimable and the run cannot be replayed into a second attempt.
@@ -632,13 +634,16 @@ def test_forced_restart_neither_duplicates_the_claim_nor_loses_memory(tmp_path: 
         (MemoryKind.ATTEMPT, 2),
         (MemoryKind.OUTCOME, 2),
     ]
-    assert events[-1].outcome is FindingOutcome.VERIFIED
+    assert events[-1].outcome is FindingOutcome.PENDING_REVIEW
 
     report = memory.efficiency()
     assert report.issues == 1
     assert report.attempts == 2
     assert report.retries == 1
-    assert report.verified_findings == 1
+    assert report.verified_findings == 0
+    assert report.findings == 0
+    assert report.completed_issues == 1
+    assert report.pending_review == 1
     queue.close()
     memory.close()
 
@@ -648,3 +653,140 @@ def test_nothing_claimable_returns_none(tmp_path: Path) -> None:
     worker = _worker(queue, tmp_path)
     assert worker.run_once(now_ns=START_NS) is None
     queue.close()
+
+
+def test_a_declared_request_that_is_not_a_capability_fails_at_construction(
+    tmp_path: Path,
+) -> None:
+    """A look-alike string must not survive to the phase that would have used it."""
+    queue = _queue(tmp_path)
+    steps = _steps()
+    steps[StepPhase.VERIFY] = FunctionStep(
+        StepPhase.VERIFY,
+        _fixed(_verify_result()),
+        frozenset({"sealed_oos_access"}),  # type: ignore[arg-type]
+    )
+    with pytest.raises(TypeError) as raised:
+        BoundedWorker(queue, worker_id="w1", steps=steps)
+    assert "sealed_oos_access" in str(raised.value)
+    assert "not a Capability" in str(raised.value)
+
+    forbidden_string = _steps()
+    forbidden_string[StepPhase.PUBLISH] = FunctionStep(
+        StepPhase.PUBLISH,
+        _fixed(_publish_result()),
+        frozenset({"MAIN_MERGE"}),  # type: ignore[arg-type]
+    )
+    with pytest.raises(TypeError) as raised:
+        BoundedWorker(queue, worker_id="w1", steps=forbidden_string)
+    assert "MAIN_MERGE" in str(raised.value)
+
+    # Nothing was claimed, so no issue is left holding an unusable lease.
+    queue.enqueue("i1", now_ns=START_NS)
+    assert queue.state("i1") is IssueState.PENDING
+    queue.close()
+
+
+def test_a_shape_shifting_declaration_blocks_and_releases_the_lease(
+    tmp_path: Path,
+) -> None:
+    """A step that passes construction and then declares a non-member must not leak a lease."""
+
+    class ShapeShifting:
+        phase = StepPhase.VERIFY
+
+        def __init__(self) -> None:
+            self.reads = 0
+
+        @property
+        def requests(self) -> frozenset[Capability]:
+            self.reads += 1
+            # Honest at construction, a look-alike string when the phase runs.
+            if self.reads == 1:
+                return frozenset()
+            return frozenset({"sealed_oos_access"})  # type: ignore[return-value]
+
+        def execute(self, context: StepContext) -> StepResult:
+            return _verify_result()
+
+    steps: dict[StepPhase, Any] = {
+        StepPhase.PREPARE: FunctionStep(StepPhase.PREPARE, _fixed(_prepare_result())),
+        StepPhase.IMPLEMENT: FunctionStep(StepPhase.IMPLEMENT, _fixed(_implement_result())),
+        StepPhase.VERIFY: ShapeShifting(),
+        StepPhase.PUBLISH: FunctionStep(StepPhase.PUBLISH, _fixed(_publish_result())),
+    }
+    queue = _queue(tmp_path)
+    worker = BoundedWorker(queue, worker_id="w1", steps=steps, lease_ttl_ns=TTL_NS)
+    worker.register("i1")
+
+    with pytest.raises(TypeError):
+        worker.run_once(now_ns=START_NS)
+
+    # The unexpected driver failure still left a terminal state behind: no held lease.
+    assert queue.state("i1") is IssueState.BLOCKED
+    assert worker.run_once(now_ns=START_NS + 1) is None
+    queue.close()
+
+
+def test_a_failed_step_still_has_its_returned_capabilities_audited(tmp_path: Path) -> None:
+    """The refusal names the capability, even when the step also failed."""
+    queue = _queue(tmp_path)
+    steps = _steps(
+        verify=_verify_result(
+            ok=False,
+            failure="FAILED tests/test_x.py::test_y",
+            requests=(Capability.MAIN_MERGE,),
+        )
+    )
+    worker = _worker(queue, tmp_path, steps=steps)
+    worker.register("i1")
+
+    with pytest.raises(WorkerAuthorizationError) as excinfo:
+        worker.run_once(now_ns=START_NS)
+
+    error = excinfo.value
+    assert error.capability is Capability.MAIN_MERGE
+    assert error.reason == "UNAUTHORIZED_CAPABILITY:MAIN_MERGE"
+    assert error.phase is StepPhase.VERIFY
+    assert error.receipt.terminal is WorkerTerminal.BLOCKED
+    assert queue.state("i1") is IssueState.BLOCKED
+    queue.close()
+
+
+def test_a_stale_worker_cannot_block_the_new_owner(tmp_path: Path) -> None:
+    queue = _queue(tmp_path)
+    queue.enqueue("i1", now_ns=START_NS)
+    first = queue.claim("w1", START_NS, TTL_NS)
+    assert first is not None
+    assert queue.release_expired(START_NS + TTL_NS) == ("i1",)
+    second = queue.claim("w2", START_NS + TTL_NS, TTL_NS)
+    assert second is not None and second.token != first.token
+
+    with pytest.raises(LeaseMismatchError):
+        queue.block_lease(first, "late block from the expired worker")
+
+    record = queue.snapshot("i1")
+    assert record.state is IssueState.LEASED
+    assert record.lease is not None and record.lease.token == second.token
+    assert queue.history("i1")[-1].outcome is LeaseOutcome.ACTIVE
+
+    # The same refusal through the worker's own terminal path: its BLOCKED transition is
+    # lease-scoped, so the newer owner keeps the issue.
+    memory = ResearchMemory(tmp_path / "memory.sqlite3")
+    stale = BoundedWorker(
+        queue,
+        worker_id="w1",
+        steps=_steps(
+            verify=_verify_result(ok=False, failure="FAILED tests/test_x.py::test_y")
+        ),
+        lease_ttl_ns=TTL_NS,
+        memory=memory,
+    )
+    with pytest.raises(LeaseMismatchError):
+        stale.run_lease(first)
+
+    record = queue.snapshot("i1")
+    assert record.state is IssueState.LEASED
+    assert record.lease is not None and record.lease.token == second.token
+    queue.close()
+    memory.close()
