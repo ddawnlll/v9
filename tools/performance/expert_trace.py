@@ -12,7 +12,7 @@ import time
 from types import FrameType
 from typing import Any
 
-from v8_next.experts.registry import CANONICAL_28_EXPERTS, get_expert, observe_expert
+from v8_next.experts.registry import CANONICAL_28_EXPERTS, get_expert, observe_expert, observe_spec
 
 
 def _stats(values: list[float]) -> dict[str, float | int]:
@@ -24,9 +24,20 @@ def _stats(values: list[float]) -> dict[str, float | int]:
     }
 
 
+def _entry_expert(frame: FrameType) -> str:
+    spec = frame.f_locals.get("spec")
+    if spec is not None:
+        return str(spec.expert_id)
+    return str(frame.f_locals["expert_id"])
+
+
 class ExpertTrace:
     def __init__(self) -> None:
         self.codes = {name: get_expert(name).observer_fn.__code__ for name in CANONICAL_28_EXPERTS}
+        # The ensemble dispatches through observe_spec(spec, ...); observe_expert
+        # remains the public by-name entry point. Track either, so the trace does
+        # not depend on which one the hot path uses.
+        self.entry_codes = {observe_spec.__code__, observe_expert.__code__}
         self.samples: dict[str, list[tuple[float, float, float]]] = {
             name: [] for name in CANONICAL_28_EXPERTS
         }
@@ -51,8 +62,8 @@ class ExpertTrace:
 
     def _event(self, frame: FrameType, event: str, arg: Any) -> None:
         if self.active is None:
-            if event == "call" and frame.f_code is observe_expert.__code__:
-                name = frame.f_locals["expert_id"]
+            if event == "call" and frame.f_code in self.entry_codes:
+                name = _entry_expert(frame)
                 if name not in self.codes:
                     raise RuntimeError(f"unexpected expert {name!r}")
                 now = time.perf_counter()
