@@ -25,4 +25,4 @@ Run from the target root with Python 3.12.12 and the locked dependencies:
 - **Mypy is not clean:** the 18 inherited errors affect `certification.py`, `adapters/expert_strategy.py`, `audit/pipeline.py`, `adapters/swing_engine.py`, `app/paper.py`, and `app/portfolio.py`. They were not changed because they reproduce on the source and are outside migration-related fixes. Required verification is therefore not fully passing.
 - External market tapes, historical evidence and the old dashboard are not included. Tests and tools that need them cannot establish those results from this checkout alone. No economic or live-trading claim is made.
 - The local installation used cached packages after a network timeout; fresh installation requires access to the locked dependencies.
-- Publication status: pending.
+- Published at `https://github.com/ddawnlll/v9` on `main`; this is a migration baseline, not a claim that all required checks pass.
