@@ -328,6 +328,8 @@ def select_timeline(rows: list[dict], case: str, phase_marks: list[tuple[str, fl
                 "utime_s": row["utime_s"],
                 "stime_s": row["stime_s"],
                 "major_faults": row["major_faults"],
+                "voluntary_ctxt_switches": row["voluntary_ctxt_switches"],
+                "nonvoluntary_ctxt_switches": row["nonvoluntary_ctxt_switches"],
                 "phase": phase,
             }
         )
@@ -392,6 +394,7 @@ def main() -> int:
             fieldnames=[
                 "case", "sample_index", "since_spawn_s", "phase", "rss_bytes", "vms_bytes",
                 "threads", "utime_s", "stime_s", "major_faults",
+                "voluntary_ctxt_switches", "nonvoluntary_ctxt_switches",
             ],
         )
         writer.writeheader()

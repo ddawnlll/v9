@@ -159,7 +159,9 @@ Reading it honestly:
 * **Half the quota is used.** The replay is effectively single-threaded Python work; ~50 % of two
   vCPUs means one busy core plus overhead. There is no spare-thread exploitation to remove.
 * 12 threads resident throughout (Polars pool + native runtime), 12.0 % system CPU (B1) — no
-  measurable I/O wait.
+  measurable I/O wait. Final sample: 8,495 voluntary / 84 non-voluntary context switches for B1,
+  15,771 / 386 for B3, and **0 major page faults in every sample** — the working set fits in RAM and
+  nothing was evicted to swap.
 * Peak observed CPU utilisation equals the average within sampling noise; no burst above ~56 %.
 * Events/decisions throughput: 2,160 decisions in 2.795 s = **773 decisions/s**; the ten-leg case
   reaches 1,573 decisions/s plus 2,690 funding settlements (`scaling-instruments-10`).
