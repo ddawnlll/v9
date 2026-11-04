@@ -1,0 +1,73 @@
+{
+  "cache": null,
+  "code_sha": "e0871451c949ce563487d9e0b8072b30f30176c3",
+  "cold": {
+    "max_wall_s": 0.8651015409996035,
+    "median_wall_s": 0.8651015409996035,
+    "min_wall_s": 0.8651015409996035,
+    "p95_wall_s": 0.8651015409996035,
+    "refusal_reason": null,
+    "repetitions": 1,
+    "status": "MEASURED"
+  },
+  "config_sha256": "f203bad83a7fdfe64d6b9090f7dc90a40e104c6c6553299ac1b544992bd59bbf",
+  "digests": {
+    "decision": "8ecef5f05713f19ea9195f8ed9e03d407c5fee5bdb730db993afa840d5ac9b16",
+    "fill": null,
+    "funding": "20788c118a0b0e64b0910578b09d040cd5f4d76260bc669dbca96c324d154a61",
+    "order": null,
+    "report": null
+  },
+  "issue_id": "M0-08",
+  "memory": {
+    "peak_rss_bytes": 226344960,
+    "refusal_reason": null,
+    "ru_maxrss_raw": 226344960,
+    "ru_maxrss_unit": "bytes",
+    "status": "MEASURED"
+  },
+  "mode": "baseline",
+  "notes": [
+    "order/fill/report digests are NOT_RUN: this slice measures the expert decision layer only and runs no economic execution replay.",
+    "PR #1's 2-vCPU/4-GiB container figures are a proposed baseline and were not re-run; this receipt stands on its own measurement."
+  ],
+  "oom": false,
+  "receipt_version": "v9.resource-baseline.1",
+  "refusals": {},
+  "runtime": {
+    "nautilus_trader": "2.0.0rc4",
+    "numpy": "2.5.3",
+    "polars": "1.44.1",
+    "pydantic": "2.13.5",
+    "python": "3.12.12"
+  },
+  "scope": {
+    "legs": 1,
+    "months": 2.9568788501026693,
+    "refusal_reason": "SCOPE_BELOW_TARGET: measured 1 leg(s) / 2.96 month(s), target is 40 legs / 12 months",
+    "status": "NOT_RUN",
+    "target_legs": 40,
+    "target_months": 12.0
+  },
+  "tape": {
+    "bars": 2160,
+    "bytes": 1340416,
+    "instrument_id": "BTCUSDT-PERP.BINANCE",
+    "path": "research/tape/btcusdt-1h-2025Q1/tape.jsonl",
+    "refusal_reason": null,
+    "sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7",
+    "status": "MEASURED"
+  },
+  "target_peak_rss_bytes": 4294967296,
+  "warm": {
+    "max_wall_s": 0.8872350419987924,
+    "median_wall_s": 0.8765136250003707,
+    "min_wall_s": 0.8429550000000745,
+    "p95_wall_s": 0.8872350419987924,
+    "refusal_reason": null,
+    "repetitions": 5,
+    "status": "MEASURED"
+  },
+  "within_rss_target": true,
+  "workload": "28-expert ensemble, per-bar observe_all_28 over real tape"
+}
