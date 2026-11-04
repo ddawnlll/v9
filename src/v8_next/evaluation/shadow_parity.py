@@ -13,10 +13,15 @@ Two questions, kept deliberately separate:
    drifting quietly. :func:`compare` is the differential gate over two signatures.
 2. *Does V9 shadow mutate anything?* Under ``policy_state="SHADOW"`` the adaptive
    chain (belief -> evidence -> policy -> decision receipt) runs over the same
-   fixture's decision cuts and populates a decision stream. The native streams are
-   captured *before* and *after* that chain and must be identical; nothing in the
-   chain can construct an order because this module imports no execution adapter
-   and no order type (pinned by ``tests/test_shadow_parity.py`` at the AST level).
+   fixture's decision cuts and populates a decision stream. The run is handed a
+   live :class:`NativeSession` -- the only native surface it can reach -- and that
+   session's own digest is taken *before* and *after* the chain and must be
+   identical. A session is required for ``SHADOW``: a digest pair over a frozen
+   fixture would be a gate that cannot observe anything. Nothing in the chain can
+   construct an order because this module imports no execution adapter and no
+   order type (pinned by ``tests/test_shadow_parity.py`` at the AST level); the
+   sink is an injected protocol, so a mutating adaptive step is *detectable*
+   rather than impossible to write.
    :func:`assert_shadow_unmutated` is the purpose-built check for that pair.
 
 Why not the existing gates
@@ -52,11 +57,11 @@ cannot submit, amend or cancel anything.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from types import MappingProxyType
-from typing import Annotated, Final, Literal, Self
+from typing import Annotated, Final, Literal, Protocol, Self, TypeAlias
 
 from pydantic import (
     BaseModel,
@@ -129,6 +134,7 @@ __all__ = [
     "LineageNotCertifiable",
     "NativeDecisionEvent",
     "NativeOrderEvent",
+    "NativeSession",
     "OpportunityEvent",
     "ParityVerdict",
     "PinnedReferenceDrift",
@@ -140,6 +146,7 @@ __all__ = [
     "ShadowMutationError",
     "ShadowNotExercised",
     "ShadowParityError",
+    "ShadowStep",
     "assert_pinned",
     "assert_shadow_unmutated",
     "capture_replay",
@@ -201,6 +208,41 @@ ABSTAIN: Final[str] = "ABSTAIN"
 _STRUCTURE_EXPERT: Final[str] = "structure"
 _REGIME_EXPERT: Final[str] = "regime"
 _FIXTURE_SOURCE: Final[str] = "shadow-parity-fixture"
+
+
+# --------------------------------------------------------------------------- #
+# the native sink a shadow pass is measured against
+# --------------------------------------------------------------------------- #
+class NativeSession(Protocol):
+    """The only native surface a shadow pass may be handed.
+
+    A shadow run must be able to *observe* the native state it claims not to
+    change. ``digest`` is a content digest of that state; ``submit`` and
+    ``cancel`` are the only mutating verbs the adaptive path could ever reach,
+    which is why they are the ones declared here. This module implements no
+    session, imports no execution adapter and names no order type: the session is
+    injected by the caller (a paper engine in production, a recording double in
+    tests). Zero mutation is therefore *measured* on a live sink, not argued from
+    a frozen fixture.
+    """
+
+    def digest(self) -> str:
+        """Content digest of the native state this session currently holds."""
+        ...
+
+    def submit(self, intent: object) -> None:
+        """Ask the native authority to act on an intent. A shadow run never may."""
+        ...
+
+    def cancel(self, client_order_id: str) -> None:
+        """Ask the native authority to cancel an order. A shadow run never may."""
+        ...
+
+
+#: One adaptive pass: cut -> belief -> evidence -> policy -> receipts, with the
+#: native sink in scope so a violation is observable. The production pass
+#: (:func:`shadow_decisions`) never calls the sink; a test can inject one that does.
+ShadowStep: TypeAlias = Callable[["ReplayScript", NativeSession], "tuple[DecisionReceipt, ...]"]
 
 
 # --------------------------------------------------------------------------- #
@@ -954,13 +996,24 @@ def _evidence(belief: MarketBeliefV1) -> tuple[_StanceView, ...]:
 
 
 def _belief_view(belief: MarketBeliefV1) -> _BeliefFactsView:
-    stale = belief.status is BeliefStatus.STALE or belief.quality is QualityState.STALE
+    """Belief -> the policy's coarse ``(stale, abstain)`` facts, fail-closed.
+
+    Only a ``FRESH`` belief of ``OK`` quality is usable evidence. Every other
+    status is unusable: ``UNKNOWN`` (the aggregate quality is unreadable while a
+    regime is still named) is not a milder ``STALE`` -- presenting it as fresh
+    let the policy emit a bare ``HOLD`` on unreadable evidence. ``ABSTAIN`` keeps
+    its own, more specific branch, so it is not collapsed into ``stale`` here.
+    """
+    abstain = belief.status is BeliefStatus.ABSTAIN
+    stale = not abstain and (
+        belief.status is not BeliefStatus.FRESH or belief.quality is not QualityState.OK
+    )
     return _BeliefFactsView(
         version_hash=belief.version_hash,
         regime=belief.regime_label.value,
         uncertainty=UNCERTAINTY_BANDS[belief.uncertainty],
         stale=stale,
-        abstain=belief.status is BeliefStatus.ABSTAIN,
+        abstain=abstain,
         as_of_ns=belief.max_input_available_at,
     )
 
@@ -1015,11 +1068,41 @@ def _input_refs(belief: MarketBeliefV1, view: ObservationView) -> tuple[Decision
     )
 
 
+def _decision_request(
+    events: ReplayScript, cut: DecisionCutEvent, belief: MarketBeliefV1
+) -> DecisionRequest:
+    """Assemble the policy request for one cut from PIT facts only."""
+    return DecisionRequest(
+        decision_time_ns=cut.decision_time_ns,
+        instrument_id=cut.instrument_id,
+        venue_status=cut.venue_status,
+        position=PositionState(
+            presence=cut.position_presence,
+            quantity=cut.position_quantity,
+            exposure=cut.position_exposure,
+        ),
+        portfolio=PortfolioState(
+            equity=cut.equity,
+            committed_exposure=cut.committed_exposure,
+            capacity=cut.capacity,
+        ),
+        opportunity=_opportunity_view(events, cut),
+        belief=_belief_view(belief),
+        expert_stances=_evidence(belief),
+    )
+
+
 def shadow_decisions(events: ReplayScript) -> tuple[DecisionReceipt, ...]:
     """Run belief -> evidence -> policy -> receipt for every cut, in time order.
 
     Nothing here can construct an order: the only outputs are advisory decisions
     and immutable receipts. The ledger rejects an unverifiable or non-PIT receipt.
+
+    A receipt archives the provenance that shaped the decision, not just its
+    verdict: the active constraint set the policy reported (``VENUE_UNKNOWN``,
+    ``STALE``, ``GROSS_EXPOSURE_EXCEEDED``, ...) is copied into
+    :class:`ReceiptInputs`, so the receipt digest covers it. Dropping it left a
+    receipt that could not explain why an action was unavailable.
     """
     if not events.cuts:
         raise ShadowNotExercised(
@@ -1038,26 +1121,13 @@ def shadow_decisions(events: ReplayScript) -> tuple[DecisionReceipt, ...]:
             )
         belief, view = _belief_at(events, cut, previous)
         previous = belief
-        request = DecisionRequest(
-            decision_time_ns=cut.decision_time_ns,
-            instrument_id=cut.instrument_id,
-            venue_status=cut.venue_status,
-            position=PositionState(
-                presence=cut.position_presence,
-                quantity=cut.position_quantity,
-                exposure=cut.position_exposure,
-            ),
-            portfolio=PortfolioState(
-                equity=cut.equity,
-                committed_exposure=cut.committed_exposure,
-                capacity=cut.capacity,
-            ),
-            opportunity=_opportunity_view(events, cut),
-            belief=_belief_view(belief),
-            expert_stances=_evidence(belief),
-        )
+        request = _decision_request(events, cut, belief)
         decision = policy.evaluate(request)
-        ledger.append(decision, ReceiptInputs(inputs=_input_refs(belief, view)))
+        explanation = policy.explain(request)
+        ledger.append(
+            decision,
+            ReceiptInputs(inputs=_input_refs(belief, view), constraints=explanation.constraints),
+        )
     return ledger.receipts()
 
 
@@ -1090,15 +1160,40 @@ def _signature(
     )
 
 
-def capture_replay(events: ReplayScript, *, policy_state: PolicyState) -> ReplaySignature:
+def _sink_digest(session: NativeSession, *, moment: str) -> str:
+    """Read the native sink's digest, refusing a sink that cannot be observed."""
+    value = session.digest()
+    if not isinstance(value, str) or not _is_digest(value):
+        raise ShadowParityError(
+            f"native session returns no usable digest {moment}",
+            code="SHADOW_SINK_MALFORMED",
+            reasons=(f"SHADOW_SINK_MALFORMED:{moment}",),
+        )
+    return value
+
+
+def capture_replay(
+    events: ReplayScript,
+    *,
+    policy_state: PolicyState,
+    native_session: NativeSession | None = None,
+    shadow_step: ShadowStep | None = None,
+) -> ReplaySignature:
     """Capture the digest set of one replay of ``events`` under ``policy_state``.
 
     ``OFF`` never evaluates the adaptive chain and therefore carries no decision
-    stream. ``SHADOW`` evaluates it and captures the native streams before and
-    after: the two captures must be identical, which is the zero-native-mutation
-    invariant. Capture fails closed -- a ``SHADOW`` script with no cuts is not
-    evidence that shadow ran, and a fixture whose own lineage cannot be certified
-    ``COMPLETE`` cannot be a baseline.
+    stream; ``native_session`` is unused there.
+
+    ``SHADOW`` evaluates the chain against a live :class:`NativeSession` and
+    compares that session's own digest before and after the pass. The sink is
+    required: a digest pair over the frozen fixture cannot change, so it would be
+    a gate that can never fail. ``shadow_step`` defaults to the production pass
+    (:func:`shadow_decisions`) and exists so a test can inject a step that does
+    reach for ``submit``/``cancel`` -- which is how the gate is proven to work.
+
+    Capture fails closed -- a ``SHADOW`` script with no cuts is not evidence that
+    shadow ran, a run with no observable sink proves nothing, and a fixture whose
+    own lineage cannot be certified ``COMPLETE`` cannot be a baseline.
     """
     if not isinstance(events, ReplayScript):
         raise TypeError(f"expected ReplayScript, got {type(events).__name__}")
@@ -1115,21 +1210,27 @@ def capture_replay(events: ReplayScript, *, policy_state: PolicyState) -> Replay
             code="UNKNOWN_POLICY_STATE",
             reasons=(f"UNKNOWN_POLICY_STATE:{policy_state}",),
         )
-
-    native_before = _native_digests(events)
-    receipts = shadow_decisions(events)
-    native_after = _native_digests(events)
-    if native_before != native_after:
-        drifted = tuple(
-            stream for stream in NATIVE_STREAMS if native_before[stream] != native_after[stream]
+    if native_session is None:
+        raise ShadowParityError(
+            "a shadow run needs an observable native sink; without one the "
+            "zero-mutation gate cannot fail",
+            code="SHADOW_SINK_MISSING",
+            reasons=("SHADOW_SINK_MISSING",),
         )
+
+    before = _sink_digest(native_session, moment="before")
+    receipts = (
+        shadow_decisions(events) if shadow_step is None else shadow_step(events, native_session)
+    )
+    after = _sink_digest(native_session, moment="after")
+    if before != after:
         raise ShadowMutationError(
-            f"the adaptive chain changed native stream(s) {list(drifted)}",
-            reasons=tuple(f"DIGEST_DRIFT:{stream}" for stream in drifted),
+            "the adaptive chain changed the native sink during the shadow pass",
+            reasons=("DIGEST_DRIFT:native_session",),
         )
     return _signature(
         policy_state=POLICY_SHADOW,
-        native=native_after,
+        native=_native_digests(events),
         decisions=_decisions_digest(receipts),
         decision_ids=tuple(receipt.decision_id for receipt in receipts),
     )

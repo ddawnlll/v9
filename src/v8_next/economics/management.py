@@ -18,11 +18,16 @@ explanation into three things that stay strictly apart:
 Three invariants are structural, not conventional:
 
 1. **Protection is read, never assumed.** A protection reading that is
-   ``UNKNOWN``, ``REJECTED``, ``GAP`` or ``UNPROTECTED`` is never reported as
-   protected and can never produce a ``HOLD``: the advisory fails closed to
-   ``EXIT`` and ``fail_closed`` is set. A ``PROTECTED`` reading whose stop price
-   is absent or already through the mark is self-contradictory and is downgraded
-   to ``UNKNOWN`` before it reaches any consumer.
+   ``UNKNOWN``, ``REJECTED``, ``GAP``, ``PARTIAL`` or ``UNPROTECTED`` is never
+   reported as protected and can never produce a ``HOLD``: the advisory fails
+   closed to ``EXIT`` and ``fail_closed`` is set. ``PARTIAL`` -- a live stop that
+   covers less than the filled position -- is the state that must force a
+   protective resize, so it is grouped with the denied states rather than read as
+   "mostly protected". A ``PROTECTED`` reading whose stop price is absent or
+   already through the mark is self-contradictory and is downgraded to
+   ``UNKNOWN`` before it reaches any consumer. The enum itself is the domain's
+   (:mod:`v8_next.domain.protection`), shared verbatim with the native checker,
+   so a producer's ``PARTIAL`` is a consumer's ``PARTIAL``.
 2. **Nothing widens risk autonomously.** A break-even move is proposed only in
    the protective direction (a ``LONG`` stop can only move up, a ``SHORT`` stop
    can only move down), only when it is still on the safe side of the mark, and
@@ -50,6 +55,7 @@ from typing import Final, Literal, Mapping
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from v8_next.domain.decision import DecisionAction, ReasonCode, VenueOrderStatus
+from v8_next.domain.protection import ProtectionState
 from v8_next.economics.legality import (
     PRECEDENCE,
     LegalActionTable,
@@ -104,22 +110,6 @@ _DEFAULT_TICK_SIZE: Final[Decimal] = Decimal("0.01")
 _QUANTITY_PRECISION: Final[Decimal] = Decimal("0.000000001")
 
 
-class ProtectionState(StrEnum):
-    """What the native protection reading actually says.
-
-    Only ``PROTECTED`` may ever be reported as protected. Everything else is a
-    fail-closed management state: ``UNPROTECTED`` (known absent),
-    ``REJECTED`` (the venue refused the stop), ``GAP`` (coverage hole observed)
-    and ``UNKNOWN`` (unreadable).
-    """
-
-    PROTECTED = "PROTECTED"
-    UNPROTECTED = "UNPROTECTED"
-    UNKNOWN = "UNKNOWN"
-    REJECTED = "REJECTED"
-    GAP = "GAP"
-
-
 class ProtectiveKind(StrEnum):
     """The two protective-intent proposals this module may raise."""
 
@@ -164,6 +154,7 @@ _PROTECTION_REASONS: Final[Mapping[ProtectionState, tuple[ReasonCode, ...]]] = M
     {
         ProtectionState.PROTECTED: (),
         ProtectionState.UNPROTECTED: (ReasonCode.RISK_DENIED,),
+        ProtectionState.PARTIAL: (ReasonCode.RISK_DENIED,),
         ProtectionState.UNKNOWN: (ReasonCode.RISK_UNKNOWN,),
         ProtectionState.REJECTED: (ReasonCode.VENUE_REJECTED, ReasonCode.RISK_DENIED),
         ProtectionState.GAP: (ReasonCode.RISK_UNKNOWN,),
@@ -894,7 +885,12 @@ def _protective_add_proposal(
         return None
     reason = (
         ReasonCode.RISK_DENIED
-        if protection_state in {ProtectionState.UNPROTECTED, ProtectionState.REJECTED}
+        if protection_state
+        in {
+            ProtectionState.UNPROTECTED,
+            ProtectionState.PARTIAL,
+            ProtectionState.REJECTED,
+        }
         else ReasonCode.RISK_UNKNOWN
     )
     return _make_proposal(
