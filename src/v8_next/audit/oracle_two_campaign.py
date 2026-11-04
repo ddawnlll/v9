@@ -628,6 +628,64 @@ def _provenance_digest(
     return canonical_digest(PROVENANCE_TAG, payload)
 
 
+def _independent_final_equity(ledger: CampaignLedger, funding_total: Decimal) -> Decimal:
+    """Final equity re-derived from the per-order ledgers and the funding rows."""
+    order_realized = sum((row.realized_pnl for row in ledger.orders), ZERO)
+    order_fees = sum((row.fees for row in ledger.orders), ZERO)
+    return (
+        ledger.initial_equity + order_realized + funding_total - order_fees + ledger.unrealized_pnl
+    )
+
+
+def reconcile_campaign_arithmetic(
+    ledger: CampaignLedger,
+    *,
+    funding_rows: Sequence[FundingRecord] = (),
+) -> None:
+    """Re-derive one campaign's totals from its per-order rows and funding evidence.
+
+    The campaign totals are accumulated fill-by-fill in :func:`_recompute_campaign`
+    while each :class:`OrderLedger` is accumulated order-by-order. Summing the order
+    rows is therefore a second, independent computation of the same money: a
+    corrupted, dropped or double-counted campaign total — or a funding row that
+    belongs to another campaign — raises :class:`OracleViolation` with
+    :attr:`OracleViolationCode.ARITHMETIC_MISMATCH`. ``final_equity`` is re-derived
+    from those independent sums, never re-evaluated from the campaign's own fields.
+    """
+    funding_total = ZERO
+    for row in funding_rows:
+        if row.campaign_id != ledger.campaign_id:
+            raise OracleViolation(
+                OracleViolationCode.CAMPAIGN_MISMATCH,
+                row.funding_id,
+                f"funding row campaign {row.campaign_id!r} != ledger campaign "
+                f"{ledger.campaign_id!r}",
+            )
+        funding_total += row.amount
+
+    order_realized = sum((row.realized_pnl for row in ledger.orders), ZERO)
+    order_fees = sum((row.fees for row in ledger.orders), ZERO)
+    for name, campaign_total, independent in (
+        ("realized_pnl", ledger.realized_pnl, order_realized),
+        ("fees", ledger.fees, order_fees),
+        ("funding", ledger.funding, funding_total),
+    ):
+        if campaign_total != independent:
+            raise OracleViolation(
+                OracleViolationCode.ARITHMETIC_MISMATCH,
+                ledger.campaign_id,
+                f"{name} {campaign_total} != independent per-order/funding sum {independent}",
+            )
+
+    independent_final = _independent_final_equity(ledger, funding_total)
+    if independent_final != ledger.final_equity:
+        raise OracleViolation(
+            OracleViolationCode.ARITHMETIC_MISMATCH,
+            ledger.campaign_id,
+            f"final_equity {ledger.final_equity} != independently summed {independent_final}",
+        )
+
+
 def recompute(
     *,
     campaigns: Sequence[CampaignRecord],
@@ -676,23 +734,13 @@ def recompute(
 
     total_initial = sum((ledger.initial_equity for ledger in ledgers), ZERO)
     total_final = sum((ledger.final_equity for ledger in ledgers), ZERO)
-    identity = sum(
-        (
-            ledger.initial_equity
-            + ledger.realized_pnl
-            + ledger.funding
-            - ledger.fees
-            + ledger.unrealized_pnl
-            for ledger in ledgers
-        ),
-        ZERO,
-    )
-    if identity != total_final:
-        raise OracleViolation(
-            OracleViolationCode.ARITHMETIC_MISMATCH,
-            "<report>",
-            f"equity identity {identity} != summed final equity {total_final}",
-        )
+
+    # Each campaign total is re-derived from its per-order ledgers and its funding
+    # rows. The campaign aggregates are accumulated fill-by-fill while the order
+    # ledgers are accumulated order-by-order, so this is an independent second
+    # computation — not a restatement of the expression that produced the totals.
+    for ledger in ledgers:
+        reconcile_campaign_arithmetic(ledger, funding_rows=by_campaign_funding[ledger.campaign_id])
 
     return OracleReport(
         ledgers=ledgers,
@@ -746,4 +794,5 @@ __all__ = [
     "OrderSide",
     "recompute",
     "reconcile_aggregate",
+    "reconcile_campaign_arithmetic",
 ]
