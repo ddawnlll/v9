@@ -581,6 +581,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
     from decimal import Decimal
 
     from v8_next.audit.pipeline import (
+        derive_audit_inputs,
         refresh_manifest_digests,
         run_native_audit,
         validate_audit_dir,
@@ -592,13 +593,24 @@ def cmd_audit(args: argparse.Namespace) -> int:
         if not (run_dir / "run_manifest.json").is_file():
             print(f"error: no audit run at {run_dir}", file=sys.stderr)
             return 2
-        write_reports(run_dir)
+        audit_inputs = derive_audit_inputs(run_dir)
+        write_reports(
+            run_dir,
+            verdict=audit_inputs.verdict,
+            lineage=audit_inputs.lineage,
+            as_of_ns=audit_inputs.as_of_ns,
+        )
         refresh_manifest_digests(run_dir)
         validation = validate_audit_dir(run_dir)
         (run_dir / "validation_results.json").write_text(
             _json.dumps(validation, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        write_reports(run_dir)
+        write_reports(
+            run_dir,
+            verdict=audit_inputs.verdict,
+            lineage=audit_inputs.lineage,
+            as_of_ns=audit_inputs.as_of_ns,
+        )
         refresh_manifest_digests(run_dir)
         print(
             f"report-only: {run_dir} validation={validation['status']} "
