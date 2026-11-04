@@ -1,0 +1,216 @@
+{
+  "baseline": {
+    "code_sha": "0000000000000000000000000000000000000000",
+    "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "costs": {
+      "fee": "MISSING",
+      "funding": "MISSING",
+      "microstructure": "UNSUPPORTED",
+      "partial_fill_model": "NOT_RUN",
+      "slippage": "MISSING",
+      "stop_first_tie": true
+    },
+    "dataset_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "engine_version": "NOT_RUN",
+    "fees": null,
+    "fills": null,
+    "funding": null,
+    "gross_pnl": null,
+    "intervention": "BASELINE",
+    "max_drawdown": null,
+    "net_pnl": null,
+    "net_pnl_ci": null,
+    "net_r": null,
+    "reasons": [
+      "NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY"
+    ],
+    "run_id": "baseline-not-run",
+    "status": "NOT_RUN",
+    "trades": null
+  },
+  "blockers": [
+    "BASELINE:NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY",
+    "MARKET_BELIEF:NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY",
+    "EXPERT_ROUTING:NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY",
+    "ENTRY_TIMING:NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY",
+    "POSITION_THESIS:NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY",
+    "PORTFOLIO_ALLOCATION:NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY",
+    "BASELINE:COST_PROVENANCE_MISSING:fee",
+    "BASELINE:COST_PROVENANCE_MISSING:funding",
+    "BASELINE:COST_PROVENANCE_MISSING:slippage",
+    "BASELINE:MICROSTRUCTURE_UNSUPPORTED",
+    "MARKET_BELIEF:COST_PROVENANCE_MISSING:fee",
+    "MARKET_BELIEF:COST_PROVENANCE_MISSING:funding",
+    "MARKET_BELIEF:COST_PROVENANCE_MISSING:slippage",
+    "MARKET_BELIEF:MICROSTRUCTURE_UNSUPPORTED",
+    "EXPERT_ROUTING:COST_PROVENANCE_MISSING:fee",
+    "EXPERT_ROUTING:COST_PROVENANCE_MISSING:funding",
+    "EXPERT_ROUTING:COST_PROVENANCE_MISSING:slippage",
+    "EXPERT_ROUTING:MICROSTRUCTURE_UNSUPPORTED",
+    "ENTRY_TIMING:COST_PROVENANCE_MISSING:fee",
+    "ENTRY_TIMING:COST_PROVENANCE_MISSING:funding",
+    "ENTRY_TIMING:COST_PROVENANCE_MISSING:slippage",
+    "ENTRY_TIMING:MICROSTRUCTURE_UNSUPPORTED",
+    "POSITION_THESIS:COST_PROVENANCE_MISSING:fee",
+    "POSITION_THESIS:COST_PROVENANCE_MISSING:funding",
+    "POSITION_THESIS:COST_PROVENANCE_MISSING:slippage",
+    "POSITION_THESIS:MICROSTRUCTURE_UNSUPPORTED",
+    "PORTFOLIO_ALLOCATION:COST_PROVENANCE_MISSING:fee",
+    "PORTFOLIO_ALLOCATION:COST_PROVENANCE_MISSING:funding",
+    "PORTFOLIO_ALLOCATION:COST_PROVENANCE_MISSING:slippage",
+    "PORTFOLIO_ALLOCATION:MICROSTRUCTURE_UNSUPPORTED"
+  ],
+  "claim": "NONE",
+  "deltas": [],
+  "digest": "c1cb33ee91ddd11867781d7e85be16c3c5e84c658d99b77d12730a0141d2f8a6",
+  "interventions": [
+    {
+      "code_sha": "0000000000000000000000000000000000000000",
+      "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "costs": {
+        "fee": "MISSING",
+        "funding": "MISSING",
+        "microstructure": "UNSUPPORTED",
+        "partial_fill_model": "NOT_RUN",
+        "slippage": "MISSING",
+        "stop_first_tie": true
+      },
+      "dataset_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "engine_version": "NOT_RUN",
+      "fees": null,
+      "fills": null,
+      "funding": null,
+      "gross_pnl": null,
+      "intervention": "ENTRY_TIMING",
+      "max_drawdown": null,
+      "net_pnl": null,
+      "net_pnl_ci": null,
+      "net_r": null,
+      "reasons": [
+        "NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY"
+      ],
+      "run_id": "entry_timing-not-run",
+      "status": "NOT_RUN",
+      "trades": null
+    },
+    {
+      "code_sha": "0000000000000000000000000000000000000000",
+      "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "costs": {
+        "fee": "MISSING",
+        "funding": "MISSING",
+        "microstructure": "UNSUPPORTED",
+        "partial_fill_model": "NOT_RUN",
+        "slippage": "MISSING",
+        "stop_first_tie": true
+      },
+      "dataset_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "engine_version": "NOT_RUN",
+      "fees": null,
+      "fills": null,
+      "funding": null,
+      "gross_pnl": null,
+      "intervention": "EXPERT_ROUTING",
+      "max_drawdown": null,
+      "net_pnl": null,
+      "net_pnl_ci": null,
+      "net_r": null,
+      "reasons": [
+        "NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY"
+      ],
+      "run_id": "expert_routing-not-run",
+      "status": "NOT_RUN",
+      "trades": null
+    },
+    {
+      "code_sha": "0000000000000000000000000000000000000000",
+      "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "costs": {
+        "fee": "MISSING",
+        "funding": "MISSING",
+        "microstructure": "UNSUPPORTED",
+        "partial_fill_model": "NOT_RUN",
+        "slippage": "MISSING",
+        "stop_first_tie": true
+      },
+      "dataset_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "engine_version": "NOT_RUN",
+      "fees": null,
+      "fills": null,
+      "funding": null,
+      "gross_pnl": null,
+      "intervention": "MARKET_BELIEF",
+      "max_drawdown": null,
+      "net_pnl": null,
+      "net_pnl_ci": null,
+      "net_r": null,
+      "reasons": [
+        "NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY"
+      ],
+      "run_id": "market_belief-not-run",
+      "status": "NOT_RUN",
+      "trades": null
+    },
+    {
+      "code_sha": "0000000000000000000000000000000000000000",
+      "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "costs": {
+        "fee": "MISSING",
+        "funding": "MISSING",
+        "microstructure": "UNSUPPORTED",
+        "partial_fill_model": "NOT_RUN",
+        "slippage": "MISSING",
+        "stop_first_tie": true
+      },
+      "dataset_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "engine_version": "NOT_RUN",
+      "fees": null,
+      "fills": null,
+      "funding": null,
+      "gross_pnl": null,
+      "intervention": "PORTFOLIO_ALLOCATION",
+      "max_drawdown": null,
+      "net_pnl": null,
+      "net_pnl_ci": null,
+      "net_r": null,
+      "reasons": [
+        "NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY"
+      ],
+      "run_id": "portfolio_allocation-not-run",
+      "status": "NOT_RUN",
+      "trades": null
+    },
+    {
+      "code_sha": "0000000000000000000000000000000000000000",
+      "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "costs": {
+        "fee": "MISSING",
+        "funding": "MISSING",
+        "microstructure": "UNSUPPORTED",
+        "partial_fill_model": "NOT_RUN",
+        "slippage": "MISSING",
+        "stop_first_tie": true
+      },
+      "dataset_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "engine_version": "NOT_RUN",
+      "fees": null,
+      "fills": null,
+      "funding": null,
+      "gross_pnl": null,
+      "intervention": "POSITION_THESIS",
+      "max_drawdown": null,
+      "net_pnl": null,
+      "net_pnl_ci": null,
+      "net_r": null,
+      "reasons": [
+        "NO_ECONOMIC_FINALIST_FROM_M3_07_AND_NO_AUTHORIZED_COSTED_NATIVE_REPLAY"
+      ],
+      "run_id": "position_thesis-not-run",
+      "status": "NOT_RUN",
+      "trades": null
+    }
+  ],
+  "preregistration_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+  "schema_version": "v9-costed-ablation-v1",
+  "status": "BLOCKED"
+}
