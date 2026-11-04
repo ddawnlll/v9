@@ -1,0 +1,60 @@
+Wed Nov  4 17:20:30 2026    /out/profile.pstats
+
+         997179 function calls (992120 primitive calls) in 0.327 seconds
+
+   Ordered by: cumulative time
+   List reduced from 2063 to 50 due to restriction <50>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.001    0.001    0.384    0.384 /work/src/v8_next/adapters/expert_strategy.py:1502(run_expert_strategy_backtest)
+        1    0.003    0.003    0.258    0.258 {method 'run' of 'nautilus_trader.backtest.BacktestEngine' objects}
+      720    0.009    0.000    0.255    0.000 /work/src/v8_next/adapters/expert_strategy.py:471(on_bar)
+      720    0.002    0.000    0.132    0.000 /work/src/v8_next/experts/registry.py:669(observe_all_28)
+    20880    0.005    0.000    0.129    0.000 /work/src/v8_next/experts/registry.py:685(<genexpr>)
+    20160    0.027    0.000    0.124    0.000 /work/src/v8_next/experts/registry.py:605(observe_expert)
+    364/7    0.001    0.000    0.122    0.017 <frozen importlib._bootstrap>:1349(_find_and_load)
+    362/7    0.001    0.000    0.122    0.017 <frozen importlib._bootstrap>:1304(_find_and_load_unlocked)
+    347/4    0.000    0.000    0.122    0.030 <frozen importlib._bootstrap>:911(_load_unlocked)
+    289/4    0.000    0.000    0.122    0.030 <frozen importlib._bootstrap_external>:993(exec_module)
+   823/11    0.000    0.000    0.122    0.011 <frozen importlib._bootstrap>:480(_call_with_frames_removed)
+    393/4    0.005    0.000    0.121    0.030 {built-in method builtins.exec}
+        1    0.000    0.000    0.100    0.100 /work/.venv/lib/python3.12/site-packages/pandas/__init__.py:1(<module>)
+    68/40    0.000    0.000    0.076    0.002 {built-in method builtins.__import__}
+        1    0.000    0.000    0.053    0.053 /work/.venv/lib/python3.12/site-packages/pandas/core/api.py:1(<module>)
+      720    0.001    0.000    0.043    0.000 /work/src/v8_next/economics/decisions.py:91(opportunity_at)
+      720    0.012    0.000    0.040    0.000 /work/src/v8_next/domain/market.py:147(from_ordered_prefix)
+  539/372    0.000    0.000    0.035    0.000 <frozen importlib._bootstrap>:1390(_handle_fromlist)
+      748    0.000    0.000    0.034    0.000 /usr/local/lib/python3.12/functools.py:982(__get__)
+      720    0.001    0.000    0.033    0.000 /work/src/v8_next/domain/market.py:101(continuous)
+      769    0.014    0.000    0.033    0.000 {built-in method builtins.all}
+  570/560    0.004    0.000    0.031    0.000 {built-in method builtins.__build_class__}
+    19440    0.011    0.000    0.031    0.000 /work/src/v8_next/experts/common.py:22(directional_stance)
+    20160    0.017    0.000    0.029    0.000 /work/src/v8_next/economics/decisions.py:63(stance_record)
+        1    0.000    0.000    0.029    0.029 /work/.venv/lib/python3.12/site-packages/pandas/core/groupby/__init__.py:1(<module>)
+        1    0.000    0.000    0.028    0.028 /work/.venv/lib/python3.12/site-packages/pandas/core/groupby/generic.py:1(<module>)
+    56/30    0.000    0.000    0.025    0.001 <frozen importlib._bootstrap_external>:1299(exec_module)
+    56/30    0.007    0.000    0.025    0.001 {built-in method _imp.exec_dynamic}
+      289    0.001    0.000    0.025    0.000 <frozen importlib._bootstrap_external>:1066(get_code)
+        1    0.000    0.000    0.023    0.023 /work/.venv/lib/python3.12/site-packages/pandas/core/frame.py:1(<module>)
+        1    0.000    0.000    0.021    0.021 /work/.venv/lib/python3.12/site-packages/pandas/core/config_init.py:1(<module>)
+        1    0.000    0.000    0.021    0.021 /work/src/v8_next/audit/__init__.py:1(<module>)
+        1    0.000    0.000    0.020    0.020 /work/.venv/lib/python3.12/site-packages/pandas/errors/__init__.py:1(<module>)
+        1    0.000    0.000    0.020    0.020 /work/.venv/lib/python3.12/site-packages/pandas/_libs/__init__.py:1(<module>)
+   259560    0.019    0.000    0.019    0.000 /work/src/v8_next/domain/market.py:103(<genexpr>)
+      289    0.002    0.000    0.018    0.000 <frozen importlib._bootstrap_external>:755(_compile_bytecode)
+        1    0.000    0.000    0.018    0.018 /work/src/v8_next/audit/authority.py:1(<module>)
+        1    0.000    0.000    0.018    0.018 /work/src/v8_next/evaluation/claims.py:1(<module>)
+        1    0.000    0.000    0.017    0.017 /work/.venv/lib/python3.12/site-packages/pandas/_libs/tslibs/__init__.py:1(<module>)
+    10080    0.007    0.000    0.017    0.000 /work/src/v8_next/economics/decisions.py:321(stance_with)
+        1    0.000    0.000    0.016    0.016 /work/src/v8_next/evaluation/benchmark_receipt.py:1(<module>)
+      289    0.016    0.000    0.016    0.000 {built-in method marshal.loads}
+   234389    0.015    0.000    0.015    0.000 {built-in method builtins.getattr}
+        1    0.000    0.000    0.015    0.015 /work/.venv/lib/python3.12/site-packages/pandas/core/generic.py:1(<module>)
+     1440    0.014    0.000    0.014    0.000 /work/src/v8_next/domain/market.py:82(__post_init__)
+        1    0.000    0.000    0.013    0.013 /work/.venv/lib/python3.12/site-packages/pandas/core/arrays/__init__.py:1(<module>)
+       14    0.000    0.000    0.012    0.001 /work/.venv/lib/python3.12/site-packages/pydantic/_internal/_model_construction.py:84(__new__)
+     2880    0.006    0.000    0.012    0.000 /usr/local/lib/python3.12/dataclasses.py:1540(replace)
+      559    0.007    0.000    0.010    0.000 <frozen importlib._bootstrap>:463(_lock_unlock_module)
+      357    0.001    0.000    0.010    0.000 <frozen importlib._bootstrap>:1240(_find_spec)
+
+

@@ -1,0 +1,28 @@
+{
+  "git_base_sha": "e04cc5b38bfda3bba25f71f58980c5d8ff888061",
+  "note": "source tree as recorded; profiling tools were uncommitted at time of run; hashes identify exact files",
+  "sha256": {
+    "uv.lock": "b3ee5c3836d26b8e6a598f6a9ffe1b50213939bd00efaceb0397d19b9f2b698b",
+    "src/v8_next/adapters/expert_strategy.py": "8b6f23e8369b43a8e045a6f7b1d64784835fac0a1769213b4afd88c56ee99c9c",
+    "tools/performance/ensemble_profile.py": "987972f83522e76097f0ff83dd46c60bba62c30f8deea8844083fcf5c9d330cb",
+    "tools/performance/run_process.py": "2b8f9655013d0bbe9844aec3ba5bdf09364e9d39bbb546362a92b910a93f3546",
+    "tools/performance/continuity.goose": "926786693916f4c245d05e784298fcb62c387f3bd79ddf3e71603cf845ae8d96"
+  },
+  "host_cpu": "Apple M3 Pro",
+  "container": "Linux aarch64 on Docker Desktop VM",
+  "container_python": "3.12.16",
+  "nautilus_trader": "2.0.0rc4",
+  "polars": "1.44.1",
+  "uv": "0.9.14",
+  "base_image": "python:3.12-slim@sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30",
+  "threads": {
+    "POLARS_MAX_THREADS": "2",
+    "OMP_NUM_THREADS": "2",
+    "OPENBLAS_NUM_THREADS": "2"
+  },
+  "cgroup_memory_max_bytes": 4294967296,
+  "cgroup_cpu_max": "200000 100000",
+  "goose": "v2026.3 macOS arm64; runtime 4d3da949e563",
+  "goose_archive_sha256": "2ffaaf46b3edde27aed03fcd9ebe73e9b6639cac30d8a6915f7dc00795b7aedf",
+  "historical_data_sha256": null
+}
