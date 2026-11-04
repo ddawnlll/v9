@@ -2,22 +2,22 @@
   "parity": null,
   "receipt": {
     "cache": null,
-    "code_sha": "e0871451c949ce563487d9e0b8072b30f30176c3",
+    "code_sha": "0582143ed9c442313a969ff44e2cd8e481525070",
     "cold": {
-      "max_wall_s": 4.554001625001547,
-      "median_wall_s": 4.554001625001547,
-      "min_wall_s": 4.554001625001547,
-      "p95_wall_s": 4.554001625001547,
+      "max_wall_s": 2.3739183330035303,
+      "median_wall_s": 2.3739183330035303,
+      "min_wall_s": 2.3739183330035303,
+      "p95_wall_s": 2.3739183330035303,
       "refusal_reason": null,
       "repetitions": 1,
       "status": "MEASURED"
     },
-    "consumers": 2,
+    "consumers": 1,
     "issue_id": "M1-06",
     "memory": {
-      "peak_rss_bytes": 178372608,
+      "peak_rss_bytes": 179699712,
       "refusal_reason": null,
-      "ru_maxrss_raw": 178372608,
+      "ru_maxrss_raw": 179699712,
       "ru_maxrss_unit": "bytes",
       "status": "MEASURED"
     },
@@ -25,7 +25,7 @@
     "notes": [
       "values_digest compares the five shared specs bar by bar against the unbundled full-prefix kernels."
     ],
-    "reads": 21210,
+    "reads": 10605,
     "receipt_version": "v9.resource-baseline.1",
     "refusals": {},
     "runtime": {
@@ -44,12 +44,12 @@
       "sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7",
       "status": "MEASURED"
     },
-    "values_digest": "abf8b0c0b8c39419135a61d8d97b402cc1ba419758f9ac95a036944d934f06db",
+    "values_digest": "ca7767d8458f859a345c76e7d7ad2f51b9bc6bcf3a60521cde353a763a9b6de5",
     "warm": {
-      "max_wall_s": 4.653707374993246,
-      "median_wall_s": 4.584498875003192,
-      "min_wall_s": 4.534832334000384,
-      "p95_wall_s": 4.653707374993246,
+      "max_wall_s": 2.5228906249976717,
+      "median_wall_s": 2.3397457499959273,
+      "min_wall_s": 2.3336071250087116,
+      "p95_wall_s": 2.5228906249976717,
       "refusal_reason": null,
       "repetitions": 5,
       "status": "MEASURED"
