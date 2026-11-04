@@ -3,8 +3,6 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-import polars as pl
-
 from v8_next.domain.market import CausalFrame
 from v8_next.economics.decisions import Opportunity, Stance, numeric
 from v8_next.experts.common import context_reason, directional_stance
@@ -41,6 +39,28 @@ def observe_bollinger_reversion(frame: CausalFrame, opportunity: Opportunity | N
     )
 
 
+def recovery_run_start(values: tuple[float | None, ...], threshold: float, above: bool) -> int | None:
+    """Start of the terminal threshold-run, or None when the last bar is outside it.
+
+    Exact scalar port of the former full-prefix ``pl.Series`` mask scan: None
+    entries count as False (as ``fill_null(False)`` did) and an unbroken run
+    from the first bar yields 0, which callers skip exactly as before. Only the
+    terminal run is walked, so quiet bars pay O(1) instead of rebuilding a
+    Series over the whole prefix on every bar.
+    """
+    n = len(values)
+    if n == 0:
+        return None
+    last = values[n - 1]
+    if last is None or not (last > threshold if above else last < threshold):
+        return None
+    for i in range(n - 1, -1, -1):
+        value = values[i]
+        if value is None or not (value > threshold if above else value < threshold):
+            return i + 1
+    return 0
+
+
 def observe_rsi_reversion(frame: CausalFrame, opportunity: Opportunity | None) -> Stance:
     reason = context_reason(frame, opportunity, 21)
     direction = None
@@ -48,15 +68,10 @@ def observe_rsi_reversion(frame: CausalFrame, opportunity: Opportunity | None) -
         rsi = wilder_rsi(close_series(frame))
         reason = "NO_RECOVERY_TRIGGER"
         # LONG takes precedence as in the active Rust v1/a hypothesis.
-        rsi_s = pl.Series("rsi", [v for v in rsi], dtype=pl.Float64)
         for side, threshold in (("LONG", 30), ("SHORT", 70)):
-            rec_mask = ((rsi_s > threshold) if side == "LONG" else (rsi_s < threshold)).fill_null(
-                False
-            )
-            if not rec_mask[-1]:
+            start = recovery_run_start(rsi, threshold, side == "LONG")
+            if start is None:
                 continue
-            false_indices = (~rec_mask).arg_true()
-            start = int(false_indices[-1]) + 1 if len(false_indices) else 0
             if start == 0 or rsi[start - 1] is None:
                 continue
             signal, latest = frame.candles[start], frame.candles[-1]

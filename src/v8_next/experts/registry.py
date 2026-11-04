@@ -41,6 +41,7 @@ from v8_next.experts.failed_moves import (
     observe_failed_move,
 )
 from v8_next.experts.features import _ACTIVE_LAZY, _LazyBundle
+from v8_next.experts.engine import FeatureEngine
 from v8_next.experts.fibonacci import observe_fib_projection, observe_fib_retracement
 from v8_next.experts.gaps import observe_gap
 from v8_next.experts.ichimoku import observe_ichimoku
@@ -619,22 +620,25 @@ def _witness_version(spec: ExpertSpec) -> str:
 def _with_witness(spec: ExpertSpec, stance: Stance, chosen_variant: str | None) -> Stance:
     """Return ``stance`` carrying this expert's authoritative witness metadata.
 
-    Equivalent to rebuilding the record with the metadata overrides, but without
-    binding ten keyword arguments or formatting the version string per call. The
-    field set, field order and values are unchanged, so equality, hashing, repr
-    and every audit record derived from the result are identical.
+    Single positional construction: the only fields surviving from the raw
+    stance are kind, reason, opportunity_id and decision_ns (everything else
+    is overwritten with the spec's authoritative metadata), so rebuilding
+    directly is identical to copy-and-overwrite, without the dict copy.
+    Field order and values are unchanged, so equality, hashing, repr and
+    every audit record derived from the result are identical.
     """
-    values = stance.__dict__.copy()
-    values["observer_id"] = spec.expert_id
-    values["behavior_family"] = spec.behavior_family
-    values["mechanism_family"] = spec.mechanism_family
-    values["dependency_group"] = spec.dependency_group
-    values["version"] = _witness_version(spec)
-    values["variant_id"] = chosen_variant or stance.variant_id or "UNRESOLVED"
-    cls = type(stance)
-    witnessed = cls.__new__(cls)
-    witnessed.__dict__.update(values)
-    return witnessed
+    return Stance(
+        spec.expert_id,
+        spec.dependency_group,
+        stance.kind,
+        stance.reason,
+        stance.opportunity_id,
+        stance.decision_ns,
+        spec.behavior_family,
+        spec.mechanism_family,
+        _witness_version(spec),
+        chosen_variant or stance.variant_id or "UNRESOLVED",
+    )
 
 
 def observe_spec(
@@ -710,6 +714,7 @@ def observe_all_28(
     opportunity: Opportunity | None,
     *,
     readings: tuple[PositioningReading, ...] = (),
+    engine: FeatureEngine | None = None,
 ) -> tuple[Stance, ...]:
     """Observe an opportunity across all 28 canonical active experts with authoritative metadata.
 
@@ -718,8 +723,13 @@ def observe_all_28(
     and cleared afterwards (per-bar invalidation, no cross-bar leakage).
     Quiet bars that never touch a series pay only the ContextVar set/reset.
     Misses fail closed to the unbundled path, so stances stay identical.
+
+    ``engine`` is the strategy-owned cross-bar indicator state (one per
+    instrument feed). Indicator fast paths use it only when they can prove
+    the retained prefix matches this bar, and fall back to full-prefix
+    computation otherwise, so stances stay identical with or without one.
     """
-    token = _ACTIVE_LAZY.set(_LazyBundle(frame))
+    token = _ACTIVE_LAZY.set(_LazyBundle(frame, engine))
     try:
         return tuple(
             observe_spec(spec, frame, opportunity, readings) for spec in _dispatch_specs()

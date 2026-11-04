@@ -20,9 +20,22 @@ from v8_next.opportunities.models import (
 class OpportunityBook:
     """Canonical Opportunity Book holding Expert-independent opportunity episodes."""
 
+    #: Statuses scanned by the per-candle transition check. Terminal episodes
+    #: leave the active index but stay in ``_episodes`` for audit.
+    _TRANSITION_STATUSES = (
+        OpportunityStatus.CANDIDATE,
+        OpportunityStatus.CONFIRMED,
+        OpportunityStatus.ADMITTED,
+    )
+
     def __init__(self) -> None:
         self._episodes: list[OpportunityRecord] = []
         self._by_id: dict[str, int] = {}
+        #: Active episode indices per instrument, in insertion order. The
+        #: per-candle transition check and active queries walk only this
+        #: index instead of rescanning terminal episodes every bar.
+        self._active_by_instrument: dict[str, list[int]] = {}
+        self._active_positions: dict[int, int] = {}
 
     def insert(self, opportunity: OpportunityRecord) -> None:
         """Idempotently insert an opportunity episode into the book."""
@@ -31,12 +44,35 @@ class OpportunityBook:
         idx = len(self._episodes)
         self._by_id[opportunity.opportunity_id] = idx
         self._episodes.append(opportunity)
+        if opportunity.status in self._TRANSITION_STATUSES:
+            self._active_positions[idx] = len(
+                self._active_by_instrument.setdefault(opportunity.instrument_id, [])
+            )
+            self._active_by_instrument[opportunity.instrument_id].append(idx)
 
     def get(self, opportunity_id: str) -> OpportunityRecord | None:
         idx = self._by_id.get(opportunity_id)
         if idx is None:
             return None
         return self._episodes[idx]
+
+    def _deactivate(self, idx: int) -> None:
+        """Remove ``idx`` from the active index; the episode stays for audit."""
+        position = self._active_positions.pop(idx, None)
+        if position is None:
+            return
+        episode = self._episodes[idx]
+        active = self._active_by_instrument.get(episode.instrument_id)
+        if not active:
+            return
+        # Swap-remove keeps deactivation O(1); on_candle sorts the small
+        # active set per instrument, so transition order stays deterministic.
+        last = active.pop()
+        if last != idx:
+            active[position] = last
+            self._active_positions[last] = position
+        if not active:
+            del self._active_by_instrument[episode.instrument_id]
 
     def update_status(self, opportunity_id: str, new_status: OpportunityStatus) -> bool:
         idx = self._by_id.get(opportunity_id)
@@ -45,6 +81,16 @@ class OpportunityBook:
         current = self._episodes[idx]
         if current.status != new_status:
             self._episodes[idx] = current.with_status(new_status)
+            if new_status not in self._TRANSITION_STATUSES:
+                self._deactivate(idx)
+            elif idx not in self._active_positions:
+                # Re-admission of a terminal episode: restore index
+                # membership so the transition check sees it again.
+                episode = self._episodes[idx]
+                self._active_positions[idx] = len(
+                    self._active_by_instrument.setdefault(episode.instrument_id, [])
+                )
+                self._active_by_instrument[episode.instrument_id].append(idx)
             return True
         return False
 
@@ -58,10 +104,15 @@ class OpportunityBook:
         Returns list of newly invalidated or expired opportunities on this tick.
         """
         transitioned: list[OpportunityRecord] = []
-        for idx, ep in enumerate(self._episodes):
-            if ep.instrument_id != candle.instrument_id:
-                continue
-            if ep.status not in (OpportunityStatus.CANDIDATE, OpportunityStatus.CONFIRMED, OpportunityStatus.ADMITTED):
+        active = self._active_by_instrument.get(candle.instrument_id)
+        if not active:
+            return transitioned
+        # Insertion order: indices grow monotonically, so sorting restores the
+        # exact scan order of the former full-book loop (which ran in index
+        # order) after O(1) swap-removes above.
+        for idx in sorted(active):
+            ep = self._episodes[idx]
+            if ep.status not in self._TRANSITION_STATUSES:
                 continue
 
             # Check price invalidation (stop loss breach)
@@ -79,6 +130,7 @@ class OpportunityBook:
             if invalidated:
                 new_ep = ep.with_status(OpportunityStatus.INVALIDATED)
                 self._episodes[idx] = new_ep
+                self._deactivate(idx)
                 transitioned.append(new_ep)
                 continue
 
@@ -86,6 +138,7 @@ class OpportunityBook:
             if candle.end_ns > ep.valid_until_ns:
                 new_ep = ep.with_status(OpportunityStatus.EXPIRED)
                 self._episodes[idx] = new_ep
+                self._deactivate(idx)
                 transitioned.append(new_ep)
 
         return transitioned
@@ -102,6 +155,27 @@ class OpportunityBook:
         ),
     ) -> list[OpportunityRecord]:
         """Query all currently valid/active opportunities matching criteria."""
+        wanted = set(statuses)
+        if wanted <= set(self._TRANSITION_STATUSES):
+            if instrument_id is not None:
+                indices = sorted(self._active_by_instrument.get(instrument_id, ()))
+            else:
+                # Global insertion order, as the former full-book scan.
+                indices = sorted(
+                    idx
+                    for active in self._active_by_instrument.values()
+                    for idx in active
+                )
+            active = []
+            for idx in indices:
+                ep = self._episodes[idx]
+                if ep.status not in wanted:
+                    continue
+                if timestamp_ns is not None:
+                    if not (ep.as_of_time_ns <= timestamp_ns <= ep.valid_until_ns):
+                        continue
+                active.append(ep)
+            return active
         active = []
         for ep in self._episodes:
             if instrument_id is not None and ep.instrument_id != instrument_id:

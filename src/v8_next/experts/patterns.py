@@ -7,7 +7,18 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from v8_next.domain.market import CausalFrame
-from v8_next.experts.features import per_bar_memo
+from v8_next.experts.features import _engine_for, per_bar_memo
+
+
+def _pattern_pivots_full(frame: CausalFrame, *, high: bool, strength: int) -> tuple[int, ...]:
+    """Legacy full-prefix computation; the equivalence reference."""
+    values = frame.df["high"] if high else frame.df["low"]
+    if not values.is_finite().all():
+        raise ValueError("price outside finite float domain")
+    roll = values.rolling_max(strength) if high else values.rolling_min(strength)
+    left, right = roll.shift(1), roll.shift(-strength)
+    mask = (values > left) & (values > right) if high else (values < left) & (values < right)
+    return tuple(int(i) for i in mask.fill_null(False).arg_true())
 
 
 @per_bar_memo
@@ -16,13 +27,16 @@ def pattern_pivots(frame: CausalFrame, *, high: bool, strength: int = 3) -> tupl
         raise ValueError("positive pivot strength required")
     if not frame.continuous:
         raise ValueError("source gap")
-    values = frame.df["high"] if high else frame.df["low"]
-    if not values.is_finite().all():
-        raise ValueError("price outside finite float domain")
-    roll = values.rolling_max(strength) if high else values.rolling_min(strength)
-    left, right = roll.shift(1), roll.shift(-strength)
-    mask = (values > left) & (values > right) if high else (values < left) & (values < right)
-    return tuple(int(i) for i in mask.fill_null(False).arg_true())
+    engine = _engine_for(frame)
+    if engine is not None:
+        fast = engine.confirmed_pivots(frame, high=high, strength=strength)
+        if fast is not None:
+            return fast
+        full = _pattern_pivots_full(frame, high=high, strength=strength)
+        engine.adopt_verified(frame)
+        engine.confirmed_pivots(frame, high=high, strength=strength)
+        return full
+    return _pattern_pivots_full(frame, high=high, strength=strength)
 
 
 def retests(frame: CausalFrame, direction: str, level: Decimal) -> bool:

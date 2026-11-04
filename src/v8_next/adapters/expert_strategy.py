@@ -63,6 +63,7 @@ from v8_next.economics.decisions import (
     stance_record,
 )
 from v8_next.economics.grammar import grammar_opportunity
+from v8_next.experts.engine import FeatureEngine
 from v8_next.experts.registry import CANONICAL_28_EXPERTS, observe_all_28
 from v8_next.opportunities.book import OpportunityBook
 from v8_next.opportunities.exposure import ExposureResolver
@@ -236,6 +237,10 @@ class ExpertEnsembleStrategy(Strategy):
         #: Last frame built for this bar sequence. Only used to carry validation
         #: forward one bar; always replaced by a fully validated frame on doubt.
         self._frame: CausalFrame | None = None
+        #: Cross-bar indicator state for this instrument feed. Indicator fast
+        #: paths use it only on proven prefixes and fall back otherwise, so a
+        #: fresh engine is indistinguishable from none.
+        self._feature_engine = FeatureEngine()
         self.decisions: list[dict[str, Any]] = []
         self.order_events: list[dict[str, Any]] = []
         self.opened_positions: list[dict[str, Any]] = []
@@ -635,7 +640,9 @@ class ExpertEnsembleStrategy(Strategy):
 
         # 6. Invoke all 28 canonical active witnesses
         try:
-            stances = observe_all_28(frame, opportunity, readings=self.readings)
+            stances = observe_all_28(
+                frame, opportunity, readings=self.readings, engine=self._feature_engine
+            )
         except Exception as exc:  # audit the failure, then preserve fail-closed behaviour
             self._audit(
                 "EXPERT_EVALUATED",

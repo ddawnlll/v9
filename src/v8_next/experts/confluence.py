@@ -2,26 +2,21 @@
 
 from decimal import Decimal
 
-import polars as pl
-
 from v8_next.domain.market import CausalFrame
 from v8_next.economics.decisions import Opportunity, Stance, numeric, stance_with
 from v8_next.experts.common import context_reason, directional_stance
 from v8_next.experts.features import close_series, wilder_rsi
 from v8_next.experts.fibonacci import fib_impulse
-from v8_next.experts.reversion import bollinger_direction
+from v8_next.experts.reversion import bollinger_direction, recovery_run_start
 
 
 def recovery_direction(values: tuple[float | None, ...]) -> str | None:
     if not values or values[-1] is None:
         return None
-    s = pl.Series("rsi", [v for v in values], dtype=pl.Float64)
     for side, threshold in (("LONG", 30), ("SHORT", 70)):
-        rec_mask = ((s > threshold) if side == "LONG" else (s < threshold)).fill_null(False)
-        if not rec_mask[-1]:
+        start = recovery_run_start(values, threshold, side == "LONG")
+        if start is None:
             continue
-        false_indices = (~rec_mask).arg_true()
-        start = int(false_indices[-1]) + 1 if len(false_indices) else 0
         if start > 0 and values[start - 1] is not None:
             return side
     return None

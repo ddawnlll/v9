@@ -23,12 +23,25 @@ def previous_session_bars(frame: CausalFrame) -> tuple[Candle, ...] | None:
     """Previous complete UTC day's H/L/final close, fixed throughout the session."""
     if not frame.continuous:
         raise ValueError("source gap")
-    if not frame.candles:
+    candles = frame.candles
+    if not candles:
         return None
-    session = frame.candles[-1].start_ns // DAY_NS * DAY_NS
-    previous = tuple(
-        c for c in frame.candles if session - DAY_NS <= c.start_ns and c.end_ns <= session
-    )
+    session = candles[-1].start_ns // DAY_NS * DAY_NS
+    # Starts are strictly increasing on a validated frame, so the previous
+    # session is located by bisection instead of filtering the whole prefix
+    # on every bar. The slice below is validated exactly as before, which is
+    # what makes the result identical: any deviation (short history, gaps,
+    # non-hourly bars, bars spanning the boundary) still yields None.
+    lo, hi = 0, len(candles)
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if candles[mid].start_ns < session:
+            lo = mid + 1
+        else:
+            hi = mid
+    if lo < 24:
+        return None
+    previous = candles[lo - 24 : lo]
     if (
         len(previous) != 24
         or previous[0].start_ns != session - DAY_NS
