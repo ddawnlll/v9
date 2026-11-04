@@ -1,0 +1,28 @@
+{
+  "bars": 2160,
+  "bars_per_instrument": {
+    "BTCUSDT": 2160
+  },
+  "decisions": 2160,
+  "execution_profile": "baseline",
+  "fills": 89,
+  "fixture_s": 0.0233227920000445,
+  "funding_missing_mark": 0,
+  "funding_rows_dropped": 0,
+  "funding_rows_supplied": 270,
+  "funding_settlements_fed": 269,
+  "imports_s": 0.2483919579999565,
+  "orders": null,
+  "peak_rss_bytes": 261120000,
+  "pid": 166,
+  "pre_output_s": 2.7854172099999914,
+  "production_backtest_s": 2.5137024599999904,
+  "profiled": false,
+  "start_monotonic_s": 865.342674102,
+  "symbols": [
+    "BTCUSDT"
+  ],
+  "system_cpu_s": 0.338433,
+  "user_cpu_s": 2.650893,
+  "workload": "historical development tape; performance record only, no economic claim"
+}

@@ -1,0 +1,124 @@
+{
+  "allocations_instrumented": false,
+  "bars": 2160,
+  "decisions": 2160,
+  "exclusive_experts": {},
+  "expert_exclusive_instrumented": false,
+  "expert_timing_instrumented": false,
+  "experts": {},
+  "fills": 1,
+  "first_start_ns": 1735689600000000000,
+  "fixture": null,
+  "fixture_s": 0.056386209000038434,
+  "imports_s": 0.2050272500000574,
+  "last_end_ns": 1743465600000000000,
+  "orders": 3,
+  "peak_rss_bytes": 252960768,
+  "pid": 37,
+  "pre_output_s": 2.7653483349999988,
+  "production_backtest_s": 2.503934875999903,
+  "profiled": false,
+  "stage_trace_instrumented": true,
+  "stages": [
+    {
+      "phase": "function_entry",
+      "rss_end_bytes": 159506432,
+      "rss_start_bytes": 159506432,
+      "wall_s": 8.062500000960426e-05
+    },
+    {
+      "phase": "instrument_setup",
+      "rss_end_bytes": 160292864,
+      "rss_start_bytes": 159506432,
+      "wall_s": 0.00022733399998742243
+    },
+    {
+      "phase": "bar_conversion",
+      "rss_end_bytes": 160948224,
+      "rss_start_bytes": 160292864,
+      "wall_s": 0.004116000000067288
+    },
+    {
+      "phase": "execution_profile",
+      "rss_end_bytes": 160948224,
+      "rss_start_bytes": 160948224,
+      "wall_s": 1.9665999957396707e-05
+    },
+    {
+      "phase": "engine_init",
+      "rss_end_bytes": 198615040,
+      "rss_start_bytes": 160948224,
+      "wall_s": 0.10292504200003805
+    },
+    {
+      "phase": "venue_setup",
+      "rss_end_bytes": 199008256,
+      "rss_start_bytes": 198615040,
+      "wall_s": 0.00013720799995553534
+    },
+    {
+      "phase": "instrument_add",
+      "rss_end_bytes": 199532544,
+      "rss_start_bytes": 199008256,
+      "wall_s": 7.558400000107213e-05
+    },
+    {
+      "phase": "data_add",
+      "rss_end_bytes": 208052224,
+      "rss_start_bytes": 199532544,
+      "wall_s": 0.0007460409999566764
+    },
+    {
+      "phase": "strategy_setup",
+      "rss_end_bytes": 209100800,
+      "rss_start_bytes": 208052224,
+      "wall_s": 0.002464916999997513
+    },
+    {
+      "phase": "engine_run",
+      "rss_end_bytes": 251113472,
+      "rss_start_bytes": 209100800,
+      "wall_s": 2.3751974180000843
+    },
+    {
+      "phase": "economic_state",
+      "rss_end_bytes": 251113472,
+      "rss_start_bytes": 251113472,
+      "wall_s": 0.000388749999956417
+    },
+    {
+      "phase": "report_import",
+      "rss_end_bytes": 251113472,
+      "rss_start_bytes": 251113472,
+      "wall_s": 0.0005457910000359334
+    },
+    {
+      "phase": "native_reports",
+      "rss_end_bytes": 252796928,
+      "rss_start_bytes": 251113472,
+      "wall_s": 0.011671333999970557
+    },
+    {
+      "phase": "fill_report",
+      "rss_end_bytes": 252796928,
+      "rss_start_bytes": 252796928,
+      "wall_s": 0.0017796659999476105
+    },
+    {
+      "phase": "result_assembly",
+      "rss_end_bytes": 252796928,
+      "rss_start_bytes": 252796928,
+      "wall_s": 3.816700007064355e-05
+    },
+    {
+      "phase": "engine_dispose",
+      "rss_end_bytes": 252796928,
+      "rss_start_bytes": 252796928,
+      "wall_s": 0.0001449999999749707
+    }
+  ],
+  "start_monotonic_s": 573.122512676,
+  "system_cpu_s": 0.354886,
+  "user_cpu_s": 2.6121309999999998,
+  "workload": "historical tape; availability and provenance require independent verification"
+}
