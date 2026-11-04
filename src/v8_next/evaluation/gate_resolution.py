@@ -221,7 +221,11 @@ def load_tape_candles(
                     for name in z.namelist():
                         if name.endswith(".csv"):
                             with z.open(name) as f:
-                                df_csv = pl.read_csv(f, has_header=True)
+                                # Full-file schema inference: a monthly archive can
+                                # open with integer-looking volumes and only later
+                                # carry fractional ones, which trips the default
+                                # first-100-rows guess on real vendor data.
+                                df_csv = pl.read_csv(f, has_header=True, infer_schema_length=None)
                                 for row in df_csv.iter_rows(named=True):
                                     candles.append(
                                         Candle(
