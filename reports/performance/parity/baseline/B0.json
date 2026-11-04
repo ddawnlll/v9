@@ -1,0 +1,178 @@
+{
+  "bars_requested": 744,
+  "capture": {
+    "peak_rss_bytes": 265380,
+    "replay_s": 1.9206
+  },
+  "chunk_size": 64,
+  "chunks": {
+    "audit_events": [
+      "3e8bd4dfa6461d2971ae2c3c0bbe1bba59677a130a6105bbdedd36ec09c3603c",
+      "a58caef190abbef5de80161668f620794a887746e987fd8404b1eebdf3ab3a0a",
+      "380dea027eacea20d66639b0f1d28eb72760a0fd6b06d6ee528bcf58881b52d4",
+      "b89ad061b5ac19914ec07ae1e4349b8d8206920a704ddcca82814566627bbb5e",
+      "cf42b25238780205d9a9f66d60434b583a261b64f43589b6ee70ead86d605b29",
+      "a8ec48c58fbad800ffcf430ba07f90572169c1e84c1e276c94f44a70d5ab11c5",
+      "c2eefced3654ce2008fef83075fb1c2e2e8e7d95e3b0bcd9fe596edbbdfd8f2b",
+      "5a97212f77181cd3e5d8929d4f019af7283e64a04fe33f364876b734ac7901e7",
+      "30e860daf64eea9ac085c02c267b35070d3161902a35d18ba7eebfa314e3881d",
+      "edcc1345f689cb0742ff870783c6838cee68b491f2e5bd12f4072f44a62253b4",
+      "ce5c12568d9b1458e7dbb374c8bfc456fed73274d1bef42b3d841a5b6a2c403c",
+      "b9c47b5ebf639347f431e8878bdb94389211a1a3bd85e031628c342cd9a952cd",
+      "49354333c8d8a78f2af75a247f5f5d337b5aefafb14d0ab56eb0a6010f9f3b5e",
+      "7c87223c0fbe0819d482e7230968e390ae5d35d828b7b0bdb2a41b0f3afb4fb0",
+      "e61b921c79814db52c8bd2ac53d726455e55cf2c9464fd8ffcfc3170ed153f5c",
+      "ffe75eba7fcd035efe64f6dc245365694401d35ec512de5d990c08f47de294f4",
+      "852084857638a7a00a85c8a83ef562444cf08ffaa222355faf82ed816926967a",
+      "110b6e38fb24938f62f483a36dc7478159e5d2a0c08b2ac7b524138e4a6dccf7",
+      "a34651199d26b1306a3069607712bf593954fb89cccbd101039a386dec72ab07",
+      "5f1a9f8475d6d5444b5f7bee279cae8ccb71d7e1f4104457cbb00fd75ff16d07",
+      "db598e52baf56a0d8893d255dd39afbe267205eeb22a6d31245e73c61df28ee3",
+      "adbd66a35070bf3df5f69f271778d192b1ac3b62dd2bb0c6ca558a6733ee6911",
+      "4c2ccae6e1a67321bb3eb7d9a3c8d438bdf56c669dae1471c4a8e34ebd942638",
+      "815e34d938978729e6dcc021992fb071534bd4adf24357f398695179f59eb556",
+      "3a125f80eba4e5a45f7b36fc33b5f5a70d9e810e9ec572b242f20bf932dff102",
+      "fc913e2236f90b4fe963242f5f2b6af5a30db4493bce85fba22082f6ead5c4f9",
+      "c073b2e9db8d487001cae9e3defa2acb05e5b341bb3285fd6810ff22d13f9733",
+      "5e56bcbe16ae9f7ac1dc2f57ff6319afb26152ba49259b51e9e5d21bbbaea2f8",
+      "40a4ecc3f85441fea2ec4008e4d5b8019e51f68d467d67f03eccef19adde8a0b",
+      "cf73462a45563b05a6312831481b331f6d61c03be50318266ebe5b678e61e6cc",
+      "578bf41b007a374c37838a53798f0b4c98eb444a8e20977a17ce9b44233a8ed4",
+      "d5c13109314ec021e03550cb2695fea63e3f8dcc474c7ca11546e4884aab1c96",
+      "69a4e443650466912910f4d304037cce6d0e10da19bad1aaa3023054b5c10500",
+      "da98ae473bb699c8521fc668aacf58461d312498be24e92fb65ed7ceba005580",
+      "f15a4f287ffe7dee69cb50833ab5b66cdc3221e0f92c61b18eafa53446e506a3",
+      "34228362df1107136124e8216a85043cc5f9a2e0e574383fe2b78ec818363abc",
+      "d3d295d6b28a8269e28dc6dfb972830ac3537d2b5769ff79992cb28f8f00aa80",
+      "0d6e55aef59c8818986fba9c64c4d261ff66cc4e92b6c51297a0d62a1873f2ee",
+      "b3d32e7e70e1f65d7a60e7947ec261436dbc4dd41927b7730de85f5d269e5d62",
+      "4327358092e0f82535b7bd7f2d985c17fa05175ef39cdf8b6bd5dc248b6db931",
+      "1e27ccab4fbe9889dc0c6d77600c7103ec0858eaa0bc8dc0cf832237feb4182f",
+      "b7d3ed4db1b43e3ece7de82f59532c449ce4a19f7ea386ec87f1483909ff438a",
+      "60b9b8ee533b049f03e37cc57903d5c9b80cca2402620982d2f19f9144ffe37e"
+    ],
+    "closed_positions": [],
+    "decisions": [
+      "ee7a206291dd1493851d1adb8725d175e5607534927ab1b8eb24874dd002010d",
+      "a07f1c66742e99a3796ed49f76a070189adadced3648e64ed50fa9790183cd10",
+      "3450420ab3159dcd2660aebbd7f379391326b16ba93473d279b1332e517f67f7",
+      "65637616cc04693b40a904f9e1d786cfdc9b3027f4096dd253d974ef8822c90c",
+      "f054528894545045d2948545f7ea143d3e82ebad4515dab4e2cb1589392facc4",
+      "ca6d1139ff1c0e87012a6e152c301bea44b355b0cb3b25a433a5bb99b48255dd",
+      "039f9842f61d1cb35afd2c426d48d5991ba339fa9fd6dcf640c7d40820a1c557",
+      "934f46c3186f8af980cccb5646e79bbf8a1e27f40d2798d047697b538258f418",
+      "b5c33827594d000d141fc7f97cdfa30ba46d24d9d4f385aae16feb32555a4067",
+      "efb9539bfa3927a76a54e9d12f9d3411074b186282b6e02d11d07264725a88c5",
+      "75fbb895d6c678ab337cf37bac74d26902b12a22120129580e6a76be4d61c18b",
+      "3391cacbda6a44f3fc4757e05b367ae4b81fcccb243d301e7225a8cd94f88256"
+    ],
+    "fill_records": [
+      "a92947b4a3ae51a89746988922190b108704ddc9f01b8e5564d1f0b022e9db58"
+    ],
+    "opened_positions": [
+      "aa4d29873fb229eb38f601b46a22d9747a87ff909dbe749f21b90408d6fbb644"
+    ],
+    "opportunity_book": [
+      "62bdfcfa0993af8abf8c6a103f78c94554e2cfff8bf329688db9a5d890a58986"
+    ],
+    "order_events": [
+      "d906b33c483af5d0f3f631b4c32b92efb317e71e51cf03c30b646901cd915cb9"
+    ]
+  },
+  "meta": {
+    "candles": 744
+  },
+  "mode": "single",
+  "schema": 1,
+  "sections": {
+    "account": {
+      "chunked": false,
+      "count": 6,
+      "sha256": "e011677e42fc742b59cbf0a27a6d9c94af86636a37e944837896e640a035f27f"
+    },
+    "audit_events": {
+      "chunked": true,
+      "count": 2742,
+      "sha256": "68c0fa45b11e7ee51eb1f3113e575731f19fb427f1f7f33bb88e18d8dacf2f78"
+    },
+    "closed_positions": {
+      "chunked": true,
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "decisions": {
+      "chunked": true,
+      "count": 744,
+      "sha256": "6446f99e07a2b41110f43aa74c137a42694333406a9ba07df4cb5d5e53d71d87"
+    },
+    "decisions_count": {
+      "chunked": false,
+      "count": null,
+      "sha256": "a15faf6f6c7e4c11d7956175f4a1c01edffff6e114684eee28c255a86a8888f8"
+    },
+    "execution": {
+      "chunked": false,
+      "count": 5,
+      "sha256": "e9451bae49ed04d3cc4b90ea104c9406f8ab9ea7b2eb7e1193160a667561c0c2"
+    },
+    "fill_records": {
+      "chunked": true,
+      "count": 1,
+      "sha256": "a92947b4a3ae51a89746988922190b108704ddc9f01b8e5564d1f0b022e9db58"
+    },
+    "fill_report_type": {
+      "chunked": false,
+      "count": null,
+      "sha256": "90ce0fa6e577de04e6ca9a6147aaf8d0762b5b131e034069108957090752e285"
+    },
+    "instrument_id": {
+      "chunked": false,
+      "count": null,
+      "sha256": "490e94784eb8af841401d3a1880bdc6007797878df39f5cfdda8c4f4d1cceab6"
+    },
+    "native_reports": {
+      "chunked": false,
+      "count": 2,
+      "sha256": "51065224c6b57edf3074b562dcbbc2501108d4fb1a41e50d271d34e62bb0226e"
+    },
+    "opened_positions": {
+      "chunked": true,
+      "count": 1,
+      "sha256": "aa4d29873fb229eb38f601b46a22d9747a87ff909dbe749f21b90408d6fbb644"
+    },
+    "opportunity_book": {
+      "chunked": true,
+      "count": 42,
+      "sha256": "62bdfcfa0993af8abf8c6a103f78c94554e2cfff8bf329688db9a5d890a58986"
+    },
+    "order_events": {
+      "chunked": true,
+      "count": 3,
+      "sha256": "d906b33c483af5d0f3f631b4c32b92efb317e71e51cf03c30b646901cd915cb9"
+    },
+    "research_lifecycle": {
+      "chunked": false,
+      "count": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    "strategy_id": {
+      "chunked": false,
+      "count": null,
+      "sha256": "857e9315b6db05108092178ac548c09d4df728b6f4ce3895b3dd1ba6fcb835d9"
+    },
+    "total_bars": {
+      "chunked": false,
+      "count": null,
+      "sha256": "a15faf6f6c7e4c11d7956175f4a1c01edffff6e114684eee28c255a86a8888f8"
+    }
+  },
+  "symbols": [
+    "BTCUSDT"
+  ],
+  "volatile_keys": {
+    "event_id": 2,
+    "init_id": 3,
+    "recorded_time_ns": 2742
+  },
+  "workload": "B0"
+}
