@@ -22,7 +22,7 @@ part of the certificate derivation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, cast
 
 from v8_next.evaluation.minerva import MinervaEvaluator, MinervaRobustness
 from v8_next.evaluation.mintrl import MinTRLPlan, estimate_min_trl
@@ -184,13 +184,13 @@ def minerva_for_certificate(
         )
     try:
         robustness = MinervaEvaluator.evaluate(
-            dsr=float(dsr),
-            pbo=float(pbo),
-            spa_p_value=float(spa_p),
-            actual_track_days=float(actual_track_days),
-            min_trl_days=float(resolved_min_trl_days),
-            worst_regime_return_bps=float(worst_regime_return_bps),
-            regime_floor_bps=float(regime_floor_bps),
+            dsr=float(cast(float, dsr)),
+            pbo=float(cast(float, pbo)),
+            spa_p_value=float(cast(float, spa_p)),
+            actual_track_days=float(cast(float, actual_track_days)),
+            min_trl_days=float(cast(float, resolved_min_trl_days)),
+            worst_regime_return_bps=float(cast(float, worst_regime_return_bps)),
+            regime_floor_bps=float(cast(float, regime_floor_bps)),
             prudex=prudex,
         )
     except ValueError as exc:

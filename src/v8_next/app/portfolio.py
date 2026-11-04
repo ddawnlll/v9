@@ -249,7 +249,7 @@ def capacity_from_participation(
                 "sigma_per_bar": sigma,
                 "impact_bps_at_peak": (
                     k * sigma * _math.sqrt(peak) * 1e4
-                    if scenario_measured
+                    if sigma is not None and peak > 0
                     else None
                 ),
             }

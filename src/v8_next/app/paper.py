@@ -428,8 +428,9 @@ def _acquire_writer_lock(lock: Any) -> None:
     """
     try:
         if os.name == "nt":
-            import msvcrt
+            import importlib
 
+            msvcrt = importlib.import_module("msvcrt")
             lock.seek(0, os.SEEK_END)
             if lock.tell() == 0:
                 lock.write("\0")
@@ -447,8 +448,9 @@ def _acquire_writer_lock(lock: Any) -> None:
 
 def _release_writer_lock(lock: Any) -> None:
     if os.name == "nt":
-        import msvcrt
+        import importlib
 
+        msvcrt = importlib.import_module("msvcrt")
         lock.seek(0)
         msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
     else:

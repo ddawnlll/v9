@@ -739,6 +739,8 @@ class ExpertEnsembleStrategy(Strategy):
         d4_due: list[Any] = []
         d4_entry: Any | None = None
         if self._d4_lifecycle is not None:
+            if candle.available_ns is None:
+                raise TypeError("D4 lifecycle requires candle available_ns")
             market_available_ns = int(candle.available_ns)
             # (a) advance lifecycles that already exist on this completed bar
             self._d4_lifecycle.advance(
@@ -752,6 +754,8 @@ class ExpertEnsembleStrategy(Strategy):
             # immediately); registration happens after the advance so a new
             # opportunity can never transition on its own detection bar.
             if record is not None and opportunity is not None:
+                if record.stop_price is None or record.target_price is None:
+                    raise TypeError("D4 lifecycle requires stop and target prices")
                 self._d4_lifecycle.detect(
                     opportunity_id=record.opportunity_id,
                     direction=opportunity.direction,

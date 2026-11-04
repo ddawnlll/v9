@@ -394,7 +394,7 @@ class SwingEngineStrategy(Strategy):
         position = self.cache.position(PositionId.from_str(self.active_position_id))
         if position is None or position.is_closed:
             return None
-        return abs(position.quantity.as_decimal())
+        return cast(Decimal, abs(position.quantity.as_decimal()))
 
     def _entry_terminal(self) -> bool:
         order = self._entry_order()

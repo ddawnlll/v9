@@ -17,7 +17,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence, cast
 
 from v8_next.audit.forensic import (
     EVALUATION_STATES,
@@ -133,14 +133,15 @@ def _peak_memory_mb() -> float | None:
 
         counters = _Counters()
         counters.cb = ctypes.sizeof(_Counters)
-        psapi = ctypes.WinDLL("psapi.dll")
+        windows_ctypes = cast(Any, ctypes)
+        psapi = windows_ctypes.WinDLL("psapi.dll")
         psapi.GetProcessMemoryInfo.argtypes = [
             wintypes.HANDLE,
             ctypes.POINTER(_Counters),
             wintypes.DWORD,
         ]
         psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
-        process = ctypes.windll.kernel32.GetCurrentProcess()
+        process = windows_ctypes.windll.kernel32.GetCurrentProcess()
         if not psapi.GetProcessMemoryInfo(process, ctypes.byref(counters), counters.cb):
             return None
         return round(float(counters.PeakWorkingSetSize) / (1024 * 1024), 2)
