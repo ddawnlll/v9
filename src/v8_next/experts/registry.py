@@ -34,6 +34,7 @@ from v8_next.experts.climax import observe_volume_climax
 from v8_next.experts.confluence import observe_confluence
 from v8_next.experts.divergence import observe_divergence
 from v8_next.experts.donchian import observe_donchian
+from v8_next.experts.engine import FeatureEngine
 from v8_next.experts.failed_moves import (
     WARMUP as FAILED_MOVES_WARMUP,
 )
@@ -619,22 +620,25 @@ def _witness_version(spec: ExpertSpec) -> str:
 def _with_witness(spec: ExpertSpec, stance: Stance, chosen_variant: str | None) -> Stance:
     """Return ``stance`` carrying this expert's authoritative witness metadata.
 
-    Equivalent to rebuilding the record with the metadata overrides, but without
-    binding ten keyword arguments or formatting the version string per call. The
-    field set, field order and values are unchanged, so equality, hashing, repr
-    and every audit record derived from the result are identical.
+    Single positional construction: the only fields surviving from the raw
+    stance are kind, reason, opportunity_id and decision_ns (everything else
+    is overwritten with the spec's authoritative metadata), so rebuilding
+    directly is identical to copy-and-overwrite, without the dict copy.
+    Field order and values are unchanged, so equality, hashing, repr and
+    every audit record derived from the result are identical.
     """
-    values = stance.__dict__.copy()
-    values["observer_id"] = spec.expert_id
-    values["behavior_family"] = spec.behavior_family
-    values["mechanism_family"] = spec.mechanism_family
-    values["dependency_group"] = spec.dependency_group
-    values["version"] = _witness_version(spec)
-    values["variant_id"] = chosen_variant or stance.variant_id or "UNRESOLVED"
-    cls = type(stance)
-    witnessed = cls.__new__(cls)
-    witnessed.__dict__.update(values)
-    return witnessed
+    return Stance(
+        spec.expert_id,
+        spec.dependency_group,
+        stance.kind,
+        stance.reason,
+        stance.opportunity_id,
+        stance.decision_ns,
+        spec.behavior_family,
+        spec.mechanism_family,
+        _witness_version(spec),
+        chosen_variant or stance.variant_id or "UNRESOLVED",
+    )
 
 
 def observe_spec(
@@ -667,6 +671,115 @@ def _dispatch_specs() -> tuple[ExpertSpec, ...]:
     if not _DISPATCH_SPECS:
         _DISPATCH_SPECS = tuple(get_expert(expert_id) for expert_id in CANONICAL_28_EXPERTS)
     return _DISPATCH_SPECS
+
+
+def _make_dispatcher(spec: ExpertSpec) -> Callable[[CausalFrame, Opportunity | None, tuple[PositioningReading, ...]], Stance]:
+    """One precomputed per-expert call for the hot 28-wide loop.
+
+    Encodes the same dispatch shape ``observe_spec`` resolves per call
+    (variant/readings plumbing plus witness stamping), so ``observe_all_28``
+    pays one call per expert instead of three. ``observe_spec`` stays the
+    reference for the by-name path; the parity gate proves them identical.
+    """
+    version = _witness_version(spec)
+    default = spec.default_variant
+    observer = spec.observer_fn
+    expert_id = spec.expert_id
+    dependency = spec.dependency_group
+    behavior = spec.behavior_family
+    mechanism = spec.mechanism_family
+    if spec.takes_variant and default is not None:
+        variant_id: str | None = default
+        if spec.takes_readings:
+
+            def dispatch(
+                frame: CausalFrame,
+                opportunity: Opportunity | None,
+                readings: tuple[PositioningReading, ...],
+                expert_id: str = expert_id,
+            ) -> Stance:
+                raw = observer(frame, opportunity, variant=default, readings=readings)
+                return Stance(
+                    expert_id,
+                    dependency,
+                    raw.kind,
+                    raw.reason,
+                    raw.opportunity_id,
+                    raw.decision_ns,
+                    behavior,
+                    mechanism,
+                    version,
+                    variant_id or raw.variant_id or "UNRESOLVED",
+                )
+        else:
+
+            def dispatch(
+                frame: CausalFrame,
+                opportunity: Opportunity | None,
+                readings: tuple[PositioningReading, ...],
+                expert_id: str = expert_id,
+            ) -> Stance:
+                raw = observer(frame, opportunity, variant=default)
+                return Stance(
+                    expert_id,
+                    dependency,
+                    raw.kind,
+                    raw.reason,
+                    raw.opportunity_id,
+                    raw.decision_ns,
+                    behavior,
+                    mechanism,
+                    version,
+                    variant_id or raw.variant_id or "UNRESOLVED",
+                )
+    elif spec.takes_readings:
+
+        def dispatch(
+            frame: CausalFrame,
+            opportunity: Opportunity | None,
+            readings: tuple[PositioningReading, ...],
+            expert_id: str = expert_id,
+        ) -> Stance:
+            raw = observer(frame, opportunity, readings=readings)
+            return Stance(
+                expert_id,
+                dependency,
+                raw.kind,
+                raw.reason,
+                raw.opportunity_id,
+                raw.decision_ns,
+                behavior,
+                mechanism,
+                version,
+                default or raw.variant_id or "UNRESOLVED",
+            )
+    else:
+
+        def dispatch(
+            frame: CausalFrame,
+            opportunity: Opportunity | None,
+            readings: tuple[PositioningReading, ...],
+            expert_id: str = expert_id,
+        ) -> Stance:
+            raw = observer(frame, opportunity)
+            return Stance(
+                expert_id,
+                dependency,
+                raw.kind,
+                raw.reason,
+                raw.opportunity_id,
+                raw.decision_ns,
+                behavior,
+                mechanism,
+                version,
+                default or raw.variant_id or "UNRESOLVED",
+            )
+    return dispatch
+
+
+_DISPATCHERS: tuple[Callable[[CausalFrame, Opportunity | None, tuple[PositioningReading, ...]], Stance], ...] = tuple(
+    _make_dispatcher(get_expert(expert_id)) for expert_id in CANONICAL_28_EXPERTS
+)
 
 
 def observe_expert(
@@ -710,6 +823,7 @@ def observe_all_28(
     opportunity: Opportunity | None,
     *,
     readings: tuple[PositioningReading, ...] = (),
+    engine: FeatureEngine | None = None,
 ) -> tuple[Stance, ...]:
     """Observe an opportunity across all 28 canonical active experts with authoritative metadata.
 
@@ -718,11 +832,14 @@ def observe_all_28(
     and cleared afterwards (per-bar invalidation, no cross-bar leakage).
     Quiet bars that never touch a series pay only the ContextVar set/reset.
     Misses fail closed to the unbundled path, so stances stay identical.
+
+    ``engine`` is the strategy-owned cross-bar indicator state (one per
+    instrument feed). Indicator fast paths use it only when they can prove
+    the retained prefix matches this bar, and fall back to full-prefix
+    computation otherwise, so stances stay identical with or without one.
     """
-    token = _ACTIVE_LAZY.set(_LazyBundle(frame))
+    token = _ACTIVE_LAZY.set(_LazyBundle(frame, engine))
     try:
-        return tuple(
-            observe_spec(spec, frame, opportunity, readings) for spec in _dispatch_specs()
-        )
+        return tuple(dispatch(frame, opportunity, readings) for dispatch in _DISPATCHERS)
     finally:
         _ACTIVE_LAZY.reset(token)

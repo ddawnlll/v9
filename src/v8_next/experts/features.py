@@ -11,6 +11,7 @@ import polars as pl
 
 from v8_next.domain.market import CausalFrame
 from v8_next.economics.decisions import numeric
+from v8_next.experts.engine import FeatureEngine
 
 
 @dataclass(frozen=True)
@@ -42,10 +43,11 @@ class _LazyBundle:
     close/high/low/volume access builds once; the other 27 readers reuse.
     """
 
-    __slots__ = ("frame", "built", "memo")
+    __slots__ = ("engine", "frame", "built", "memo")
 
-    def __init__(self, frame: CausalFrame) -> None:
+    def __init__(self, frame: CausalFrame, engine: FeatureEngine | None = None) -> None:
         self.frame = frame
+        self.engine = engine
         self.built: BarFeatureBundle | None = None
         #: Per-bar indicator memo, keyed by (function, argument identity).
         #: Cleared with the bundle, so no value outlives the bar it was
@@ -191,19 +193,8 @@ def volume_series(frame: CausalFrame) -> pl.Series:
     return s
 
 
-@per_bar_memo
-def wilder_rsi(closes: pl.Series, period: int = 14) -> tuple[float | None, ...]:
-    """SMA seed over period deltas, then Wilder EMA through Polars.
-
-    Flat seed maps to 50, gain-only to 100, loss-only to zero, matching the
-    declared legacy RSI convention. No warmup zero or partial seed is emitted.
-    """
-    if period < 1:
-        raise ValueError("positive RSI period required")
-    if not closes.is_finite().all() or closes.null_count():
-        raise ValueError("RSI requires finite closes")
-    if len(closes) <= period:
-        return (None,) * len(closes)
+def _wilder_rsi_full(closes: pl.Series, period: int) -> tuple[float | None, ...]:
+    """Legacy full-prefix computation; the equivalence reference."""
     deltas = closes.diff().slice(1)
     gains, losses = deltas.clip(lower_bound=0), (-deltas).clip(lower_bound=0)
 
@@ -223,10 +214,42 @@ def wilder_rsi(closes: pl.Series, period: int = 14) -> tuple[float | None, ...]:
 
 
 @per_bar_memo
-def trend_emas(frame: CausalFrame) -> tuple[float, float]:
-    closes = close_series(frame)
-    if len(closes) < 20:
-        raise ValueError("EMA warmup requires 20 bars")
+def wilder_rsi(closes: pl.Series, period: int = 14) -> tuple[float | None, ...]:
+    """SMA seed over period deltas, then Wilder EMA through Polars.
+
+    Flat seed maps to 50, gain-only to 100, loss-only to zero, matching the
+    declared legacy RSI convention. No warmup zero or partial seed is emitted.
+
+    In a wired replay the strategy-owned engine serves the retained history
+    (O(1) amortized); any doubt falls back to the full-prefix computation,
+    so results are identical.
+    """
+    if period < 1:
+        raise ValueError("positive RSI period required")
+    if not closes.is_finite().all() or closes.null_count():
+        raise ValueError("RSI requires finite closes")
+    if len(closes) <= period:
+        return (None,) * len(closes)
+    frame: CausalFrame | None = None
+    engine: FeatureEngine | None = None
+    if period == FeatureEngine.RSI_PERIOD:
+        lazy = _ACTIVE_LAZY.get()
+        if lazy is not None and lazy.engine is not None:
+            bundle = lazy.get()
+            if closes is bundle.closes:
+                frame, engine = lazy.frame, lazy.engine
+    if engine is not None and frame is not None:
+        fast = engine.rsi_tuple(frame, len(closes))
+        if fast is not None:
+            return fast
+    result = _wilder_rsi_full(closes, period)
+    if engine is not None and frame is not None and period == FeatureEngine.RSI_PERIOD:
+        engine.adopt_rsi(frame, result)
+    return result
+
+
+def _emas_full(closes: pl.Series) -> tuple[float, float]:
+    """Legacy full-prefix computation; the equivalence reference."""
     return (
         numeric(closes.ewm_mean(span=5, adjust=False)[-1]),
         numeric(closes.ewm_mean(span=20, adjust=False)[-1]),
@@ -234,24 +257,66 @@ def trend_emas(frame: CausalFrame) -> tuple[float, float]:
 
 
 @per_bar_memo
-def significant_swings(frame: CausalFrame, strength: int = 10) -> tuple[int | None, int | None]:
-    """Latest strict, confirmed pivots with bar range >= current mean range14.
+def trend_emas(frame: CausalFrame) -> tuple[float, float]:
+    closes = close_series(frame)
+    if len(closes) < 20:
+        raise ValueError("EMA warmup requires 20 bars")
+    engine = _engine_for(frame)
+    if engine is not None:
+        fast = engine.ema_pair(frame)
+        if fast is not None:
+            return fast
+    result = _emas_full(closes)
+    if engine is not None:
+        engine.adopt_ema(frame, {5: result[0], 20: result[1]})
+    return result
 
-    Indices refer to the supplied causal prefix. Right-hand confirmation uses
-    only bars already inside that prefix. This preserves the legacy significance
-    hypothesis (mean high-low range, not a silently substituted Wilder ATR).
-    """
-    if strength < 1:
-        raise ValueError("positive pivot strength required")
-    if not frame.continuous:
-        raise ValueError("source gap")
-    if len(frame.candles) < max(14, 2 * strength + 1):
+
+def _engine_for(frame: CausalFrame) -> FeatureEngine | None:
+    """The strategy-owned engine for this bar, or None outside a wired replay."""
+    lazy = _ACTIVE_LAZY.get()
+    if lazy is not None and lazy.frame is frame:
+        return lazy.engine
+    return None
+
+
+_ENGINE_MISS = object()
+
+
+def _swings_via_engine(
+    engine: FeatureEngine, frame: CausalFrame, strength: int
+) -> tuple[int | None, int | None] | object:
+    """Latest significant pivots from retained state, or ``_ENGINE_MISS``."""
+    n = len(frame.candles)
+    highs = engine.confirmed_pivots(frame, high=True, strength=strength)
+    if highs is None:
+        return _ENGINE_MISS
+    lows = engine.confirmed_pivots(frame, high=False, strength=strength)
+    if lows is None:  # unreachable after a highs hit, kept for totality
+        return _ENGINE_MISS
+    threshold = engine.tail_threshold(n)
+    retained = engine.retained_series()
+    if threshold is None or retained is None:  # same totality guard
+        return _ENGINE_MISS
+    if threshold <= 0:
         return None, None
+    high_all, low_all, _ = retained
+    return (
+        FeatureEngine.latest_above(highs, high_all, low_all, threshold),
+        FeatureEngine.latest_above(lows, high_all, low_all, threshold),
+    )
+
+
+def _significant_swings_full(
+    frame: CausalFrame, strength: int
+) -> tuple[int | None, int | None]:
+    """Legacy full-prefix computation; the equivalence reference."""
     values = frame.df.select(["high", "low"])
     if not values["high"].is_finite().all() or not values["low"].is_finite().all():
         raise ValueError("price outside finite float domain")
-    ranges = values["high"] - values["low"]
-    threshold = numeric(ranges.tail(14).mean())
+    high_all, low_all = values["high"], values["low"]
+    # Fourteen ranges decide the threshold; identical values, no full-prefix table.
+    threshold = numeric((high_all.tail(14) - low_all.tail(14)).mean())
     if threshold <= 0:
         return None, None
     found: list[int | None] = []
@@ -262,20 +327,77 @@ def significant_swings(frame: CausalFrame, strength: int = 10) -> tuple[int | No
         mask = (
             ((series > left) & (series > right)) if high else ((series < left) & (series < right))
         )
-        indices = (mask & (ranges >= threshold)).fill_null(False).arg_true()
-        found.append(int(indices[-1]) if len(indices) else None)
+        # Threshold-filter the pivot positions, not a full-prefix range
+        # column: conjunction with a never-null comparison commutes with the
+        # null fill, so the surviving latest index is unchanged.
+        latest: int | None = None
+        candidates = mask.fill_null(False).arg_true()
+        for position in range(len(candidates) - 1, -1, -1):
+            index = int(candidates[position])
+            if high_all[index] - low_all[index] >= threshold:
+                latest = index
+                break
+        found.append(latest)
     return found[0], found[1]
 
 
 @per_bar_memo
-def macd_line(frame: CausalFrame) -> float:
-    """Source 34-bar availability; first-close EMA12 minus EMA26."""
-    if len(frame.candles) < 34:
-        raise ValueError("MACD requires 34 bars")
-    closes = close_series(frame)
+def significant_swings(frame: CausalFrame, strength: int = 10) -> tuple[int | None, int | None]:
+    """Latest strict, confirmed pivots with bar range >= current mean range14.
+
+    Indices refer to the supplied causal prefix. Right-hand confirmation uses
+    only bars already inside that prefix. This preserves the legacy significance
+    hypothesis (mean high-low range, not a silently substituted Wilder ATR).
+
+    In a wired replay the strategy-owned engine serves confirmed pivots from
+    retained state (O(1) amortized); any doubt falls back to the full-prefix
+    computation below, so results are identical.
+    """
+    if strength < 1:
+        raise ValueError("positive pivot strength required")
+    if not frame.continuous:
+        raise ValueError("source gap")
+    if len(frame.candles) < max(14, 2 * strength + 1):
+        return None, None
+    engine = _engine_for(frame)
+    if engine is not None:
+        fast = _swings_via_engine(engine, frame, strength)
+        if fast is not _ENGINE_MISS:
+            result: tuple[int | None, int | None] = fast  # type: ignore[assignment]
+            return result
+        full = _significant_swings_full(frame, strength)
+        engine.adopt_verified(frame)
+        return full
+    return _significant_swings_full(frame, strength)
+
+
+def _macd_full(closes: pl.Series) -> float:
+    """Legacy full-prefix computation; the equivalence reference."""
     return numeric(
         (closes.ewm_mean(span=12, adjust=False) - closes.ewm_mean(span=26, adjust=False))[-1]
     )
+
+
+@per_bar_memo
+def macd_line(frame: CausalFrame) -> float:
+    """Source 34-bar availability; first-close EMA12 minus EMA26.
+
+    In a wired replay the strategy-owned engine serves the retained EMA
+    difference (O(1) amortized); any doubt falls back to the full-prefix
+    computation, so results are identical.
+    """
+    if len(frame.candles) < 34:
+        raise ValueError("MACD requires 34 bars")
+    closes = close_series(frame)
+    engine = _engine_for(frame)
+    if engine is not None:
+        fast = engine.macd_value(frame)
+        if fast is not None:
+            return fast
+    result = _macd_full(closes)
+    if engine is not None:
+        engine.adopt_ema(frame, {}, verify_diff=result)
+    return result
 
 
 def _ohlc_columns(
@@ -405,7 +527,8 @@ def mean_range(frame: CausalFrame, period: int = 14) -> float:
     """Vectorized mean high-low range over the latest period bars."""
     if len(frame.candles) < period:
         return 0.0
-    r = (frame.df["high"] - frame.df["low"]).tail(period).mean()
+    window = frame.df.slice(-period, period)
+    r = (window["high"] - window["low"]).mean()
     return numeric(r) if r is not None else 0.0
 
 

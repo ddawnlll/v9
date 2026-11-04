@@ -32,7 +32,8 @@ def observe_obv_adl(frame: CausalFrame, opportunity: Opportunity | None) -> Stan
     reason = context_reason(frame, opportunity, 20)
     hit = None
     if reason is None:
-        values = frame.df.select(["close", "high", "low", "volume"]).tail(20)
+        # Row-slice before projecting: identical 20 rows, no full-prefix table.
+        values = frame.df.slice(-20, 20).select(["close", "high", "low", "volume"])
         if not all(values[c].is_finite().all() for c in values.columns):
             raise ValueError("non-finite native feature input")
         total = numeric(values["volume"].sum())
@@ -51,7 +52,8 @@ def observe_obv_adl(frame: CausalFrame, opportunity: Opportunity | None) -> Stan
             )["flow"][0]
             cmf = numeric(flow) / total
             closes = close_series(frame)
-            net = numeric(closes.diff().tail(10).sign().sum())
+            # Ten diffs need eleven closes; identical values, no full-prefix scan.
+            net = numeric(closes.tail(11).diff().tail(10).sign().sum())
             fast, slow = trend_emas(frame)
             hit = regime_hit(numeric(closes[-1]), fast, slow, cmf, net)
             reason = "VOLUME_REGIME" if hit else "NO_VOLUME_REGIME"

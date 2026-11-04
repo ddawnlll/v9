@@ -332,15 +332,18 @@ def stance_with(
     ``replace`` re-derives the field list and deep-copies unknown values on each of
     those calls (measured: 197k calls / 0.80s cumulative per portfolio run, the
     largest remaining Python-level cost after the polars collect). A ``Stance`` is a
-    flat frozen record, so rebuilding it from its own instance dict is equivalent --
+    flat frozen record, so rebuilding it positionally is equivalent --
     pinned field-by-field against ``replace`` by ``test_perf_hot_paths``.
     """
-    values = stance.__dict__.copy()
-    if variant_id is not None:
-        values["variant_id"] = variant_id
-    if version is not None:
-        values["version"] = version
-    cls = type(stance)
-    stamped = cls.__new__(cls)
-    stamped.__dict__.update(values)
-    return stamped
+    return Stance(
+        stance.observer_id,
+        stance.dependency_group,
+        stance.kind,
+        stance.reason,
+        stance.opportunity_id,
+        stance.decision_ns,
+        stance.behavior_family,
+        stance.mechanism_family,
+        version if version is not None else stance.version,
+        variant_id if variant_id is not None else stance.variant_id,
+    )

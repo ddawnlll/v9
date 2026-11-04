@@ -17,14 +17,11 @@ class Column:
     steps: int
 
 
-def columns(closes: tuple[Decimal, ...], box: Decimal) -> tuple[Column, ...]:
-    """Three-box reversal, first close seeds an X column as in the source."""
-    if not box.is_finite() or box <= 0:
-        raise ValueError("positive finite box required")
-    if any(not c.is_finite() or c <= 0 for c in closes):
-        raise ValueError("positive finite closes required")
+def _columns_validated(closes: tuple[Decimal, ...], box: Decimal) -> tuple[Column, ...]:
+    """Three-box reversal core over already-validated positive finite inputs."""
     if not closes:
         return ()
+    neg3box = -3 * box
     completed: list[Column] = []
     current = Column(1, 0, closes[0], closes[0], 0)
     for i, close in enumerate(closes[1:], 1):
@@ -36,13 +33,22 @@ def columns(closes: tuple[Decimal, ...], box: Decimal) -> tuple[Column, ...]:
                 extreme=current.extreme + current.direction * steps * box,
                 steps=current.steps + steps,
             )
-        elif movement <= -3 * box:
+        elif movement <= neg3box:
             completed.append(current)
             direction = -current.direction
             origin = current.extreme + direction * box
             steps = int(abs(close - origin) / box)
             current = Column(direction, i, origin, origin + direction * steps * box, steps)
     return (*completed, current)
+
+
+def columns(closes: tuple[Decimal, ...], box: Decimal) -> tuple[Column, ...]:
+    """Three-box reversal, first close seeds an X column as in the source."""
+    if not box.is_finite() or box <= 0:
+        raise ValueError("positive finite box required")
+    if any(not c.is_finite() or c <= 0 for c in closes):
+        raise ValueError("positive finite closes required")
+    return _columns_validated(closes, box)
 
 
 @dataclass(frozen=True)
@@ -65,9 +71,17 @@ def pandf_setup(frame: CausalFrame, variant: str = "a") -> PointFigureSetup | No
     if len(bars) < 20:
         return None
     box = sum((c.high - c.low for c in bars[-14:]), Decimal(0)) / 14
-    if box <= 0:
+    if not box.is_finite() or box <= 0:
+        if not box.is_finite():
+            # Unreachable for validated frame candles (finite Decimal ranges),
+            # but preserved: the old path raised from columns() here.
+            raise ValueError("positive finite box required")
         return None
-    transformed = columns(tuple(c.close for c in bars), box)
+    # Frame candles already guarantee positive finite Decimal closes
+    # (Candle.__post_init__), so the validated core runs without rescanning
+    # the whole prefix a second time. `box` is checked above; `columns` keeps
+    # its own validation for direct callers.
+    transformed = _columns_validated(tuple(c.close for c in bars), box)
     last = transformed[-1]
     direction = 1 if variant in ("a", "c") else -1
     needed = 2 if variant in ("a", "b") else 3

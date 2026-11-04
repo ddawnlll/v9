@@ -565,3 +565,49 @@ default first-100-rows schema inference, and archives that open with integer-loo
 later carry fractional ones failed the whole load (`could not parse 1017592.90 as dtype i64`).
 Inference is now full-file, which is identical for every archive that already parsed and unblocks
 the rest (§ commit `6632cdd`). Parity against the frozen manifests is unchanged.
+
+---
+
+## 14. Simulated account results — $500, 90 days (and 4 years)
+
+Requested question: *how much money are these simulations actually making?* The earlier sections
+measured cost, not profit; this section replays the same production pipeline with a real account
+size and reports what it produced. **No economic claim is made here**: the adapter stamps
+`NO_ECONOMIC_CLAIM` / `SIMULATED`, the window is in-sample for the authorised development period, and
+nothing below is investment advice. Sizing is `notional_per_leg = 50` on a `500` account, the same
+10 % of equity per leg as the benchmark's `10,000 / 1,000` pair, funding settlements included,
+baseline fill/fee/latency profile, no compounding.
+
+| Run | Window | Trades | Win rate | Fees paid | Gross edge before fees | **Net P&L** | Return | Max drawdown |
+|---|---|---|---|---|---|---|---|---|
+| $500, 90 days, 10 symbols | 2025-01-01 → 2025-03-31 | 101 | 36.6 % | 6.14 | 11.53 | **+5.39** | **+1.08 %** | 4.99 % |
+| $500, 4 years, 10 symbols | 2022-07 → 2026-06 | 1,399 | 35.3 % | 69.00 | 90.76 | **+21.76** | **+4.35 % total** (≈1.07 %/yr) | 10.83 % |
+
+Per calendar year on the four-year run: 2022 **−6.91**, 2023 **−15.59**, 2024 **+5.47**,
+2025 **+25.40**, 2026 (Jan–Jun) **+13.43**.
+
+Three things this says, in order of importance:
+
+1. **Fees eat most of the edge.** Commissions are 53 % of the gross edge over 90 days and **76 %**
+   over four years (69.00 of 90.76). A 35 % hit rate with a 2:1 bracket clears its costs on paper
+   and barely beyond that. Transaction cost is the binding constraint on this strategy, not
+   prediction.
+2. **The profit is regime-dependent and concentrated in the recent, in-sample period.** The two
+   years that predate the authorised development window both lose money; the run only turns positive
+   in 2024–2026. +1.07 %/yr with a 10.8 % drawdown is worse risk-adjusted than cash, and the
+   in-sample window being the best stretch is exactly the shape that warns of overfitting rather
+   than confirmation of an edge.
+3. **90 days is not evidence.** 101 trades and ±1 % is inside noise; it is quoted here only because
+   it was the requested configuration.
+
+### 40 symbols: NOT_RUN
+
+The real capture set holds **ten** symbols. A 40-symbol result cannot be produced from real data,
+and synthesising 30 more instruments would produce a number with no economic meaning while looking
+exactly like one — so it is not done. Scaling the measured ten-symbol result by four (≈ +21.5 over 90
+days) would be an invented claim about a different, untested portfolio and is deliberately not
+stated.
+
+Reproduce: `tools/analysis/account_sim.py --tape <dir> --symbols ... --bars 2160 --start-balance 500
+--notional-per-leg 50 --with-funding --output <json>`. Raw records including the equity curve:
+`evidence/sim/500usd-90d-10sym.json`, `evidence/sim/500usd-4y-10sym.json`.
