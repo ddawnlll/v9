@@ -1,0 +1,26 @@
+{
+  "archives": {
+    "BTCUSDT-1h-2025-01.zip": "9ebc05c9b3d5ab3591edf65bc5c7e5dbc2f96c1efc4adc4ea198c651a99a41b1",
+    "BTCUSDT-1h-2025-02.zip": "077d761098eb5f2dbde65457833b9edab41ea6475284a77fcce0d4bec1bfb5cf",
+    "BTCUSDT-1h-2025-03.zip": "08043384c3336b0fa3eeee06e113a6f1eceb6d3fbe7b2971e9b9fa83625fdfb9",
+    "BTCUSDT-fundingRate-2025-01.zip": "df725010d55458866eb5a47e9ee708c6796c9d7e77b14c38342cea11f381815e",
+    "BTCUSDT-fundingRate-2025-02.zip": "e918b90fb33df3a3317feea13807a892047f1ec86eeac100bdb7b3dd83285d46",
+    "BTCUSDT-fundingRate-2025-03.zip": "a3b95cfb315641fbfddc61eb32adf2a2588afb7a3973a61f464aca007ad43e3f"
+  },
+  "channel_counts": {
+    "funding": 270,
+    "kline": 2160
+  },
+  "hash_manifest_required": true,
+  "instruments": {
+    "BTCUSDT": {
+      "first_open_ms": 1735689600000,
+      "funding_rows": 270,
+      "kline_rows": 2160,
+      "last_open_ms": 1743462000000
+    }
+  },
+  "rows": 2430,
+  "schema_version": "v9.tape.1",
+  "tape_sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7"
+}
