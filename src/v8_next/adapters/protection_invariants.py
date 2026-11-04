@@ -38,12 +38,12 @@ Invariants
    reports a reversal. The ambition to reverse is recorded, the position is not flipped.
 3. A live stop and a live target must be on the protective side of the position and on
    the correct side of each other (``stop < target`` long, ``stop > target`` short).
-* A ``CANCEL_REQUEST`` never removes protection; only ``CANCELED`` does. A rejected
-  cancel leaves the order live and therefore leaves protection intact.
-* A protective order that was rejected, unknown, unacknowledged, unverifiable or
-  under-sized cannot yield ``PROTECTED``. ``REJECTED`` outranks ``UNKNOWN`` outranks
-  ``GAP`` outranks ``PARTIAL``; only a clean, fully acknowledged, correctly sized,
-  reduce-only stop (and any live target) yields ``PROTECTED``.
+4. A ``CANCEL_REQUEST`` never removes protection; only ``CANCELED`` does. A rejected
+   cancel leaves the order live and therefore leaves protection intact.
+5. A protective order that was rejected, unknown, unacknowledged, unverifiable or
+   under-sized cannot yield ``PROTECTED``. ``REJECTED`` outranks ``UNKNOWN`` outranks
+   ``GAP`` outranks ``PARTIAL``; only a clean, fully acknowledged, correctly sized,
+   reduce-only stop (and any live target) yields ``PROTECTED``.
 
 Determinism and replay
 ----------------------
