@@ -208,6 +208,48 @@ def test_reapplying_evidence_mints_one_transition_event() -> None:
     assert len(event_ids) == 1
 
 
+def test_clock_only_advance_cannot_advance_the_candidate_streak() -> None:
+    """Two cuts over one observation set are one piece of evidence (audit 1 ns case)."""
+    bars = _series(RANGE_PATH, TREND_PATH, (Decimal("1"),))
+    view, context, cut = _snapshot(bars, cuts_at=19)
+    incumbent = advance(None, view, context, now_ns=cut)
+    assert incumbent.regime_label is RegimeKind.RANGE
+
+    trend_view, trend_context, trend_cut = _snapshot(bars, cuts_at=38)
+    challenger = advance(incumbent, trend_view, trend_context, now_ns=trend_cut)
+    assert challenger.regime_label is RegimeKind.RANGE
+    assert challenger.regime_candidate is RegimeKind.TREND
+    assert challenger.candidate_streak == 1
+    assert challenger.transition is None
+
+    # The audit's reproduction: the *same* observations at a decision time one
+    # nanosecond later. The old fingerprint folded the clock in, so this second
+    # call reported INPUT_CHANGED, incremented the streak to 2 and minted a
+    # transition without a new bar.
+    clocked_view = build_view([*bars], cut_time_ns=trend_cut + 1)
+    clocked_context = assemble_context(
+        {Timeframe.M15: clocked_view}, instrument_id=IID, decision_time_ns=trend_cut + 1
+    )
+    assert update_trigger(challenger, clocked_view, clocked_context, now_ns=trend_cut + 1) is None
+    clocked = advance(challenger, clocked_view, clocked_context, now_ns=trend_cut + 1)
+    assert clocked is challenger
+    assert clocked.decision_time_ns == trend_cut
+    assert clocked.candidate_streak == 1
+    assert clocked.regime_label is RegimeKind.RANGE
+    assert clocked.transition is None
+
+    # A genuine new bar is new evidence and does advance the streak: the second
+    # consecutive TREND bar satisfies min_candidate_streak and mints the event.
+    next_view, next_context, next_cut = _snapshot(bars, cuts_at=39)
+    advanced = advance(challenger, next_view, next_context, now_ns=next_cut)
+    assert advanced.regime_label is RegimeKind.TREND
+    assert advanced.regime_candidate is RegimeKind.TREND
+    assert advanced.transition is not None
+    assert advanced.transition.occurred_at_ns == next_cut
+    # Acceptance resets the streak; the event itself proves it reached 2.
+    assert advanced.candidate_streak == 0
+
+
 def test_hysteresis_prevents_flip_flopping_on_a_borderline_sequence() -> None:
     bars = _series(RANGE_PATH, BORDERLINE, RANGE_PATH, BORDERLINE, RANGE_PATH)
     cuts = (19, 38, 57, 76, 95)

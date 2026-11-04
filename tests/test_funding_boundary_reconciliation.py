@@ -108,6 +108,36 @@ def test_future_mark_is_not_used_for_the_boundary() -> None:
     assert FundingIssueCode.NO_CAUSAL_MARK in issues_by_code(result)
 
 
+def test_settlement_boundary_after_the_as_of_cut_is_excluded_and_blocked() -> None:
+    """Audit case: boundary 400, as_of 300 (post-cut mark at 350 must not price it)."""
+    marks = (*MARKS, mark("53000", 350))
+    future = settlement(
+        settlement_id="set-future",
+        amount="-5.3",  # exactly what qty 1 x post-cut mark 53000 x 0.0001 would give
+        boundary=400,
+        received=400,
+        accounting=None,
+    )
+    result = report(
+        settlements=(future,),
+        marks=marks,
+        as_of_ns=300,
+        final_equity=None,
+    )
+
+    assert result.status is FundingReportStatus.BLOCKED
+    assert not result.passed
+    assert issues_by_code(result) == {
+        FundingIssueCode.FUNDING_BOUNDARY_IN_FUTURE: ("set-future",)
+    }
+    # Nothing after the cut is attributable: no attribution, no funding cashflow,
+    # and the equity identity carries only the as-of mark-to-market.
+    assert result.attributions == ()
+    assert result.equity is not None
+    assert result.equity.funding_total == D("0")
+    assert result.equity.expected_final_equity == D("102000")
+
+
 def test_off_grid_boundary_uses_last_causal_mark() -> None:
     result = report(settlements=(settlement(boundary=250),), final_equity=None)
     assert result.status is FundingReportStatus.PASS

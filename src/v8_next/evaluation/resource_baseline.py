@@ -38,7 +38,6 @@ Run::
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import resource
 import statistics
@@ -706,15 +705,25 @@ def _direct_feature(frame: CausalFrame, spec: FeatureSpec) -> Any:
     raise ValueError(f"unsupported feature {spec.name!r}")  # pragma: no cover
 
 
-def _current_reading(value: Any) -> Any:
+#: Kernels that return one entry per bar (a series, not a bar reading). Only
+#: these are collapsed to their current (last) value before digesting; every
+#: other kernel returns a self-contained reading, including the two pair-valued
+#: kernels whose *first* component is economically meaningful.
+_SERIES_KERNELS: Final[frozenset[str]] = frozenset({"wilder_rsi"})
+
+
+def _current_reading(spec: FeatureSpec, value: Any) -> Any:
     """The bar's current reading of a feature value.
 
-    Series kernels return the whole retained prefix (``wilder_rsi`` returns one
-    entry per bar); digesting that on every bar would itself be ``O(n^2)``, so
-    the receipt binds the *current* reading -- the value a decision consumes.
-    Full-tuple equality is asserted by the unit tests instead.
+    ``wilder_rsi`` returns the whole retained prefix (one entry per bar);
+    digesting that on every bar would itself be ``O(n^2)``, so the receipt binds
+    the *current* reading -- the value a decision consumes. ``trend_emas`` and
+    ``significant_swings`` return a fixed-size pair for this bar (ema5/ema20,
+    high pivot/low pivot) and both components are part of the reading, so the
+    pair is kept whole. Full-tuple equality for the series kernel is asserted by
+    the unit tests instead.
     """
-    if isinstance(value, tuple):
+    if spec.name in _SERIES_KERNELS and isinstance(value, tuple):
         return value[-1] if value else None
     return value
 
@@ -772,7 +781,7 @@ def replay_feature_values(
                 except ValueError:
                     value = "UNAVAILABLE"
                 reads += 1
-                bar_values.append(_current_reading(value))
+                bar_values.append(_current_reading(spec, value))
         stream.append([frame.decision_ns, bar_values])
     return FeatureReplayResult(
         bars=len(candles),
@@ -909,23 +918,6 @@ def build_feature_receipt(
     )
 
 
-def funding_digest(tape: Path | str) -> str:
-    """Digest of the tape's funding events, in file order (real tape bytes)."""
-    path = Path(tape)
-    if path.is_dir():
-        path = path / "tape.jsonl"
-    hasher = hashlib.sha256()
-    count = 0
-    with path.open("rb") as handle:
-        for line in handle:
-            if b'"channel":"funding"' in line:
-                hasher.update(line)
-                count += 1
-    if count == 0:
-        raise ValueError(f"tape {path} carries no funding events")
-    return hasher.hexdigest()
-
-
 # --------------------------------------------------------------------------- #
 # receipt assembly
 # --------------------------------------------------------------------------- #
@@ -1015,15 +1007,20 @@ def build_receipt(
 
     digests = ParityStreamDigests(
         decision=result.decision_digest(),
-        funding=funding_digest(tape_path),
+        # There is no funding *cashflow* replay in this slice. Hashing the
+        # shared input tape's funding events would make baseline and candidate
+        # equal by construction -- a tautological PASS -- so the stream is
+        # recorded as NOT_RUN (``None``) and the gate reports it BLOCKED.
+        funding=None,
         order=None,
         fill=None,
         report=None,
     )
 
     notes = (
-        "order/fill/report digests are NOT_RUN: this slice measures the expert "
-        "decision layer only and runs no economic execution replay.",
+        "order/fill/funding/report digests are NOT_RUN: this slice measures the "
+        "expert decision layer only and runs no economic execution or funding "
+        "cashflow replay.",
         "PR #1's 2-vCPU/4-GiB container figures are a proposed baseline and were "
         "not re-run; this receipt stands on its own measurement.",
     )

@@ -25,10 +25,10 @@ from v8_next.evaluation.resource_baseline import (
     ScopeCoverage,
     TapeIdentity,
     TimingSummary,
+    _current_reading,
     build_feature_receipt,
     build_receipt,
     compare_receipts,
-    funding_digest,
     git_sha,
     load_receipt,
     measure,
@@ -38,6 +38,8 @@ from v8_next.evaluation.resource_baseline import (
     replay_feature_values,
     values_parity,
 )
+from v8_next.experts.cache import RSI_14, SIGNIFICANT_SWINGS_10, TREND_EMAS
+from v8_next.telemetry.identity import canonical_digest
 
 BTC_TAPE = tape_path("btcusdt-1h-2025Q1", "tape.jsonl")
 DIGEST_A = "a" * 64
@@ -310,15 +312,6 @@ def test_git_sha_is_readable_in_a_checkout() -> None:
 
 
 @pytest.mark.slow
-def test_funding_digest_is_deterministic_on_real_tape() -> None:
-    if not BTC_TAPE.exists():
-        pytest.skip(f"real BTC tape absent at {BTC_TAPE}")
-    first = funding_digest(BTC_TAPE)
-    assert first == funding_digest(BTC_TAPE)
-    assert len(first) == 64
-
-
-@pytest.mark.slow
 def test_real_measurement_parity_and_blocked_gate(tmp_path: Path) -> None:
     if not BTC_TAPE.exists():
         pytest.skip(f"real BTC tape absent at {BTC_TAPE}")
@@ -335,12 +328,17 @@ def test_real_measurement_parity_and_blocked_gate(tmp_path: Path) -> None:
     gate = compare_receipts(baseline, candidate)
     verdicts = {verdict.stream: verdict.status for verdict in gate.streams}
     assert verdicts["decision"] is GateStatus.PASS
-    assert verdicts["funding"] is GateStatus.PASS
+    # No funding cashflow replay exists in this slice: the stream must be
+    # BLOCKED, not a tautological PASS over the shared input tape.
+    assert baseline.digests.funding is None
+    assert candidate.digests.funding is None
+    assert verdicts["funding"] is GateStatus.BLOCKED
     for stream in ("order", "fill", "report"):
         assert verdicts[stream] is GateStatus.BLOCKED
-    # Fail-closed: three unrun streams cannot certify the candidate.
+    # Fail-closed: four unrun streams cannot certify the candidate.
     assert gate.status is GateStatus.BLOCKED
     assert not gate.passed()
+    assert "DIGEST_MISSING:funding:baseline+candidate" in gate.blocking_reasons
 
     assert candidate.scope.status is MeasurementStatus.NOT_RUN
     assert candidate.within_rss_target is True
@@ -350,6 +348,33 @@ def test_real_measurement_parity_and_blocked_gate(tmp_path: Path) -> None:
 
     written = candidate.write(tmp_path / "candidate.json")
     assert load_receipt(written).digests.decision == candidate.digests.decision
+
+
+def _stream_digest(reading: object) -> str:
+    return canonical_digest("shared-feature-values", [[1, [reading]]])
+
+
+def test_pair_valued_kernels_bind_both_components_in_the_digest() -> None:
+    ema = _current_reading(TREND_EMAS, (1.0, 2.0))
+    assert ema == (1.0, 2.0)
+    assert _stream_digest(ema) != _stream_digest(_current_reading(TREND_EMAS, (9.0, 2.0)))
+    assert _stream_digest(ema) != _stream_digest(_current_reading(TREND_EMAS, (1.0, 9.0)))
+
+    swing = _current_reading(SIGNIFICANT_SWINGS_10, (10, 20))
+    assert swing == (10, 20)
+    assert _stream_digest(swing) != _stream_digest(
+        _current_reading(SIGNIFICANT_SWINGS_10, (11, 20))
+    )
+    assert _stream_digest(swing) != _stream_digest(
+        _current_reading(SIGNIFICANT_SWINGS_10, (10, 21))
+    )
+
+    # The true series kernel is still collapsed to the current bar: earlier
+    # prefix values are the retained series, not part of this bar's reading.
+    assert _current_reading(RSI_14, (10.0, 20.0, 30.0)) == 30.0
+    assert _stream_digest(_current_reading(RSI_14, (10.0, 20.0, 30.0))) == _stream_digest(
+        _current_reading(RSI_14, (99.0, 98.0, 30.0))
+    )
 
 
 def test_values_parity_is_fail_closed() -> None:

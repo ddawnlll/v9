@@ -2,13 +2,15 @@
 
 The update contract is deliberately narrow:
 
-* ``advance`` is **idempotent**: identical evidence at the same ``now_ns`` returns
-  the identical belief (same ``version_hash``), and re-applying one observation
-  never mints a second transition event.
+* ``advance`` is **idempotent**: identical evidence returns the identical belief
+  (same ``version_hash``) even when only the decision clock moved forward, and
+  re-applying one observation never mints a second transition event. The
+  candidate streak counts evidence sets, never calls.
 * ``advance`` is **incremental**: a cheap dependency fingerprint (input ids,
-  alignment state, quality, policy digest) is compared before any feature
-  arithmetic runs. An irrelevant observation (a kind the belief does not
-  consume) or a re-delivered identical snapshot does not recompute the view.
+  alignment state, quality, policy digest — deliberately not the decision clock)
+  is compared before any feature arithmetic runs. An irrelevant observation (a
+  kind the belief does not consume) or a re-delivered identical snapshot does not
+  recompute the view.
 * ``advance`` **fails closed**: absent required inputs produce an ``ABSTAIN``
   belief naming what is missing, aged evidence produces ``STALE`` (never
   ``FRESH``), and a belief whose ``max_input_available_at`` is in the future of
@@ -374,11 +376,18 @@ def _alignment_state(context: HorizonContext) -> list[list[object]]:
 def _dependency_fingerprint(
     inputs: _Inputs, context: HorizonContext, policy: BeliefPolicy
 ) -> str:
+    """Identity of the evidence a belief consumed.
+
+    The decision clock is deliberately absent: two cuts over the *same*
+    observation set must be the same dependency set, so a clock-only call can
+    never be mistaken for new evidence (and can never advance a candidate
+    streak). Genuine new evidence changes ``observation_ids``, whose ids are
+    content identities (payload and availability included).
+    """
     return canonical_digest(
         "market_belief_dependency",
         {
             "instrument_id": inputs.instrument_id,
-            "decision_time_ns": inputs.decision_time_ns,
             "observation_ids": list(inputs.observation_ids),
             "quality": inputs.at_decision_quality.value,
             "alignments": _alignment_state(context),
@@ -755,9 +764,19 @@ def _resolve_regime(
     if candidate is incumbent:
         return incumbent, incumbent, 0, None
 
-    streak = (
-        previous.candidate_streak + 1 if previous.regime_candidate is candidate else 1
-    )
+    # A candidate streak counts consecutive pieces of *evidence*, not calls or
+    # clocks: the same observation set at a later decision time must not move
+    # it. Observation ids are content identities, so a new bar (or a revised
+    # payload) changes this tuple and a clock-only call does not.
+    evidence_changed = inputs.observation_ids != previous.input_observation_ids
+    if previous.regime_candidate is candidate:
+        streak = (
+            previous.candidate_streak + 1
+            if evidence_changed
+            else previous.candidate_streak
+        )
+    else:
+        streak = 1
     if incumbent is RegimeKind.UNKNOWN:
         incumbent_score = Decimal(0)
         reason = TransitionReason.RECOVERY_FROM_UNKNOWN
@@ -769,7 +788,7 @@ def _resolve_regime(
             candidate is not RegimeKind.UNKNOWN
             and candidate_score >= incumbent_score + policy.hysteresis_band
         )
-    if not accepted or streak < policy.min_candidate_streak:
+    if not evidence_changed or not accepted or streak < policy.min_candidate_streak:
         return incumbent, candidate, streak, None
 
     trigger_ids = tuple(

@@ -23,7 +23,9 @@ it does not have.
 horizon as-of times + usable observation ids) and to a deterministic
 ``evidence_id``; the bundle carries the deduplicated input-dependency groups and
 a provenance digest that names the version, the registry, the cache version and
-the cache's input digest.
+the frame's *content* digest (decision time, bar count, last bar identity, usable
+observation ids). The provenance does not depend on how the cache reached the
+bar, so a freshly seeded and an extended cache agree on the same frame.
 
 What this module deliberately does not do:
 
@@ -57,7 +59,12 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from v8_next.belief.state import MarketBeliefV1, verify_version_hash
 from v8_next.domain.horizons import HorizonContext, Timeframe
 from v8_next.domain.market import CausalFrame
-from v8_next.domain.observation import ObservationView, QualityState, worst_quality
+from v8_next.domain.observation import (
+    ObservationView,
+    QualityState,
+    observation_id,
+    worst_quality,
+)
 from v8_next.domain.positioning import PositioningReading
 from v8_next.economics.decisions import Opportunity, StanceKind
 from v8_next.experts.cache import FeatureCache
@@ -369,6 +376,46 @@ def _selected_specs(
     return tuple(ordered), tuple(sorted(duplicates))
 
 
+def _frame_content_digest(frame: CausalFrame, view: ObservationView) -> str:
+    """Content identity of the frame an evidence bundle was produced over.
+
+    Deliberately independent of the cache's append-only chain: the same frame
+    must yield the same provenance whether the cache was freshly seeded or
+    arrived at this bar by extension. Bar count plus the last bar's identity
+    and close pin the series; observation ids pin the usable inputs (they are
+    content identities, so a revised payload changes them).
+    """
+    candles = frame.candles
+    last = candles[-1] if candles else None
+    usable = tuple(
+        sorted(
+            {
+                observation_id(observation)
+                for observation in view.observations(frame.instrument_id)
+            }
+        )
+    )
+    return canonical_digest(
+        "expert-evidence-frame",
+        {
+            "instrument_id": frame.instrument_id,
+            "decision_ns": frame.decision_ns,
+            "bar_count": len(candles),
+            "last_bar": (
+                None
+                if last is None
+                else {
+                    "start_ns": last.start_ns,
+                    "end_ns": last.end_ns,
+                    "close": str(last.close),
+                    "source_hash": last.source_hash,
+                }
+            ),
+            "observation_ids": list(usable),
+        },
+    )
+
+
 def _require_aligned(context: HorizonContext, frame: CausalFrame) -> None:
     """A context that names another instrument or decision time is a contract error."""
     if context.instrument_id != frame.instrument_id:
@@ -633,7 +680,7 @@ def produce_evidence(
             "registry": [spec.expert_id for spec in specs],
             "expert_versions": [[spec.expert_id, spec.version, spec.dependency_group] for spec in specs],
             "cache_version": cache.version,
-            "input_digest": cache.digest_for(frame),
+            "frame_digest": _frame_content_digest(frame, view),
             "context_ref": context_ref,
             "belief_version_hash": belief_hash,
             "context_layer": context_layer,

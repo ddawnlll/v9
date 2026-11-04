@@ -14,7 +14,11 @@ without collapsing them:
    ``initial + realized cashflows + funding + mark-to-market change``?
 
 Unknown exposure and a missing causal mark are typed ``BLOCKED`` outcomes. They are
-never treated as zero funding. Nothing here places orders or reads an engine report.
+never treated as zero funding. A settlement whose venue boundary is after the
+as-of cut is likewise not attributable: it is typed
+``FUNDING_BOUNDARY_IN_FUTURE``, excluded from ``funding_total`` and the equity
+identity, and the report cannot pass. Nothing here places orders or reads an
+engine report.
 """
 
 from __future__ import annotations
@@ -40,6 +44,7 @@ class FundingIssueCode(StrEnum):
     CAMPAIGN_MISMATCH = "CAMPAIGN_MISMATCH"
     MISSING_FINAL_MARK = "MISSING_FINAL_MARK"
     EQUITY_MISMATCH = "EQUITY_MISMATCH"
+    FUNDING_BOUNDARY_IN_FUTURE = "FUNDING_BOUNDARY_IN_FUTURE"
     INVALID_RECORD = "INVALID_RECORD"
 
 
@@ -270,6 +275,23 @@ def reconcile_funding_boundary(
             )
             continue
         seen_settlements.add(settlement.settlement_id)
+        if settlement.boundary_time_ns > as_of_ns:
+            # A settlement whose venue boundary lies beyond the accounting cut
+            # cannot be attributed at this cut: its quantity and mark would be
+            # read after the cut (look-ahead), and folding its cashflow into
+            # ``funding_total`` would move an as-of equity by money not yet
+            # earned. Record the typed issue and exclude it from the identity.
+            issues.append(
+                FundingIssue(
+                    code=FundingIssueCode.FUNDING_BOUNDARY_IN_FUTURE,
+                    record_id=settlement.settlement_id,
+                    detail=(
+                        f"boundary {settlement.boundary_time_ns} is after the as-of cut "
+                        f"{as_of_ns}; settlement is not attributable at this cut"
+                    ),
+                )
+            )
+            continue
         boundary_key = (
             settlement.campaign_id,
             settlement.instrument_id,
