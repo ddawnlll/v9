@@ -523,3 +523,45 @@ here.
 | `ruff check src tests tools` | clean |
 | `mypy src` | clean (208 files) |
 | New tests | `test_performance_parity.py`, `test_domain_frame_incremental.py`, `test_experts_bar_memo.py` |
+
+---
+
+## 13. Long-history check on real 4-year tape (10 symbols)
+
+Section 6 could only sweep 3 months per leg, because the authorised development window is Jan–Mar
+2025. The vendor capture set `multi-1h-4y` does hold 48 months (2022-07 … 2026-06) for the same ten
+symbols, so the *performance* question "what does a long backtest cost" was measured there. This is
+a timing and memory load only: no economic claim is made on data outside the authorised window, and
+nothing here is an out-of-sample result.
+
+| Workload | Leg-bars | Wall | Peak RSS | ms / leg-bar | KiB / leg-bar | Fills | Funding settlements |
+|---|---|---|---|---|---|---|---|
+| 10 symbols × 3 months (B3) | 21,600 | 3.836 s (median of 3) | 0.40 GiB | 0.178 | 19.65 | 203 | 2,690 |
+| 1 symbol × 4 years | 35,040 | 45.5 s (1 run) | 0.59 GiB | 1.300 | 17.77 | 1,190 | 4,380 |
+| **10 symbols × 4 years** | **350,400** | **286.2 s** | **3.65 GiB** | **0.817** | **10.91** | 2,799 | 43,880 |
+| 40 symbols × 4 years | 1,401,600 | ~19.1 min `ESTIMATE` | ~14.6 GiB `ESTIMATE` | — | — | — | — |
+
+Raw rows: `evidence/optimized/long_history_scaling.csv`.
+
+Three things this settles:
+
+1. **Cost is linear in instruments but not in history length.** Ten 4-year legs cost 74.6× the
+   ten 3-month legs while carrying 16.2× the bars, so cost per leg-bar rises from 0.178 to 0.817 ms
+   as a leg gets longer (a single 4-year leg runs at 1.300 ms/bar against 0.490 ms/bar for 2,160
+   bars). Per-instrument series are independent, so adding instruments stays near-linear; extending
+   history does not. Anything that keeps per-bar state proportional to the prefix — indicator
+   windows over the whole prefix on opportunity bars, the opportunity book, the retained decision
+   list — shows up here.
+2. **A 4 GiB VPS holds ten symbols for four years, barely.** 3.65 GiB peak for 350,400 leg-bars
+   gives ~0.35 GiB of headroom. It fits, but there is no room for a second concurrent run and no
+   safety margin for a larger decision payload.
+3. **40 symbols × 4 years is still out of reach, and cannot even be measured here.** The real tape
+   has ten symbols, so 40 is `NOT_RUN` rather than substituted with synthetic data; the linear
+   extrapolation (~19 min, ~14.6 GiB) exceeds a 4 GiB VPS by roughly 3.6× in memory. Speed is no
+   longer the binding constraint — retained state per leg is.
+
+Also fixed while loading this tape: `load_tape_candles` parsed each monthly archive with Polars'
+default first-100-rows schema inference, and archives that open with integer-looking volumes and
+later carry fractional ones failed the whole load (`could not parse 1017592.90 as dtype i64`).
+Inference is now full-file, which is identical for every archive that already parsed and unblocks
+the rest (§ commit `6632cdd`). Parity against the frozen manifests is unchanged.

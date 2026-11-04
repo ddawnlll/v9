@@ -1,0 +1,5 @@
+workload,symbols,bars_per_leg,leg_bars,wall_s,user_cpu_s,system_cpu_s,peak_rss_gib,ms_per_leg_bar,kib_per_leg_bar,decisions,fills,funding_settlements,repetitions,note
+B3 10 symbols x 3 months,10,2160,21600,3.836,3.840,0.000,0.40,0.178,19.65,21600,203,2690,3,median of 3 fresh processes (optimised tree)
+10 symbols x 4 years,10,35040,350400,286.182,282.794,9.419,3.65,0.817,10.91,350400,2799,43880,1,single run; real multi-1h-4y tape 2022-07..2026-06; no repetition yet
+1 symbol x 4 years,1,35040,35040,45.541,45.346,3.644,0.59,1.300,17.77,35040,1190,4380,1,single run; real tape; used to validate the long-history memory model before the ten-leg run
+ESTIMATE 40 symbols x 4 years,40,35040,1401600,1144.728,0.000,0.000,14.58,0.817,10.91,1401600,0,0,0,ESTIMATE: 4x the measured ten-leg point, linear in legs; real tape has only 10 symbols so this is NOT_RUN on data
