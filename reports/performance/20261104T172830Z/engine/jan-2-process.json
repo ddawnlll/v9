@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/work/.venv/bin/python",
+    "/work/tools/performance/ensemble_profile.py",
+    "--tape",
+    "/tape/jan",
+    "--bars",
+    "744",
+    "--output",
+    "/out/jan-2.json"
+  ],
+  "child_wall_s": 0.7197976249999556,
+  "child_user_cpu_s": 0.732204,
+  "child_system_cpu_s": 0.10049799999999999,
+  "child_peak_rss_bytes": 240173056,
+  "returncode": 0,
+  "stdout": "{\"bars\": 744, \"decisions\": 744, \"expert_timing_instrumented\": false, \"experts\": {}, \"fills\": 1, \"first_start_ns\": 1735689600000000000, \"fixture\": null, \"fixture_s\": 0.026755417000003945, \"imports_s\": 0.12241066599995065, \"last_end_ns\": 1738368000000000000, \"orders\": 3, \"peak_rss_bytes\": 240173056, \"pid\": 37, \"pre_output_s\": 0.6645711249999522, \"production_backtest_s\": 0.5154050419999976, \"profiled\": false, \"stage_trace_instrumented\": false, \"stages\": [], \"system_cpu_s\": 0.096787, \"user_cpu_s\": 0.695014, \"workload\": \"historical tape; availability and provenance require independent verification\"}\n",
+  "stderr": "",
+  "measurement_write_included": false
+}

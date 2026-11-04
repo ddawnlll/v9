@@ -1,0 +1,30 @@
+{
+  "base_git_sha": "d57c1346902221c776a520ce25e8e4b99e0103d8",
+  "source_note": "profiling files were uncommitted during runs; listed hashes identify current research and trace code. Ensemble script received a bounds-validation guard after engine measurements; behavior for isolated directory unchanged.",
+  "sha256": {
+    "src/v8_next/adapters/expert_strategy.py": "8b6f23e8369b43a8e045a6f7b1d64784835fac0a1769213b4afd88c56ee99c9c",
+    "src/v8_next/evaluation/runner.py": "a65021ccee7d795894ff3bea760472958aa7bf74d59009ccccd14834d104d36b",
+    "tools/performance/research_profile.py": "e057e71ea8ca0d76d594dd6f72e6b1e295c0156b5c1e4fe7a71f2838169c02cf",
+    "tools/performance/stage_trace.py": "93be330c8932b24d5426f440473b8ec778ad07c8d4e7088bd93782c9845ee706",
+    "tools/performance/run_process.py": "fc418c322421f57ed385986d4c3ca5bf14ce9339ac6e6ccd67f5553179669581",
+    "uv.lock": "b3ee5c3836d26b8e6a598f6a9ffe1b50213939bd00efaceb0397d19b9f2b698b"
+  },
+  "data_files_sha256": {
+    "BTCUSDT-1h-2025-01.zip": "9ebc05c9b3d5ab3591edf65bc5c7e5dbc2f96c1efc4adc4ea198c651a99a41b1",
+    "BTCUSDT-1h-2025-03.zip": "08043384c3336b0fa3eeee06e113a6f1eceb6d3fbe7b2971e9b9fa83625fdfb9",
+    "BTCUSDT-1h-2025-02.zip": "077d761098eb5f2dbde65457833b9edab41ea6475284a77fcce0d4bec1bfb5cf"
+  },
+  "data_scope": "BTCUSDT 2025-01-01 through 2025-04-01 development window, no sealed OOS",
+  "machine": "Apple M3 Pro, Docker Desktop aarch64 Linux VM",
+  "cpu_max": "200000 100000",
+  "memory_max_bytes": 4294967296,
+  "memory_swap_max_combined_bytes": 4294967296,
+  "python": "3.12.16",
+  "nautilus_trader": "2.0.0rc4",
+  "polars": "1.44.1",
+  "threads": {
+    "POLARS_MAX_THREADS": "2",
+    "OMP_NUM_THREADS": "2",
+    "OPENBLAS_NUM_THREADS": "2"
+  }
+}

@@ -1,0 +1,70 @@
+Wed Nov  4 20:16:30 2026    /tmp/v9-profile-2880.pstats
+
+         6678152 function calls (6673093 primitive calls) in 1.937 seconds
+
+   Ordered by: cumulative time
+   List reduced from 2063 to 60 due to restriction <60>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.004    0.004    1.942    1.942 /Users/hootie/src/v9/src/v8_next/adapters/expert_strategy.py:1502(run_expert_strategy_backtest)
+        1    0.014    0.014    1.742    1.742 {method 'run' of 'nautilus_trader.backtest.BacktestEngine' objects}
+     2880    0.045    0.000    1.727    0.001 /Users/hootie/src/v9/src/v8_next/adapters/expert_strategy.py:471(on_bar)
+     2880    0.199    0.000    0.576    0.000 /Users/hootie/src/v9/src/v8_next/domain/market.py:147(from_ordered_prefix)
+     2880    0.009    0.000    0.541    0.000 /Users/hootie/src/v9/src/v8_next/experts/registry.py:669(observe_all_28)
+    83520    0.018    0.000    0.531    0.000 /Users/hootie/src/v9/src/v8_next/experts/registry.py:685(<genexpr>)
+    80640    0.108    0.000    0.512    0.000 /Users/hootie/src/v9/src/v8_next/experts/registry.py:605(observe_expert)
+     2880    0.004    0.000    0.467    0.000 /Users/hootie/src/v9/src/v8_next/economics/decisions.py:91(opportunity_at)
+     2908    0.002    0.000    0.432    0.000 /opt/homebrew/Cellar/python@3.12/3.12.12_2/Frameworks/Python.framework/Versions/3.12/lib/python3.12/functools.py:982(__get__)
+     2880    0.006    0.000    0.430    0.000 /Users/hootie/src/v9/src/v8_next/domain/market.py:101(continuous)
+     2929    0.157    0.000    0.424    0.000 {built-in method builtins.all}
+     5760    0.278    0.000    0.278    0.000 /Users/hootie/src/v9/src/v8_next/domain/market.py:82(__post_init__)
+  4148640    0.266    0.000    0.266    0.000 /Users/hootie/src/v9/src/v8_next/domain/market.py:103(<genexpr>)
+   210240    0.243    0.000    0.243    0.000 <string>:2(__init__)
+    364/7    0.001    0.000    0.192    0.027 <frozen importlib._bootstrap>:1349(_find_and_load)
+    362/7    0.001    0.000    0.192    0.027 <frozen importlib._bootstrap>:1304(_find_and_load_unlocked)
+    347/4    0.001    0.000    0.191    0.048 <frozen importlib._bootstrap>:911(_load_unlocked)
+    289/4    0.000    0.000    0.191    0.048 <frozen importlib._bootstrap_external>:993(exec_module)
+   823/11    0.000    0.000    0.191    0.017 <frozen importlib._bootstrap>:480(_call_with_frames_removed)
+    393/4    0.005    0.000    0.191    0.048 {built-in method builtins.exec}
+        1    0.000    0.000    0.172    0.172 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/__init__.py:1(<module>)
+    68/40    0.000    0.000    0.127    0.003 {built-in method builtins.__import__}
+    77760    0.045    0.000    0.123    0.000 /Users/hootie/src/v9/src/v8_next/experts/common.py:22(directional_stance)
+    80640    0.058    0.000    0.095    0.000 /Users/hootie/src/v9/src/v8_next/economics/decisions.py:63(stance_record)
+        1    0.000    0.000    0.082    0.082 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/core/api.py:1(<module>)
+  539/372    0.000    0.000    0.072    0.000 <frozen importlib._bootstrap>:1390(_handle_fromlist)
+     5760    0.001    0.000    0.068    0.000 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/polars/series/series.py:4720(to_list)
+     5760    0.067    0.000    0.067    0.000 {method 'to_list' of 'builtins.PySeries' objects}
+    40320    0.026    0.000    0.066    0.000 /Users/hootie/src/v9/src/v8_next/economics/decisions.py:321(stance_with)
+      347    0.000    0.000    0.063    0.000 <frozen importlib._bootstrap>:806(module_from_spec)
+       56    0.000    0.000    0.060    0.001 <frozen importlib._bootstrap_external>:1291(create_module)
+       56    0.060    0.001    0.060    0.001 {built-in method _imp.create_dynamic}
+        1    0.000    0.000    0.047    0.047 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/core/groupby/__init__.py:1(<module>)
+        1    0.000    0.000    0.047    0.047 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/core/groupby/generic.py:1(<module>)
+    56/30    0.000    0.000    0.046    0.002 <frozen importlib._bootstrap_external>:1299(exec_module)
+    56/30    0.007    0.000    0.046    0.002 {built-in method _imp.exec_dynamic}
+    11520    0.024    0.000    0.046    0.000 /opt/homebrew/Cellar/python@3.12/3.12.12_2/Frameworks/Python.framework/Versions/3.12/lib/python3.12/dataclasses.py:1540(replace)
+   910469    0.044    0.000    0.044    0.000 {built-in method builtins.getattr}
+        1    0.000    0.000    0.041    0.041 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/core/config_init.py:1(<module>)
+        1    0.000    0.000    0.040    0.040 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/errors/__init__.py:1(<module>)
+        1    0.000    0.000    0.040    0.040 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/_libs/__init__.py:1(<module>)
+        1    0.000    0.000    0.038    0.038 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/core/frame.py:1(<module>)
+      289    0.001    0.000    0.034    0.000 <frozen importlib._bootstrap_external>:1066(get_code)
+  570/560    0.004    0.000    0.031    0.000 {built-in method builtins.__build_class__}
+        1    0.000    0.000    0.031    0.031 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/_libs/tslibs/__init__.py:1(<module>)
+        1    0.000    0.000    0.028    0.028 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/core/generic.py:1(<module>)
+      289    0.003    0.000    0.022    0.000 <frozen importlib._bootstrap_external>:755(_compile_bytecode)
+        1    0.000    0.000    0.022    0.022 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/core/arrays/__init__.py:1(<module>)
+        1    0.000    0.000    0.020    0.020 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/_config/__init__.py:1(<module>)
+     2880    0.002    0.000    0.020    0.000 /Users/hootie/src/v9/src/v8_next/experts/divergence.py:76(observe_divergence)
+        1    0.000    0.000    0.020    0.020 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/_config/config.py:1(<module>)
+      289    0.019    0.000    0.019    0.000 {built-in method marshal.loads}
+        1    0.000    0.000    0.019    0.019 /Users/hootie/src/v9/src/v8_next/audit/__init__.py:1(<module>)
+     2880    0.002    0.000    0.019    0.000 /Users/hootie/src/v9/src/v8_next/experts/pandf.py:94(observe_pandf)
+        1    0.000    0.000    0.019    0.019 /Users/hootie/src/v9/.venv/lib/python3.12/site-packages/pandas/_typing.py:1(<module>)
+     2880    0.002    0.000    0.018    0.000 /Users/hootie/src/v9/src/v8_next/experts/climax.py:43(observe_volume_climax)
+    77760    0.014    0.000    0.018    0.000 /Users/hootie/src/v9/src/v8_next/experts/common.py:7(context_reason)
+        1    0.000    0.000    0.017    0.017 /Users/hootie/src/v9/src/v8_next/audit/authority.py:1(<module>)
+     3435    0.009    0.000    0.016    0.000 {built-in method builtins.max}
+        1    0.000    0.000    0.016    0.016 /Users/hootie/src/v9/src/v8_next/evaluation/claims.py:1(<module>)
+
+

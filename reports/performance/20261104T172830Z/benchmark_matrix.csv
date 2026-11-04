@@ -1,0 +1,7 @@
+case,data,workload,status,wall_median_s,wall_min_s,wall_max_s,peak_rss_median_bytes,repetitions,note
+B0,BTCUSDT 1h development archive,"744 bars, BenchmarkRunner + JSON + HTML",MEASURED,0.8194315839999717,0.7239057089999505,1.6431895840000834,242868224,3,ARM Linux Docker; page-cache state differs; baseline execution profile
+B1,BTCUSDT 1h development archive,"2160 bars, BenchmarkRunner + JSON + HTML",MEASURED,1.9923867510000264,1.9564069589999917,1.993145084000048,256929792,3,ARM Linux Docker; page-cache state differs; baseline execution profile
+B2,not accessed,1 instrument 1 year,NOT_RUN,,,,,0,outside explicitly established BTC development window and/or unsupported resolution/universe
+B3,not accessed,10 instruments 3 months,NOT_RUN,,,,,0,outside explicitly established BTC development window and/or unsupported resolution/universe
+B4,not accessed,40 instruments 1 year 15m,NOT_RUN,,,,,0,outside explicitly established BTC development window and/or unsupported resolution/universe
+B5,not accessed,40 instruments 1 year 1m,NOT_RUN,,,,,0,outside explicitly established BTC development window and/or unsupported resolution/universe

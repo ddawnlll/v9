@@ -1,0 +1,25 @@
+{
+  "artifact_bytes": 32582,
+  "artifact_files": [
+    "benchmark_ledger.jsonl",
+    "forensic.html",
+    "historical-development_trades.jsonl",
+    "result.json"
+  ],
+  "bars": 744,
+  "certificate_status": "STATUS: NO_ECONOMIC_CLAIM (Research Candidate, NOT Production Approved)",
+  "first_start_ns": 1735689600000000000,
+  "fixture_s": 0.005761459000041214,
+  "forensic_html_write_s": 0.0004912910000030024,
+  "imports_s": 0.5946672500000432,
+  "last_end_ns": 1738368000000000000,
+  "peak_rss_bytes": 258215936,
+  "pre_output_s": 1.5826522920000343,
+  "receipt_html_verified": true,
+  "result_json_write_s": 0.00034958399999140966,
+  "runner_and_ledger_s": 0.9813827079999555,
+  "system_cpu_s": 0.149386,
+  "trades": 0,
+  "user_cpu_s": 1.497905,
+  "workload": "historical development mechanics; no economic claim"
+}

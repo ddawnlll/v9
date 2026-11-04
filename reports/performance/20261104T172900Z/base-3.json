@@ -1,0 +1,21 @@
+{
+  "bars": 720,
+  "decisions": 720,
+  "expert_timing_instrumented": false,
+  "experts": {},
+  "fills": 0,
+  "fixture": "flat",
+  "fixture_s": 0.0022133749999966312,
+  "imports_s": 0.19987858299998607,
+  "orders": 0,
+  "peak_rss_bytes": 203620352,
+  "pid": 36,
+  "pre_output_s": 0.5294383749999838,
+  "production_backtest_s": 0.3273464170000011,
+  "profiled": false,
+  "stage_trace_instrumented": false,
+  "stages": [],
+  "system_cpu_s": 0.044940999999999995,
+  "user_cpu_s": 0.59422,
+  "workload": "synthetic mechanics only; not economic evidence"
+}

@@ -1,0 +1,70 @@
+Wed Nov  4 18:19:41 2026    /out/b3.pstats
+
+         45675607 function calls (45665899 primitive calls) in 19.834 seconds
+
+   Ordered by: cumulative time
+   List reduced from 2413 to 60 due to restriction <60>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.008    0.008   22.786   22.786 /work/src/v8_next/adapters/portfolio_backtest.py:308(run_portfolio_backtest)
+        1    0.237    0.237   22.074   22.074 {method 'run' of 'nautilus_trader.backtest.BacktestEngine' objects}
+    21600    0.553    0.000   21.818    0.001 /work/src/v8_next/adapters/expert_strategy.py:471(on_bar)
+    21600    0.117    0.000   14.239    0.001 /work/src/v8_next/experts/registry.py:669(observe_all_28)
+   626400    0.236    0.000   14.104    0.000 /work/src/v8_next/experts/registry.py:685(<genexpr>)
+   604800    1.190    0.000   13.868    0.000 /work/src/v8_next/experts/registry.py:605(observe_expert)
+    21600    1.541    0.000    4.442    0.000 /work/src/v8_next/domain/market.py:147(from_ordered_prefix)
+    21823    0.019    0.000    4.171    0.000 /usr/local/lib/python3.12/functools.py:982(__get__)
+    21600    0.057    0.000    4.147    0.000 /work/src/v8_next/domain/market.py:101(continuous)
+    23272    1.753    0.000    4.137    0.000 {built-in method builtins.all}
+    21600    0.023    0.000    3.726    0.000 /work/src/v8_next/experts/bollinger.py:68(observe_bollinger_breakout)
+   583200    0.181    0.000    3.580    0.000 /work/src/v8_next/experts/common.py:7(context_reason)
+    30873    0.107    0.000    2.557    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/utils.py:97(wrapper)
+ 23338800    2.339    0.000    2.339    0.000 /work/src/v8_next/domain/market.py:103(<genexpr>)
+    31526    0.073    0.000    1.996    0.000 /work/.venv/lib/python3.12/site-packages/polars/dataframe/frame.py:10588(select_seq)
+    43200    1.806    0.000    1.806    0.000 /work/src/v8_next/domain/market.py:82(__post_init__)
+    38186    0.036    0.000    1.722    0.000 /work/.venv/lib/python3.12/site-packages/polars/lazyframe/frame.py:2236(_collect_eager)
+    38186    0.073    0.000    1.681    0.000 /work/.venv/lib/python3.12/site-packages/polars/lazyframe/engine.py:415(collect)
+   604800    0.852    0.000    1.379    0.000 /work/src/v8_next/economics/decisions.py:63(stance_record)
+    38186    1.365    0.000    1.365    0.000 {method 'collect' of 'builtins.PyLazyFrame' objects}
+   583200    0.486    0.000    1.345    0.000 /work/src/v8_next/experts/common.py:22(directional_stance)
+     2007    0.031    0.000    1.161    0.001 /work/src/v8_next/experts/patterns.py:12(pattern_pivots)
+    21600    0.020    0.000    0.962    0.000 /work/src/v8_next/economics/decisions.py:91(opportunity_at)
+      653    0.081    0.000    0.880    0.001 /work/src/v8_next/experts/features.py:152(wilder_rsi)
+      669    0.019    0.000    0.864    0.001 /work/src/v8_next/experts/features.py:192(significant_swings)
+    21600    0.017    0.000    0.758    0.000 /work/src/v8_next/experts/confluence.py:62(observe_confluence)
+      669    0.004    0.000    0.757    0.001 /work/src/v8_next/experts/fibonacci.py:28(fib_impulse)
+   302400    0.295    0.000    0.735    0.000 /work/src/v8_next/economics/decisions.py:321(stance_with)
+    45857    0.016    0.000    0.714    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/series.py:4720(to_list)
+    45857    0.698    0.000    0.698    0.000 {method 'to_list' of 'builtins.PySeries' objects}
+    21600    0.022    0.000    0.661    0.000 /work/src/v8_next/experts/divergence.py:76(observe_divergence)
+  6976996    0.656    0.000    0.658    0.000 {built-in method builtins.getattr}
+      223    0.004    0.000    0.628    0.003 /work/src/v8_next/experts/confluence.py:43(confluence_legs)
+   109836    0.306    0.000    0.614    0.000 /usr/local/lib/python3.12/dataclasses.py:1540(replace)
+    21600    0.020    0.000    0.573    0.000 /work/src/v8_next/experts/pandf.py:94(observe_pandf)
+    21600    0.018    0.000    0.440    0.000 /work/src/v8_next/experts/reversion.py:44(observe_rsi_reversion)
+    21600    0.018    0.000    0.436    0.000 /work/src/v8_next/experts/measuring.py:65(observe_measuring)
+      223    0.007    0.000    0.436    0.002 /work/src/v8_next/experts/divergence.py:24(divergence_setup)
+    21600    0.021    0.000    0.429    0.000 /work/src/v8_next/experts/reclaim.py:36(observe_breakout_retest)
+    21600    0.018    0.000    0.416    0.000 /work/src/v8_next/experts/failed_moves.py:79(observe_failed_move)
+    21600    0.012    0.000    0.385    0.000 /work/src/v8_next/experts/trend.py:31(observe_trend_depth)
+     6660    0.018    0.000    0.377    0.000 /work/.venv/lib/python3.12/site-packages/polars/dataframe/frame.py:10498(select)
+      223    0.023    0.000    0.351    0.002 /work/src/v8_next/experts/pandf.py:59(pandf_setup)
+     5390    0.348    0.000    0.348    0.000 {method 'add_data' of 'nautilus_trader.backtest.BacktestEngine' objects}
+    21600    0.013    0.000    0.326    0.000 /work/src/v8_next/experts/fibonacci.py:82(observe_fib_projection)
+    21600    0.024    0.000    0.325    0.000 /work/src/v8_next/experts/momentum.py:31(observe_obv_adl)
+    21600    0.012    0.000    0.322    0.000 /work/src/v8_next/experts/fibonacci.py:55(observe_fib_retracement)
+      223    0.001    0.000    0.308    0.001 /work/src/v8_next/experts/measuring.py:23(measuring_setup)
+      223    0.008    0.000    0.307    0.001 /work/src/v8_next/experts/patterns.py:44(pattern_structures)
+    31526    0.030    0.000    0.297    0.000 /work/.venv/lib/python3.12/site-packages/polars/lazyframe/frame.py:5178(select_seq)
+    38186    0.039    0.000    0.291    0.000 /work/.venv/lib/python3.12/site-packages/polars/_utils/parse/expr.py:86(parse_into_list_of_expressions)
+      223    0.001    0.000    0.287    0.001 /work/src/v8_next/experts/failed_moves.py:22(failed_move)
+    21600    0.023    0.000    0.283    0.000 /work/src/v8_next/experts/climax.py:43(observe_volume_climax)
+      223    0.100    0.000    0.282    0.001 /work/src/v8_next/experts/pandf.py:20(columns)
+    21600    0.017    0.000    0.265    0.000 /work/src/v8_next/experts/momentum.py:70(observe_macd_stoch)
+     4669    0.003    0.000    0.250    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/series.py:4428(arg_true)
+9338/4669    0.019    0.000    0.246    0.000 /work/.venv/lib/python3.12/site-packages/polars/functions/lazy.py:2430(arg_where)
+      223    0.007    0.000    0.234    0.001 /work/src/v8_next/experts/bollinger.py:24(band_setup)
+    21600    0.021    0.000    0.222    0.000 /work/src/v8_next/experts/ichimoku.py:8(observe_ichimoku)
+   695956    0.144    0.000    0.210    0.000 /work/src/v8_next/experts/features.py:179(<genexpr>)
+
+

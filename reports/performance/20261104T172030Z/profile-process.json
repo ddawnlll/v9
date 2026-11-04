@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/work/.venv/bin/python",
+    "/work/tools/performance/ensemble_profile.py",
+    "--bars",
+    "720",
+    "--profile",
+    "/out/profile.pstats",
+    "--output",
+    "/out/profile.json"
+  ],
+  "child_wall_s": 0.5773709579999888,
+  "child_user_cpu_s": 0.640564,
+  "child_system_cpu_s": 0.022019,
+  "child_peak_rss_bytes": 209072128,
+  "returncode": 0,
+  "stdout": "{\"bars\": 720, \"decisions\": 720, \"expert_timing_instrumented\": false, \"experts\": {}, \"fills\": 0, \"fixture\": \"flat\", \"fixture_s\": 0.0015249160000223583, \"imports_s\": 0.12623062499997673, \"orders\": 0, \"peak_rss_bytes\": 209072128, \"pid\": 85, \"pre_output_s\": 0.5176689169999804, \"production_backtest_s\": 0.3899133759999813, \"profiled\": true, \"system_cpu_s\": 0.02002, \"user_cpu_s\": 0.597613, \"workload\": \"synthetic mechanics only; not economic evidence\"}\n",
+  "stderr": "",
+  "measurement_write_included": false
+}

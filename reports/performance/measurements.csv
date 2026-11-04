@@ -1,0 +1,62 @@
+case,workload,metric,unit,repetitions,min,median,max,p95,note
+B0,"1 instrument, 1 month (BTCUSDT 1h, 744 bars)",child_wall_s,s,3,1.0629,1.0741,2.4141,2.4141,"fresh child process per repetition; includes interpreter startup, output and teardown"
+B0,"1 instrument, 1 month (BTCUSDT 1h, 744 bars)",user_cpu_s,s,3,1.0269,1.0510,2.2591,2.2591,RUSAGE_CHILDREN user time for the measured child
+B0,"1 instrument, 1 month (BTCUSDT 1h, 744 bars)",system_cpu_s,s,3,0.1412,0.1556,0.1968,0.1968,RUSAGE_CHILDREN system time for the measured child
+B0,"1 instrument, 1 month (BTCUSDT 1h, 744 bars)",cpu_total_s,s,3,1.1824,1.1922,2.4559,2.4559,user + system for the same child
+B0,"1 instrument, 1 month (BTCUSDT 1h, 744 bars)",cpu_utilisation_pct_of_2_vcpu,%,3,50.9,55.5,55.6,55.6,cpu_total/wall relative to the 2-vCPU cgroup quota; not a host-wide figure
+B0,"1 instrument, 1 month (BTCUSDT 1h, 744 bars)",os_peak_rss,MiB,3,228.5,230.9,240.5,240.5,ru_maxrss high-water mark; not a sampled series
+B0,"1 instrument, 1 month (BTCUSDT 1h, 744 bars)",bars_per_s,bars/s,3,308.2,692.7,700.0,700.0,744 bars per repetition
+B0,"1 instrument, 1 month (BTCUSDT 1h, 744 bars)",bars,bars,3,744,744,744,744,replayed bar count
+B0,"1 instrument, 1 month (BTCUSDT 1h, 744 bars)",decisions,count,3,744,744,744,744,decisions recorded by the production strategy
+B0,"1 instrument, 1 month (BTCUSDT 1h, 744 bars)",fills,count,3,1,1,1,1,native fill records
+B1,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",child_wall_s,s,3,2.7607,2.7952,2.8037,2.8037,"fresh child process per repetition; includes interpreter startup, output and teardown"
+B1,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",user_cpu_s,s,3,2.5964,2.6182,2.6498,2.6498,RUSAGE_CHILDREN user time for the measured child
+B1,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",system_cpu_s,s,3,0.3307,0.3441,0.3563,0.3563,RUSAGE_CHILDREN system time for the measured child
+B1,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",cpu_total_s,s,3,2.9404,2.9745,2.9806,2.9806,user + system for the same child
+B1,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",cpu_utilisation_pct_of_2_vcpu,%,3,53.2,53.2,53.3,53.3,cpu_total/wall relative to the 2-vCPU cgroup quota; not a host-wide figure
+B1,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",os_peak_rss,MiB,3,240.0,241.1,241.1,241.1,ru_maxrss high-water mark; not a sampled series
+B1,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",bars_per_s,bars/s,3,770.4,772.8,782.4,782.4,2160 bars per repetition
+B1,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",bars,bars,3,2160,2160,2160,2160,replayed bar count
+B1,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",decisions,count,3,2160,2160,2160,2160,decisions recorded by the production strategy
+B1,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",fills,count,3,1,1,1,1,native fill records
+B3,"10 instruments, 3 months (1h, 21600 bars total)",child_wall_s,s,3,13.6125,13.7284,15.2678,15.2678,"fresh child process per repetition; includes interpreter startup, output and teardown"
+B3,"10 instruments, 3 months (1h, 21600 bars total)",user_cpu_s,s,3,13.2259,13.2742,14.6357,14.6357,RUSAGE_CHILDREN user time for the measured child
+B3,"10 instruments, 3 months (1h, 21600 bars total)",system_cpu_s,s,3,0.6194,0.6934,0.7805,0.7805,RUSAGE_CHILDREN system time for the measured child
+B3,"10 instruments, 3 months (1h, 21600 bars total)",cpu_total_s,s,3,13.8453,13.9675,15.4163,15.4163,user + system for the same child
+B3,"10 instruments, 3 months (1h, 21600 bars total)",cpu_utilisation_pct_of_2_vcpu,%,3,50.5,50.9,50.9,50.9,cpu_total/wall relative to the 2-vCPU cgroup quota; not a host-wide figure
+B3,"10 instruments, 3 months (1h, 21600 bars total)",os_peak_rss,MiB,3,547.3,547.8,557.2,557.2,ru_maxrss high-water mark; not a sampled series
+B3,"10 instruments, 3 months (1h, 21600 bars total)",bars_per_s,bars/s,3,1414.7,1573.4,1586.8,1586.8,21600 bars per repetition
+B3,"10 instruments, 3 months (1h, 21600 bars total)",bars,bars,3,21600,21600,21600,21600,replayed bar count
+B3,"10 instruments, 3 months (1h, 21600 bars total)",decisions,count,3,21600,21600,21600,21600,decisions recorded by the production strategy
+B3,"10 instruments, 3 months (1h, 21600 bars total)",fills,count,3,203,203,203,203,native fill records
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",instrumented_child_wall_s,s,1,2.8738,2.8738,2.8738,2.8738,sys.monitoring instrumented; not an uninstrumented baseline
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:script_imports_after_timer_start,s,1,0.2050,0.2050,0.2050,0.2050,"non-overlapping interval, 7.13% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:input_preparation_tape_load_and_candle_build,s,1,0.0564,0.0564,0.0564,0.0564,"non-overlapping interval, 1.96% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:function_entry,s,1,0.0001,0.0001,0.0001,0.0001,"non-overlapping interval, 0.00% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:instrument_setup,s,1,0.0002,0.0002,0.0002,0.0002,"non-overlapping interval, 0.01% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:bar_conversion,s,1,0.0041,0.0041,0.0041,0.0041,"non-overlapping interval, 0.14% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:execution_profile,s,1,0.0000,0.0000,0.0000,0.0000,"non-overlapping interval, 0.00% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:engine_init,s,1,0.1029,0.1029,0.1029,0.1029,"non-overlapping interval, 3.58% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:venue_setup,s,1,0.0001,0.0001,0.0001,0.0001,"non-overlapping interval, 0.00% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:instrument_add,s,1,0.0001,0.0001,0.0001,0.0001,"non-overlapping interval, 0.00% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:data_add,s,1,0.0007,0.0007,0.0007,0.0007,"non-overlapping interval, 0.03% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:strategy_setup,s,1,0.0025,0.0025,0.0025,0.0025,"non-overlapping interval, 0.09% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:engine_run,s,1,2.3752,2.3752,2.3752,2.3752,"non-overlapping interval, 82.65% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:economic_state,s,1,0.0004,0.0004,0.0004,0.0004,"non-overlapping interval, 0.01% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:report_import,s,1,0.0005,0.0005,0.0005,0.0005,"non-overlapping interval, 0.02% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:native_reports,s,1,0.0117,0.0117,0.0117,0.0117,"non-overlapping interval, 0.41% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:fill_report,s,1,0.0018,0.0018,0.0018,0.0018,"non-overlapping interval, 0.06% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:result_assembly,s,1,0.0000,0.0000,0.0000,0.0000,"non-overlapping interval, 0.00% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:engine_dispose,s,1,0.0001,0.0001,0.0001,0.0001,"non-overlapping interval, 0.01% of instrumented child wall"
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",instrumentation_inconsistency:replay_setup_and_monitoring_unattributed,s,1,0.2580,0.2580,0.2580,0.2580,stage intervals exceed the enclosing replay span by this much; the instrumented waterfall is indicative and does not reconcile
+B1-stage-trace,"1 instrument, 3 months (BTCUSDT 1h, 2160 bars)",phase:interpreter_startup_output_and_teardown_unattributed,s,1,0.1085,0.1085,0.1085,0.1085,"non-overlapping interval, 3.77% of instrumented child wall"
+scaling-bars-720,"1 instrument, first 720 bars of the 3-month BTCUSDT window",child_wall_s,s,3,1.0864,1.1071,1.1802,1.1802,650.3 bars/s; peak RSS 228.9 MiB
+scaling-bars-1440,"1 instrument, first 1440 bars of the 3-month BTCUSDT window",child_wall_s,s,3,1.8259,1.8612,1.9030,1.9030,773.7 bars/s; peak RSS 234.3 MiB
+scaling-bars-2160,"1 instrument, first 2160 bars of the 3-month BTCUSDT window",child_wall_s,s,3,2.8270,2.8374,2.9135,2.9135,761.2 bars/s; peak RSS 241.9 MiB
+scaling-instruments-1,"1 instrument(s) x 2160 bars, 3-month window, funding fed",child_wall_s,s,3,2.8831,2.9059,3.0613,3.0613,peak RSS 248.3 MiB
+scaling-instruments-2,"2 instrument(s) x 2160 bars, 3-month window, funding fed",child_wall_s,s,3,5.0203,5.0874,5.0904,5.0904,peak RSS 286.0 MiB
+scaling-instruments-5,"5 instrument(s) x 2160 bars, 3-month window, funding fed",child_wall_s,s,3,8.1936,8.1941,8.2564,8.2564,peak RSS 382.2 MiB
+scaling-instruments-10,"10 instrument(s) x 2160 bars, 3-month window, funding fed",child_wall_s,s,3,13.6655,13.7420,13.8244,13.8244,peak RSS 547.4 MiB
+B2,"1 instrument, 1 year",child_wall_s,s,0,,,,,NOT_RUN: no 12-month window inside the authorized BTC development window
+B4,"40 instruments, 3 months",child_wall_s,s,0,,,,,NOT_RUN: real hourly tape exists for 10 symbols only; no synthetic 40-leg run performed
+B5,"40 instruments, 1 year",child_wall_s,s,0,,,,,NOT_RUN: neither the 40-symbol universe nor a 12-month authorized window exists locally

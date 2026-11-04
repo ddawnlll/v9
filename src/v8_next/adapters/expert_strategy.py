@@ -47,7 +47,13 @@ from v8_next.adapters.execution_telemetry import (
     fill_signature,
     native_fill_records,
 )
-from v8_next.domain.market import Candle, CausalFrame, build_candle_dataframe, frame_at
+from v8_next.domain.market import (
+    Candle,
+    CausalFrame,
+    build_candle_dataframe,
+    extend_causal_frame,
+    frame_at,
+)
 from v8_next.domain.positioning import PositioningReading
 from v8_next.economics.decisions import (
     Opportunity,
@@ -227,6 +233,9 @@ class ExpertEnsembleStrategy(Strategy):
 
         # Internal state & diagnostic ledgers
         self.candles: list[Candle] = []
+        #: Last frame built for this bar sequence. Only used to carry validation
+        #: forward one bar; always replaced by a fully validated frame on doubt.
+        self._frame: CausalFrame | None = None
         self.decisions: list[dict[str, Any]] = []
         self.order_events: list[dict[str, Any]] = []
         self.opened_positions: list[dict[str, Any]] = []
@@ -531,12 +540,26 @@ class ExpertEnsembleStrategy(Strategy):
             )
 
         # 3. Build CausalFrame
-        if use_prefix:
-            frame = CausalFrame.from_ordered_prefix(
-                str(self.instrument_id), bar.ts_init, tuple(self.candles), self._source_prefix_df
+        #
+        # Fast path: extend the previous bar's validated frame by exactly the
+        # candle just appended. `use_prefix` already proved the live bar is the
+        # next element of the ordered source this frame was built from, so the
+        # parent's validation is carried forward and only the appended candle is
+        # verified. `extend_causal_frame` returns None instead of guessing, and
+        # any fallback revalidates the whole prefix as before.
+        frame: CausalFrame | None = None
+        if use_prefix and self._frame is not None and len(self._frame.candles) + 1 == len(self.candles):
+            frame = extend_causal_frame(
+                self._frame, bar.ts_init, candle, self._source_prefix_df
             )
-        else:
-            frame = frame_at(str(self.instrument_id), bar.ts_init, tuple(self.candles))
+        if frame is None:
+            if use_prefix:
+                frame = CausalFrame.from_ordered_prefix(
+                    str(self.instrument_id), bar.ts_init, tuple(self.candles), self._source_prefix_df
+                )
+            else:
+                frame = frame_at(str(self.instrument_id), bar.ts_init, tuple(self.candles))
+        self._frame = frame
 
         # 4. Detect Opportunity
         opportunity: Opportunity | None

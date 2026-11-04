@@ -1,0 +1,149 @@
+{
+  "report": "V9 end-to-end performance and memory benchmark",
+  "measured_at_utc": "2026-11-04T18:00:00Z/2026-11-04T18:35:00Z (approximate wall clock of the measurement session; host clock reads 2026-11-04)",
+  "base_git_sha": "a4fa50de770cce2367c5360fa516f7d1fa01743c",
+  "base_git_branch": "codex/performance-forensics",
+  "provenance_note": "The measurement and assembly tools listed under source_sha256 were uncommitted when the runs executed; the digests below identify the exact files that produced these numbers. Prior evidence under reports/performance/<timestamp>Z/ is retained unchanged as branch history and is cited by directory.",
+  "source_sha256": {
+    "src/v8_next/adapters/expert_strategy.py": "8b6f23e8369b43a8e045a6f7b1d64784835fac0a1769213b4afd88c56ee99c9c",
+    "src/v8_next/adapters/portfolio_backtest.py": "23e1a8949e0ebc3e17f0472e48bf77a8c7b9d8b15ae7bad6c921794efb1319f8",
+    "src/v8_next/domain/market.py": "e3c1ed23ce488e87498b6867d45a11905758b470314620c41737cecfa4d9c25f",
+    "src/v8_next/experts/registry.py": "79cf978cd184a43625bb1a1b6948dca99343653b6c2221fc4289fe0d01fc491f",
+    "src/v8_next/economics/decisions.py": "c4a2437e43b20325c4b9b50986fc8a520bef2d2edaa842d423aa366df2f91cbc",
+    "tools/performance/ensemble_profile.py": "0af5eae2c6a43ebe313dd51c5fa9537889d9215ab82dedcb88dfa472c9dd733d",
+    "tools/performance/portfolio_tape.py": "fd775e16d7dcd2c69f127075d4719e49e738f5c3289eda2b95372b0a4b0b25ed",
+    "tools/performance/memory_timeline.py": "5b377a29cc834890f4e71f0dae169a4379f984cea99f0c9ab18be575b465036e",
+    "tools/performance/run_process.py": "9e5b70474a563ed2702d81623eef36a1a798f20c46162747052227f08e0639a9",
+    "tools/performance/stage_trace.py": "93be330c8932b24d5426f440473b8ec778ad07c8d4e7088bd93782c9845ee706",
+    "tools/performance/expert_trace.py": "903f120219c729415f0cc81efb71dee2ae09dab6f813a37aa300cc48dfc2f916",
+    "tools/performance/assemble_report.py": "4c71e54d8d9fc87068f8e4d38c0c67d1a42af39ccfe0c7a7fc4028cf295843a3",
+    "pyproject.toml": "58e1582344a0e9ebc71efec3ae1d579b4c72b2dbed9aa53e32db8ea0cbd18530",
+    "uv.lock": "b3ee5c3836d26b8e6a598f6a9ffe1b50213939bd00efaceb0397d19b9f2b698b"
+  },
+  "host": {
+    "model": "Apple M3 Pro",
+    "cpus": 11,
+    "memory_bytes": 19327352832,
+    "os": "Darwin 26.1 (macOS)",
+    "note": "Mac measurements are not Linux VPS measurements. Every reported benchmark ran inside the ARM Linux container described under container, not on bare macOS."
+  },
+  "container": {
+    "runtime": "Docker Engine 27.3.1 (Docker Desktop VM, arm64)",
+    "image": "v9-performance:local",
+    "base_image": "python:3.12-slim@sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30",
+    "python": "3.12.16",
+    "nautilus_trader": "2.0.0rc4",
+    "polars": "1.44.1",
+    "uv": "0.9.14",
+    "limits": {
+      "cpu_max": "200000 100000",
+      "cpu_equivalents": 2,
+      "memory_max_bytes": 4294967296,
+      "memory_swap_max_bytes": 4294967296,
+      "memory_events_after_runs": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "cpu_stat_after_runs": {
+        "nr_throttled": 0,
+        "throttled_usec": 0
+      }
+    },
+    "thread_limits": {
+      "POLARS_MAX_THREADS": "2",
+      "OMP_NUM_THREADS": "2",
+      "OPENBLAS_NUM_THREADS": "2"
+    },
+    "status": "deleted after measurement at the user's request; the recorded cpu.max/memory.max and the zero OOM/throttle counters describe the environment as it was during measurement"
+  },
+  "dataset": {
+    "source_root": "/Users/hootie/src/v8/research/tape/multi-1h-4y (git-ignored sibling checkout)",
+    "window": "2025-01-01T00:00Z..2025-04-01T00:00Z (the monograph's BTC development window)",
+    "instruments": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "BNBUSDT",
+      "SOLUSDT",
+      "XRPUSDT",
+      "ADAUSDT",
+      "DOGEUSDT",
+      "AVAXUSDT",
+      "LINKUSDT",
+      "LTCUSDT"
+    ],
+    "channels": [
+      "1h klines",
+      "fundingRate"
+    ],
+    "bar_counts": {
+      "single_leg_1_month": 744,
+      "single_leg_3_months": 2160,
+      "ten_legs_3_months_total": 21600
+    },
+    "archives_used": 60,
+    "archive_hashes_file": "evidence/tape-hashes.txt",
+    "archive_hashes_file_sha256": "25fb2cabe76ac759f0d644878d54d451a2211f9f6cf2c1d5672aede9a0edea07",
+    "checksum_verification": "each archive verified against its vendor .CHECKSUM sidecar before use (shasum -a 256 -c): 60/60 OK",
+    "funding_rows_supplied_ten_legs": 2700,
+    "funding_settlements_fed_ten_legs": 2690,
+    "not_used": "no data outside the development window, no sealed out-of-sample data, no synthetic data in any reported timing or memory row"
+  },
+  "measurement_method": {
+    "baseline": "fresh child process per repetition, timed by a parent via resource.RUSAGE_CHILDREN; includes interpreter startup, output and teardown; excludes the parent's own measurement file write",
+    "memory_sampling": "parent samples /proc/<pid>/statm, status and stat about every 100 ms; median observed gap 0.101 s, max 0.110 s",
+    "warmup": "the first process in a fresh container is measurably slower (4.29 s vs 2.79 s for the same B1 workload); it is retained as the max of the B0/B1/B3 triples and called out as cold-start",
+    "instrumented_runs": "sys.monitoring stage trace, cProfile and tracemalloc runs are reported separately and never used as baseline timings"
+  },
+  "optimization_measurement": {
+    "measured_on": "host (Apple M3 Pro, macOS, native .venv), not the container",
+    "why": "the 2 vCPU / 4 GiB Linux measurement container and its images were deleted at the user's request after the benchmark in sections 1-11 was complete",
+    "comparability": "ratios only; absolute values are NOT comparable with the container measurements in this file",
+    "protocol": "each stage checked out as a git worktree at its commit, PYTHONPATH pointing at that worktree's src, one discarded warm-up per workload, then three fresh processes per workload per stage, interleaved within a single session",
+    "stages": {
+      "bfa7613": "pre-optimisation",
+      "278d404": "incremental causal frame + carried continuity",
+      "bc68f49": "witness/stance dispatch",
+      "87fc4df": "per-bar indicator memo + cheaper stance records"
+    },
+    "result": {
+      "B1": {
+        "wall_s": {
+          "before": 1.804,
+          "after": 1.059
+        },
+        "speedup": 1.7,
+        "peak_rss_mib": {
+          "before": 187.4,
+          "after": 183.9
+        }
+      },
+      "B3": {
+        "wall_s": {
+          "before": 9.045,
+          "after": 3.836
+        },
+        "speedup": 2.36,
+        "peak_rss_mib": {
+          "before": 459.3,
+          "after": 414.5
+        }
+      },
+      "profiled_B3_total_s": {
+        "before": 12.013,
+        "after": 5.646
+      },
+      "profiled_B3_calls": {
+        "before": 45676402,
+        "after": 18211978
+      }
+    },
+    "parity": "B0/B1/B3 byte-identical to the pre-optimisation manifests (16/16/30 sections)",
+    "reproduce": "reports/performance/reproduce_optimization.sh",
+    "artifacts": "evidence/optimized/ (optimization_attribution.csv, hotspots_after_b1.csv, hotspots_after_b3.csv, pre-b3-self-full.txt, after-b1-self.txt, after-b1-cum.txt, after-b3-self.txt, after-b3-cum.txt, gates.txt)",
+    "memory_timeline_note": "the 100 ms /proc-based timeline in memory_timeline.csv is Linux-only and could not be re-run locally; local RSS figures are the child's ru_maxrss reported by run_process.py"
+  }
+}

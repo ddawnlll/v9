@@ -602,6 +602,73 @@ def registry_rows() -> list[tuple[str, bool]]:
     return [(spec_id, verify_expert_implementation(spec_id)) for spec_id in CANONICAL_28_EXPERTS]
 
 
+#: Witness version strings are constant per expert: precomputed once instead of
+#: re-formatted on every one of the 28 x bars calls per bar (measured as 4.1 MiB
+#: of identical strings retained by a 3-month replay).
+_WITNESS_VERSIONS: dict[str, str] = {}
+
+
+def _witness_version(spec: ExpertSpec) -> str:
+    version = _WITNESS_VERSIONS.get(spec.expert_id)
+    if version is None:
+        version = f"{spec.expert_id}-witness-{spec.version}"
+        _WITNESS_VERSIONS[spec.expert_id] = version
+    return version
+
+
+def _with_witness(spec: ExpertSpec, stance: Stance, chosen_variant: str | None) -> Stance:
+    """Return ``stance`` carrying this expert's authoritative witness metadata.
+
+    Equivalent to rebuilding the record with the metadata overrides, but without
+    binding ten keyword arguments or formatting the version string per call. The
+    field set, field order and values are unchanged, so equality, hashing, repr
+    and every audit record derived from the result are identical.
+    """
+    values = stance.__dict__.copy()
+    values["observer_id"] = spec.expert_id
+    values["behavior_family"] = spec.behavior_family
+    values["mechanism_family"] = spec.mechanism_family
+    values["dependency_group"] = spec.dependency_group
+    values["version"] = _witness_version(spec)
+    values["variant_id"] = chosen_variant or stance.variant_id or "UNRESOLVED"
+    cls = type(stance)
+    witnessed = cls.__new__(cls)
+    witnessed.__dict__.update(values)
+    return witnessed
+
+
+def observe_spec(
+    spec: ExpertSpec,
+    frame: CausalFrame,
+    opportunity: Opportunity | None,
+    readings: tuple[PositioningReading, ...],
+    variant: str | None = None,
+) -> Stance:
+    """Observe through one registry spec: dispatch, then apply witness metadata."""
+    chosen_variant = variant if variant is not None else spec.default_variant
+    if spec.takes_variant and chosen_variant is not None:
+        if spec.takes_readings:
+            raw = spec.observer_fn(frame, opportunity, variant=chosen_variant, readings=readings)
+        else:
+            raw = spec.observer_fn(frame, opportunity, variant=chosen_variant)
+    elif spec.takes_readings:
+        raw = spec.observer_fn(frame, opportunity, readings=readings)
+    else:
+        raw = spec.observer_fn(frame, opportunity)
+    return _with_witness(spec, raw, chosen_variant)
+
+
+_DISPATCH_SPECS: tuple[ExpertSpec, ...] = ()
+
+
+def _dispatch_specs() -> tuple[ExpertSpec, ...]:
+    """The 28 canonical specs, resolved once instead of by name on every bar."""
+    global _DISPATCH_SPECS
+    if not _DISPATCH_SPECS:
+        _DISPATCH_SPECS = tuple(get_expert(expert_id) for expert_id in CANONICAL_28_EXPERTS)
+    return _DISPATCH_SPECS
+
+
 def observe_expert(
     expert_id: str,
     frame: CausalFrame,
@@ -635,35 +702,7 @@ def observe_expert(
                 f"expected one of {VARIANT_TABLE[canonical]!r}"
             )
 
-    chosen_variant = variant if variant is not None else spec.default_variant
-
-    kwargs: dict[str, Any] = {}
-    if spec.takes_variant and chosen_variant is not None:
-        kwargs["variant"] = chosen_variant
-    if spec.takes_readings:
-        kwargs["readings"] = readings
-
-    raw_stance = spec.observer_fn(frame, opportunity, **kwargs)
-
-    # Authoritatively wrap and apply the canonical witness metadata, mirroring
-    # Rust's LegacyExpertWitnessAdapter.observe().
-    #
-    # Built from the raw stance's own instance dict rather than
-    # ``dataclasses.replace``: replace re-derives the field list and deep-copies
-    # every unhashable/unknown value on each of the 28 x bars calls per bar
-    # (measured: 499k replace calls, 1.88s cumulative over one portfolio run),
-    # while the dict merge keeps every field -- including any field added later --
-    # without either cost. Equivalence to the replace path is pinned by
-    # ``test_perf_hot_paths``.
-    metadata = {
-        "observer_id": spec.expert_id,
-        "behavior_family": spec.behavior_family,
-        "mechanism_family": spec.mechanism_family,
-        "dependency_group": spec.dependency_group,
-        "version": f"{spec.expert_id}-witness-{spec.version}",
-        "variant_id": chosen_variant or raw_stance.variant_id or "UNRESOLVED",
-    }
-    return type(raw_stance)(**{**raw_stance.__dict__, **metadata})
+    return observe_spec(spec, frame, opportunity, readings, variant)
 
 
 def observe_all_28(
@@ -683,8 +722,7 @@ def observe_all_28(
     token = _ACTIVE_LAZY.set(_LazyBundle(frame))
     try:
         return tuple(
-            observe_expert(spec_id, frame, opportunity, readings=readings)
-            for spec_id in CANONICAL_28_EXPERTS
+            observe_spec(spec, frame, opportunity, readings) for spec in _dispatch_specs()
         )
     finally:
         _ACTIVE_LAZY.reset(token)

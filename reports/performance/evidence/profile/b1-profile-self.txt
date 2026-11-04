@@ -1,0 +1,50 @@
+Wed Nov  4 18:19:17 2026    /out/b1.pstats
+
+         8536351 function calls (8528902 primitive calls) in 4.148 seconds
+
+   Ordered by: internal time
+   List reduced from 2481 to 40 due to restriction <40>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    21054    0.729    0.000    0.729    0.000 {method 'collect' of 'builtins.PyLazyFrame' objects}
+  2333880    0.238    0.000    0.238    0.000 /work/src/v8_next/domain/market.py:103(<genexpr>)
+     4320    0.176    0.000    0.176    0.000 /work/src/v8_next/domain/market.py:82(__post_init__)
+     3232    0.176    0.000    0.438    0.000 {built-in method builtins.all}
+     2160    0.148    0.000    0.429    0.000 /work/src/v8_next/domain/market.py:147(from_ordered_prefix)
+    60480    0.121    0.000    3.028    0.000 /work/src/v8_next/experts/registry.py:605(observe_expert)
+   407774    0.082    0.000    0.120    0.000 /work/src/v8_next/experts/features.py:179(<genexpr>)
+   791699    0.080    0.000    0.081    0.000 {built-in method builtins.getattr}
+    60480    0.075    0.000    0.128    0.000 /work/src/v8_next/economics/decisions.py:63(stance_record)
+486658/486549    0.074    0.000    0.106    0.000 {built-in method builtins.isinstance}
+     5782    0.073    0.000    0.073    0.000 {method 'to_list' of 'builtins.PySeries' objects}
+    17021    0.058    0.000    1.375    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/utils.py:97(wrapper)
+     2160    0.058    0.000    4.203    0.002 /work/src/v8_next/adapters/expert_strategy.py:471(on_bar)
+      123    0.057    0.000    0.160    0.001 /work/src/v8_next/experts/pandf.py:20(columns)
+    22032    0.051    0.000    0.100    0.000 /usr/local/lib/python3.12/dataclasses.py:1540(replace)
+    58320    0.050    0.000    0.137    0.000 /work/src/v8_next/experts/common.py:22(directional_stance)
+      358    0.042    0.000    0.475    0.001 /work/src/v8_next/experts/features.py:152(wilder_rsi)
+239444/239372    0.041    0.000    0.042    0.000 {built-in method __new__ of type object at 0xffff8fdc4778}
+    17379    0.040    0.000    1.077    0.000 /work/.venv/lib/python3.12/site-packages/polars/dataframe/frame.py:10588(select_seq)
+   469582    0.039    0.000    0.055    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/series.py:1438(__iter__)
+    21054    0.039    0.000    0.902    0.000 /work/.venv/lib/python3.12/site-packages/polars/lazyframe/engine.py:415(collect)
+    10709    0.034    0.000    0.078    0.000 /work/.venv/lib/python3.12/site-packages/polars/functions/lit.py:31(lit)
+    42113    0.032    0.000    0.061    0.000 <frozen os>:710(__getitem__)
+    30240    0.030    0.000    0.074    0.000 /work/src/v8_next/economics/decisions.py:321(stance_with)
+      288    0.030    0.000    0.030    0.000 {built-in method marshal.loads}
+   138225    0.030    0.000    0.043    0.000 /work/src/v8_next/experts/pandf.py:24(<genexpr>)
+    21054    0.026    0.000    0.061    0.000 /work/.venv/lib/python3.12/site-packages/polars/lazyframe/opt_flags.py:156(_eager)
+     6428    0.026    0.000    0.093    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/series.py:849(_comp)
+     2160    0.025    0.000    0.026    0.000 /work/src/v8_next/opportunities/book.py:51(on_candle)
+    62640    0.024    0.000    3.053    0.000 /work/src/v8_next/experts/registry.py:685(<genexpr>)
+    21054    0.023    0.000    0.091    0.000 /work/.venv/lib/python3.12/site-packages/polars/lazyframe/engine.py:355(_with_monitoring)
+    60322    0.021    0.000    0.047    0.000 /work/.venv/lib/python3.12/site-packages/polars/_utils/wrap.py:24(wrap_expr)
+    21054    0.021    0.000    0.158    0.000 /work/.venv/lib/python3.12/site-packages/polars/_utils/parse/expr.py:86(parse_into_list_of_expressions)
+161829/160797    0.021    0.000    0.027    0.000 {built-in method builtins.len}
+    19958    0.021    0.000    0.038    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/series.py:2076(to_frame)
+    41012    0.021    0.000    0.041    0.000 /work/.venv/lib/python3.12/site-packages/polars/_utils/wrap.py:12(wrap_df)
+    70622    0.020    0.000    0.031    0.000 /work/.venv/lib/python3.12/site-packages/polars/series/series.py:469(_from_pyseries)
+    21054    0.020    0.000    0.924    0.000 /work/.venv/lib/python3.12/site-packages/polars/lazyframe/frame.py:2236(_collect_eager)
+    38592    0.020    0.000    0.107    0.000 /work/.venv/lib/python3.12/site-packages/polars/_utils/parse/expr.py:22(parse_into_expression)
+    24342    0.020    0.000    0.051    0.000 /work/.venv/lib/python3.12/site-packages/polars/functions/col.py:40(_create_col)
+
+

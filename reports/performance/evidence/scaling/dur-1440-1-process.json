@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/work/.venv/bin/python",
+    "/work/tools/performance/ensemble_profile.py",
+    "--tape",
+    "/tape/q1",
+    "--bars",
+    "1440",
+    "--output",
+    "/out/dur-1440-1.json"
+  ],
+  "child_wall_s": 1.9029788760000201,
+  "child_user_cpu_s": 1.79862,
+  "child_system_cpu_s": 0.250402,
+  "child_peak_rss_bytes": 246890496,
+  "returncode": 0,
+  "stdout": "{\"allocations_instrumented\": false, \"bars\": 1440, \"decisions\": 1440, \"exclusive_experts\": {}, \"expert_exclusive_instrumented\": false, \"expert_timing_instrumented\": false, \"experts\": {}, \"fills\": 1, \"first_start_ns\": 1735689600000000000, \"fixture\": null, \"fixture_s\": 0.055120375999990756, \"imports_s\": 0.23652262500002053, \"last_end_ns\": 1740873600000000000, \"orders\": 3, \"peak_rss_bytes\": 246890496, \"pid\": 63, \"pre_output_s\": 1.7889724600000818, \"production_backtest_s\": 1.4973294590000705, \"profiled\": false, \"stage_trace_instrumented\": false, \"stages\": [], \"start_monotonic_s\": 848.040542344, \"system_cpu_s\": 0.24456, \"user_cpu_s\": 1.714977, \"workload\": \"historical tape; availability and provenance require independent verification\"}\n",
+  "stderr": "",
+  "measurement_write_included": false
+}

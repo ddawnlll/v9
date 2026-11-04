@@ -1,0 +1,16 @@
+{
+  "bars": 720,
+  "decisions": 720,
+  "fills": 0,
+  "fixture_s": 0.0014919169916538522,
+  "imports_s": 0.16566987500118557,
+  "orders": 0,
+  "peak_rss_bytes": 152387584,
+  "pid": 2848,
+  "pre_output_s": 0.4491799169918522,
+  "production_backtest_s": 0.2820181249990128,
+  "profiled": false,
+  "system_cpu_s": 0.059834,
+  "user_cpu_s": 0.41176599999999997,
+  "workload": "synthetic mechanics only; not economic evidence"
+}

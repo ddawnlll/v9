@@ -1,0 +1,23 @@
+{
+  "bars": 2160,
+  "decisions": 2160,
+  "expert_timing_instrumented": false,
+  "experts": {},
+  "fills": 1,
+  "first_start_ns": 1735689600000000000,
+  "fixture": null,
+  "fixture_s": 0.036930875000052765,
+  "imports_s": 0.12149220799994964,
+  "last_end_ns": 1743465600000000000,
+  "orders": 3,
+  "peak_rss_bytes": 255418368,
+  "pid": 23,
+  "pre_output_s": 1.8618181260000028,
+  "production_backtest_s": 1.7033950430000004,
+  "profiled": false,
+  "stage_trace_instrumented": false,
+  "stages": [],
+  "system_cpu_s": 0.24368499999999998,
+  "user_cpu_s": 1.7925339999999998,
+  "workload": "historical tape; availability and provenance require independent verification"
+}

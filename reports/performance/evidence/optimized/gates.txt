@@ -1,0 +1,19 @@
+# Parity + repo gates for the optimisation branch
+
+## pytest
+...                                                                      [100%]
+1089 passed, 66 skipped, 506 deselected in 6.19s
+
+## ruff
+All checks passed!
+
+## mypy
+Success: no issues found in 208 source files
+
+## tests diff (additions only expected)
+tests/test_domain_frame_incremental.py | 108 +++++++++++++++++++++++++++++++
+ tests/test_experts_bar_memo.py         |  90 ++++++++++++++++++++++++++
+ tests/test_performance_parity.py       | 114 +++++++++++++++++++++++++++++++++
+ 3 files changed, 312 insertions(+)
+
+## parity vs baseline (captured before any change)

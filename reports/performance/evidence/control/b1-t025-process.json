@@ -1,0 +1,33 @@
+{
+  "command": [
+    "/work/.venv/bin/python",
+    "tools/performance/ensemble_profile.py",
+    "--tape",
+    "/tape/q1",
+    "--bars",
+    "2160",
+    "--output",
+    "/out/b1-t025-child.json"
+  ],
+  "interval_target_s": 0.25,
+  "samples": 12,
+  "samples_missing_process": 1,
+  "child_wall_s": 3.0235668340000075,
+  "child_user_cpu_s": 2.7031169999999998,
+  "child_system_cpu_s": 0.35719,
+  "child_os_peak_rss_bytes": 252620800,
+  "sampled_peak_rss_bytes": 250707968,
+  "sampled_peak_vm_rss_bytes": 250707968,
+  "sampled_peak_vms_bytes": 2404831232,
+  "sampled_peak_threads": 12,
+  "sampled_major_faults_last": 0,
+  "cgroup_memory_peak_before_bytes": 199933952,
+  "cgroup_memory_peak_after_bytes": 199933952,
+  "cgroup_memory_current_bytes": 32022528,
+  "cgroup_memory_events_before": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+  "cgroup_memory_events_after": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+  "returncode": 0,
+  "stdout": "{\"allocations_instrumented\": false, \"bars\": 2160, \"decisions\": 2160, \"exclusive_experts\": {}, \"expert_exclusive_instrumented\": false, \"expert_timing_instrumented\": false, \"experts\": {}, \"fills\": 1, \"first_start_ns\": 1735689600000000000, \"fixture\": null, \"fixture_s\": 0.05351870800006964, \"imports_s\": 0.20726041699992948, \"last_end_ns\": 1743465600000000000, \"orders\": 3, \"peak_rss_bytes\": 252620800, \"pid\": 51, \"pre_output_s\": 2.779710001000012, \"production_backtest_s\": 2.518930876000013, \"profiled\": false, \"stage_trace_instrumented\": false, \"stages\": [], \"start_monotonic_s\": 687.641899521, \"system_cpu_s\": 0.35145, \"user_cpu_s\": 2.624266, \"workload\": \"historical tape; availability and provenance require independent verification\"}\n",
+  "stderr": "",
+  "measurement_write_included": false
+}

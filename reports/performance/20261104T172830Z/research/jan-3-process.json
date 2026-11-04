@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/work/.venv/bin/python",
+    "/work/tools/performance/research_profile.py",
+    "--tape",
+    "/tape/jan",
+    "--bars",
+    "744",
+    "--artifacts",
+    "/out/jan-artifacts-3",
+    "--output",
+    "/out/jan-3.json"
+  ],
+  "child_wall_s": 0.7239057089999505,
+  "child_user_cpu_s": 0.729015,
+  "child_system_cpu_s": 0.105474,
+  "child_peak_rss_bytes": 242868224,
+  "returncode": 0,
+  "stdout": "{\"artifact_bytes\": 32582, \"artifact_files\": [\"benchmark_ledger.jsonl\", \"forensic.html\", \"historical-development_trades.jsonl\", \"result.json\"], \"bars\": 744, \"certificate_status\": \"STATUS: NO_ECONOMIC_CLAIM (Research Candidate, NOT Production Approved)\", \"first_start_ns\": 1735689600000000000, \"fixture_s\": 0.005497916999956942, \"forensic_html_write_s\": 0.0004622090000339085, \"imports_s\": 0.15275258300005135, \"last_end_ns\": 1738368000000000000, \"peak_rss_bytes\": 242868224, \"pre_output_s\": 0.6702994170000238, \"receipt_html_verified\": true, \"result_json_write_s\": 0.00036087499995574035, \"runner_and_ledger_s\": 0.5112258330000259, \"system_cpu_s\": 0.10255099999999999, \"trades\": 0, \"user_cpu_s\": 0.6909259999999999, \"workload\": \"historical development mechanics; no economic claim\"}\n",
+  "stderr": "",
+  "measurement_write_included": false
+}

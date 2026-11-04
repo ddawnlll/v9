@@ -1,0 +1,157 @@
+{
+  "scope": "live traced Python allocations after replay; native allocations are excluded",
+  "current_bytes": 53764603,
+  "peak_bytes": 55027250,
+  "top_lines": [
+    {
+      "location": "<frozen importlib._bootstrap>:488",
+      "bytes": 18671223,
+      "blocks": 104969
+    },
+    {
+      "location": "/work/src/v8_next/economics/decisions.py:75",
+      "bytes": 16450560,
+      "blocks": 120960
+    },
+    {
+      "location": "/work/src/v8_next/experts/registry.py:663",
+      "bytes": 4326480,
+      "blocks": 60480
+    },
+    {
+      "location": "<frozen importlib._bootstrap_external>:774",
+      "bytes": 2540564,
+      "blocks": 15720
+    },
+    {
+      "location": "/work/src/v8_next/adapters/expert_strategy.py:1227",
+      "bytes": 1002240,
+      "blocks": 4320
+    },
+    {
+      "location": "/work/src/v8_next/adapters/expert_strategy.py:1247",
+      "bytes": 673920,
+      "blocks": 4320
+    },
+    {
+      "location": "<frozen importlib._bootstrap_external>:757",
+      "bytes": 267675,
+      "blocks": 2146
+    },
+    {
+      "location": "/work/src/v8_next/evaluation/gate_resolution.py:227",
+      "bytes": 259200,
+      "blocks": 2160
+    },
+    {
+      "location": "<frozen abc>:106",
+      "bytes": 230181,
+      "blocks": 789
+    },
+    {
+      "location": "/work/src/v8_next/evaluation/gate_resolution.py:235",
+      "bytes": 224640,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/src/v8_next/evaluation/gate_resolution.py:234",
+      "bytes": 224640,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/src/v8_next/evaluation/gate_resolution.py:233",
+      "bytes": 224640,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/src/v8_next/evaluation/gate_resolution.py:232",
+      "bytes": 224640,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/src/v8_next/evaluation/gate_resolution.py:231",
+      "bytes": 224640,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/.venv/lib/python3.12/site-packages/pydantic/main.py:263",
+      "bytes": 204488,
+      "blocks": 1198
+    },
+    {
+      "location": "/usr/local/lib/python3.12/dataclasses.py:473",
+      "bytes": 198403,
+      "blocks": 1700
+    },
+    {
+      "location": "/work/src/v8_next/evaluation/gate_resolution.py:238",
+      "bytes": 162000,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/src/v8_next/evaluation/gate_resolution.py:228",
+      "bytes": 131760,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/src/v8_next/adapters/expert_strategy.py:1234",
+      "bytes": 131760,
+      "blocks": 2160
+    },
+    {
+      "location": "/usr/local/lib/python3.12/copy.py:71",
+      "bytes": 119200,
+      "blocks": 400
+    },
+    {
+      "location": "/work/.venv/lib/python3.12/site-packages/pandas/util/_decorators.py:491",
+      "bytes": 116202,
+      "blocks": 34
+    },
+    {
+      "location": "/work/src/v8_next/adapters/expert_strategy.py:1237",
+      "bytes": 106279,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/src/v8_next/adapters/expert_strategy.py:1239",
+      "bytes": 106257,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/src/v8_next/adapters/expert_strategy.py:1236",
+      "bytes": 106257,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/src/v8_next/adapters/expert_strategy.py:1238",
+      "bytes": 106241,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/.venv/lib/python3.12/site-packages/numpy/ma/core.py:947",
+      "bytes": 103091,
+      "blocks": 49
+    },
+    {
+      "location": "/work/src/v8_next/adapters/expert_strategy.py:536",
+      "bytes": 85263,
+      "blocks": 2283
+    },
+    {
+      "location": "<frozen importlib._bootstrap_external>:128",
+      "bytes": 84451,
+      "blocks": 708
+    },
+    {
+      "location": "/work/src/v8_next/evaluation/gate_resolution.py:237",
+      "bytes": 77760,
+      "blocks": 2160
+    },
+    {
+      "location": "/work/src/v8_next/evaluation/gate_resolution.py:236",
+      "bytes": 77760,
+      "blocks": 2160
+    }
+  ]
+}

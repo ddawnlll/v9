@@ -1,0 +1,61 @@
+{
+  "scope": "prefix continuity predicate only; no economic or engine parity claim",
+  "bars": 2160,
+  "parity": "PASS",
+  "synthetic_parity_fixtures": [
+    "empty",
+    "single",
+    "contiguous",
+    "early_gap",
+    "late_gap"
+  ],
+  "input_sha256": "fda2488b79770b6b4acca350e82715600acf2976165441a682338f2edf182b22",
+  "output_sha256": "dfa0586986ef4fb1a09ec5047aa36704ac04d19003119f751ca33d462f12b1a0",
+  "samples": [
+    {
+      "python_predicate_s": 0.11230545899888966,
+      "numpy_predicate_s": 0.0006310419994406402,
+      "goose_predicate_s": 0.000602,
+      "goose_read_parse_s": 0.000141,
+      "goose_process_s": 0.009489749994827434
+    },
+    {
+      "python_predicate_s": 0.10120224999263883,
+      "numpy_predicate_s": 8.433399489149451e-05,
+      "goose_predicate_s": 0.000601,
+      "goose_read_parse_s": 0.00014,
+      "goose_process_s": 0.013206709001678973
+    },
+    {
+      "python_predicate_s": 0.09491275000618771,
+      "numpy_predicate_s": 9.087500802706927e-05,
+      "goose_predicate_s": 0.000601,
+      "goose_read_parse_s": 0.000142,
+      "goose_process_s": 0.00673958400147967
+    },
+    {
+      "python_predicate_s": 0.09819891600636765,
+      "numpy_predicate_s": 6.500000017695129e-05,
+      "goose_predicate_s": 0.0006,
+      "goose_read_parse_s": 0.00014,
+      "goose_process_s": 0.005603958008578047
+    },
+    {
+      "python_predicate_s": 0.09591887501301244,
+      "numpy_predicate_s": 8.070800686255097e-05,
+      "goose_predicate_s": 0.000602,
+      "goose_read_parse_s": 0.00014,
+      "goose_process_s": 0.012969167000846937
+    }
+  ],
+  "median_s": {
+    "python_predicate_s": 0.09819891600636765,
+    "numpy_predicate_s": 8.433399489149451e-05,
+    "goose_predicate_s": 0.000601,
+    "goose_read_parse_s": 0.00014,
+    "goose_process_s": 0.009489749994827434
+  },
+  "python_self_maxrss_raw": 138477568,
+  "goose_children_maxrss_raw": 1572864,
+  "rss_units": "bytes on macOS, KiB on Linux; process high-water, not predicate allocations"
+}

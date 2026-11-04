@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/work/.venv/bin/python",
+    "/work/tools/performance/ensemble_profile.py",
+    "--tape",
+    "/tape/q1",
+    "--bars",
+    "2160",
+    "--profile",
+    "/out/q1.pstats",
+    "--output",
+    "/out/q1-profile.json"
+  ],
+  "child_wall_s": 3.2604987519999895,
+  "child_user_cpu_s": 3.194099,
+  "child_system_cpu_s": 0.22800299999999998,
+  "child_peak_rss_bytes": 258498560,
+  "returncode": 0,
+  "stdout": "{\"bars\": 2160, \"decisions\": 2160, \"expert_timing_instrumented\": false, \"experts\": {}, \"fills\": 1, \"first_start_ns\": 1735689600000000000, \"fixture\": null, \"fixture_s\": 0.035087583000063205, \"imports_s\": 0.12495970800000578, \"last_end_ns\": 1743465600000000000, \"orders\": 3, \"peak_rss_bytes\": 258498560, \"pid\": 107, \"pre_output_s\": 3.1991641680000384, \"production_backtest_s\": 3.0391168769999695, \"profiled\": true, \"stage_trace_instrumented\": false, \"stages\": [], \"system_cpu_s\": 0.22305799999999998, \"user_cpu_s\": 3.151468, \"workload\": \"historical tape; availability and provenance require independent verification\"}\n",
+  "stderr": "",
+  "measurement_write_included": false
+}

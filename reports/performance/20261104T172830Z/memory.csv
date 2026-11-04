@@ -1,0 +1,17 @@
+phase,rss_start_bytes,rss_end_bytes,rss_delta_bytes,note
+function_entry,161271808,161271808,0,snapshot delta is not allocation attribution
+instrument_setup,161271808,162058240,786432,snapshot delta is not allocation attribution
+bar_conversion,162058240,162582528,524288,snapshot delta is not allocation attribution
+execution_profile,162582528,162582528,0,snapshot delta is not allocation attribution
+engine_init,162582528,200253440,37670912,snapshot delta is not allocation attribution
+venue_setup,200253440,200646656,393216,snapshot delta is not allocation attribution
+instrument_add,200646656,201170944,524288,snapshot delta is not allocation attribution
+data_add,201170944,209735680,8564736,snapshot delta is not allocation attribution
+strategy_setup,209735680,210784256,1048576,snapshot delta is not allocation attribution
+engine_run,210784256,251039744,40255488,snapshot delta is not allocation attribution
+economic_state,251039744,251039744,0,snapshot delta is not allocation attribution
+report_import,251039744,251039744,0,snapshot delta is not allocation attribution
+native_reports,251039744,252723200,1683456,snapshot delta is not allocation attribution
+fill_report,252723200,252723200,0,snapshot delta is not allocation attribution
+result_assembly,252723200,252723200,0,snapshot delta is not allocation attribution
+engine_dispose,252723200,252723200,0,snapshot delta is not allocation attribution
