@@ -520,6 +520,41 @@ def test_shared_cache_retains_state_across_evidence_bars() -> None:
     assert second.context_ref != first.context_ref
 
 
+def test_provenance_depends_on_frame_content_not_cache_history() -> None:
+    """The audit's cross-seed case: fresh cache vs cache extended one bar."""
+    shorter = _candles(140)
+    longer = _candles(141)
+    numeric = build_candle_dataframe(longer)
+    frame = CausalFrame.from_ordered_prefix(IID, shorter[-1].end_ns, shorter, numeric)
+    extended = extend_causal_frame(frame, longer[-1].end_ns, longer[-1], numeric)
+    assert extended is not None
+
+    view = _view(longer)
+    context = _context(view, extended.decision_ns)
+
+    history_cache = FeatureCache()
+    shorter_view = _view(shorter)
+    _produce(
+        frame,
+        shorter_view,
+        _context(shorter_view, frame.decision_ns),
+        cache=history_cache,
+    )
+    via_history = _produce(extended, view, context, cache=history_cache)
+    fresh = _produce(extended, view, context, cache=FeatureCache())
+
+    # The cache genuinely took the append-only chain path...
+    assert history_cache.stats().extensions == 1
+    assert history_cache.stats().reseeds == 0
+    # ...yet the same frame yields the same stances, ids and provenance.
+    assert [row.stance for row in via_history.evidence] == [row.stance for row in fresh.evidence]
+    assert tuple(row.evidence_id for row in via_history.evidence) == tuple(
+        row.evidence_id for row in fresh.evidence
+    )
+    assert len(via_history.evidence) == 28
+    assert via_history.provenance == fresh.provenance
+
+
 def test_context_layer_off_equals_plain_registry_output() -> None:
     frame, view, context, readings = _snapshot()
     opportunity = opportunity_at(frame)
