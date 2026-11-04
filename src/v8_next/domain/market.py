@@ -78,6 +78,10 @@ class CausalFrame:
     candles: tuple[Candle, ...]
     _prefix_df: pl.DataFrame | None = field(default=None, repr=False, compare=False)
     _trusted_order: bool = field(default=False, repr=False, compare=False)
+    #: Continuity already established by the caller from a validated parent.
+    #: ``None`` means "not known": ``continuous`` then scans the prefix as it
+    #: always has. This is a cache of a decision, never a decision itself.
+    _continuous_hint: bool | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if self._trusted_order:
@@ -100,6 +104,9 @@ class CausalFrame:
 
     @cached_property
     def continuous(self) -> bool:
+        hint = self._continuous_hint
+        if hint is not None:
+            return hint
         return all(
             a.end_ns == b.start_ns for a, b in zip(self.candles, self.candles[1:], strict=False)
         )
@@ -237,3 +244,58 @@ def frame_at_incremental(
             return frame_at(instrument_id, decision_ns, prefix)
         previous_end = candle.end_ns
     return CausalFrame(instrument_id, decision_ns, prefix, _trusted_order=True)
+
+
+def extend_causal_frame(
+    parent: CausalFrame,
+    decision_ns: int,
+    candle: Candle,
+    full_df: pl.DataFrame | None = None,
+) -> CausalFrame | None:
+    """Append exactly one already-positioned candle to a validated parent frame.
+
+    The per-bar hot path for callers that own the ordering themselves: a bar
+    feed that appends the next candle of an already validated sequence. Only the
+    appended candle is verified (instrument, availability, chaining off the
+    parent's last end) plus, when a numeric cache is supplied, that the cache
+    row at this index describes the same bar. The parent's own validation is
+    carried forward instead of re-walked.
+
+    Returns ``None`` -- never a wrong frame -- whenever the appended candle
+    cannot be proved admissible from the parent alone; the caller must then take
+    the full :func:`frame_at` path. The accept/reject verdict is therefore
+    identical to :func:`frame_at` on the same candle sequence: this function
+    simply refuses to make a judgement it cannot justify.
+    """
+    if candle.instrument_id != parent.instrument_id:
+        return None
+    if candle.available_ns is None or candle.available_ns > decision_ns:
+        return None
+    if decision_ns < parent.decision_ns:
+        return None
+    if parent.candles and candle.start_ns < parent.candles[-1].end_ns:
+        return None
+    if full_df is not None:
+        index = len(parent.candles)
+        if len(full_df) <= index:
+            return None
+        starts = full_df["start_ns"]
+        ends = full_df["end_ns"]
+        if starts[index] != candle.start_ns or ends[index] != candle.end_ns:
+            return None
+    # Continuity is carried forward, not rescanned: the parent already decided
+    # the whole prefix, so the only new question is whether this candle chains
+    # off the parent's last end. Reading `parent.continuous` here is O(1) once
+    # the parent has been asked -- and the parent was asked by the previous bar.
+    if parent.candles:
+        continuous = bool(parent.continuous and parent.candles[-1].end_ns == candle.start_ns)
+    else:
+        continuous = True
+    return CausalFrame(
+        parent.instrument_id,
+        decision_ns,
+        parent.candles + (candle,),
+        _prefix_df=full_df if full_df is not None else parent._prefix_df,  # noqa: SLF001
+        _trusted_order=True,
+        _continuous_hint=continuous,
+    )
