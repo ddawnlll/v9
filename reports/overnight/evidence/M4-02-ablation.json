@@ -1,0 +1,250 @@
+{
+  "arms": [
+    {
+      "arm_id": "belief_arm",
+      "ci_high": null,
+      "ci_low": null,
+      "ci_method": null,
+      "costed": false,
+      "fee_total": null,
+      "funding_total": null,
+      "hit_rate": null,
+      "intervention": "BELIEF",
+      "max_drawdown": null,
+      "net_pnl": null,
+      "net_r": null,
+      "net_r_samples": [],
+      "open_campaigns": null,
+      "provenance": null,
+      "risk_basis": null,
+      "trades": null,
+      "unsupported": [
+        "ADAPTIVE_ORDERS_DISABLED_SHADOW_ONLY"
+      ]
+    },
+    {
+      "arm_id": "expert_routing_arm",
+      "ci_high": null,
+      "ci_low": null,
+      "ci_method": null,
+      "costed": false,
+      "fee_total": null,
+      "funding_total": null,
+      "hit_rate": null,
+      "intervention": "EXPERT_ROUTING",
+      "max_drawdown": null,
+      "net_pnl": null,
+      "net_r": null,
+      "net_r_samples": [],
+      "open_campaigns": null,
+      "provenance": null,
+      "risk_basis": null,
+      "trades": null,
+      "unsupported": [
+        "ADAPTIVE_ORDERS_DISABLED_SHADOW_ONLY"
+      ]
+    },
+    {
+      "arm_id": "entry_timing_arm",
+      "ci_high": null,
+      "ci_low": null,
+      "ci_method": null,
+      "costed": false,
+      "fee_total": null,
+      "funding_total": null,
+      "hit_rate": null,
+      "intervention": "ENTRY_TIMING",
+      "max_drawdown": null,
+      "net_pnl": null,
+      "net_r": null,
+      "net_r_samples": [],
+      "open_campaigns": null,
+      "provenance": null,
+      "risk_basis": null,
+      "trades": null,
+      "unsupported": [
+        "ADAPTIVE_ORDERS_DISABLED_SHADOW_ONLY"
+      ]
+    },
+    {
+      "arm_id": "position_thesis_arm",
+      "ci_high": null,
+      "ci_low": null,
+      "ci_method": null,
+      "costed": false,
+      "fee_total": null,
+      "funding_total": null,
+      "hit_rate": null,
+      "intervention": "POSITION_THESIS",
+      "max_drawdown": null,
+      "net_pnl": null,
+      "net_r": null,
+      "net_r_samples": [],
+      "open_campaigns": null,
+      "provenance": null,
+      "risk_basis": null,
+      "trades": null,
+      "unsupported": [
+        "ADAPTIVE_ORDERS_DISABLED_SHADOW_ONLY"
+      ]
+    },
+    {
+      "arm_id": "allocation_arm",
+      "ci_high": null,
+      "ci_low": null,
+      "ci_method": null,
+      "costed": false,
+      "fee_total": null,
+      "funding_total": null,
+      "hit_rate": null,
+      "intervention": "ALLOCATION",
+      "max_drawdown": null,
+      "net_pnl": null,
+      "net_r": null,
+      "net_r_samples": [],
+      "open_campaigns": null,
+      "provenance": null,
+      "risk_basis": null,
+      "trades": null,
+      "unsupported": [
+        "ADAPTIVE_ORDERS_DISABLED_SHADOW_ONLY"
+      ]
+    }
+  ],
+  "baseline": {
+    "arm_id": "baseline_v8_no_intervention",
+    "ci_high": 0.3905151906,
+    "ci_low": -0.4335917241,
+    "ci_method": "BOOTSTRAP_PERCENTILE_95_OF_MEAN (resamples=2000, seed=20251105, unit=per-campaign net R)",
+    "costed": true,
+    "fee_total": 37.91535683,
+    "funding_total": 0.70494565,
+    "hit_rate": 0.3409090909,
+    "intervention": null,
+    "max_drawdown": 0.0199775448,
+    "net_pnl": -21.23495118,
+    "net_r": -0.021638104,
+    "net_r_samples": [
+      1.9312381095,
+      -1.0639353707,
+      1.9803314965,
+      -1.0353975991,
+      -1.0523057722,
+      1.9688927792,
+      1.9410513986,
+      1.9581635704,
+      -1.0527996453,
+      -1.0495009407,
+      -1.0544825576,
+      1.9699400498,
+      -1.0738105232,
+      1.9792878734,
+      1.9704226945,
+      -1.0505010711,
+      -1.0494979944,
+      -1.0495877126,
+      -1.0576681366,
+      -1.0566450073,
+      -1.013823786,
+      -1.0506548418,
+      1.9822772776,
+      1.9729579766,
+      -1.0458484893,
+      1.9700165356,
+      1.9660322118,
+      1.9646021934,
+      -1.0467366969,
+      -1.0499860883,
+      -1.0527162436,
+      -1.0505011705,
+      1.9702958814,
+      -1.0485124157,
+      1.9697404873,
+      -1.0495023789,
+      -1.0477703924,
+      -1.0476655723,
+      -1.0498708103,
+      -1.0499630906,
+      -1.0486374591,
+      -1.0529222669,
+      -1.0451762939,
+      -1.050906785
+    ],
+    "open_campaigns": 1,
+    "provenance": {
+      "config_sha256": "a1bcaf763d034ec9f754aefae5032f6cd461ac5d4b8696b69e70e716bf8ea091",
+      "cost_attribution_basis": "ENGINE_NATIVE: net_pnl is the native account balance delta; commissions and funding are inside position.realized_pnl; fee_total is summed from the order-fill commission column; funding_total is isolated by a funding/no-funding dual replay over an identical trade signature",
+      "engine": "nautilus_trader.BacktestEngine",
+      "engine_version": "2.0.0rc4",
+      "execution_profile": "baseline",
+      "execution_profile_digest": "e7e76a80da65251433e15b67519050bee60ec737387a0b85484d79f6d1861760",
+      "fee_model": "maker_taker",
+      "funding_basis": "TAPE_FUNDING_ROWS=270 COVERAGE=FULL_WITH_UNKNOWN_RECEIPT_TIME SETTLEMENTS_FED=269 DROPPED_AT_LOAD=0 MARK=OHLC_CLOSE_ASOF_BOUNDED_HISTORICAL_MODEL_NOT_VENUE_MARK DUAL_RUN_ISOLATION=VALID",
+      "intrabar_tie_basis": "NAUTILUS_2.0.0rc4_BAR_EXECUTION_DEFAULT (bar_adaptive_high_low_ordering=False): the intrabar stop-vs-target sequence is an engine model assumption, not an observed sequence (no STOP_FIRST claim is made)",
+      "maker_fee": "0.0002",
+      "mark_basis": "OHLC_CLOSE_ASOF_BOUNDED_HISTORICAL_MODEL_NOT_VENUE_MARK",
+      "partial_fills_basis": "ORDER_FILL_REPORT_ROWS=89 PARTIAL_ORDERS=0; bar execution fills the submitted quantity at the bar price and no captured L2/L3 depth limits size",
+      "slippage_basis": "PROFILE=baseline FILL_MODEL=default SLIPPED=False PROB_SLIPPAGE=0.0 MEASURED_SLIPPAGE_BPS_MEAN=0.0; a model assumption, not venue slippage",
+      "taker_fee": "0.0005",
+      "tape_manifest_sha256": "904eb3c31d8ed3b3a381949ae97b89a489053ad95b8b9d2a7d14416f733a3d91",
+      "tape_sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7"
+    },
+    "risk_basis": "BRACKET_RISK: per-campaign risk = entry_notional * bracket_stop_pct",
+    "trades": 44,
+    "unsupported": [
+      "MICROSTRUCTURE_UNSUPPORTED_NO_CAPTURED_BOOK_DEPTH"
+    ]
+  },
+  "deltas": [],
+  "invocation": {
+    "argv": [
+      "--tape",
+      "research/tape/btcusdt-1h-2025Q1",
+      "--out",
+      "reports/overnight/evidence/M4-02-ablation.json",
+      "--record-measurement"
+    ],
+    "module": "v8_next.evaluation.ablations"
+  },
+  "measurement": {
+    "peak_rss_basis": "ru_maxrss_bytes_macos",
+    "peak_rss_bytes": 226426880,
+    "scope": "whole CLI process, measured at JSON write time",
+    "wall_seconds": 2.007
+  },
+  "microstructure": "UNSUPPORTED:NO_CAPTURED_L2_L3_ORDER_BOOK_DEPTH: microstructure (queue position, depth-limited partial fills, adverse selection) is not measurable on the kline tape; execution is a published model assumption, not venue truth",
+  "not_run": [
+    "belief_arm",
+    "expert_routing_arm",
+    "entry_timing_arm",
+    "position_thesis_arm",
+    "allocation_arm"
+  ],
+  "notes": [
+    "No economic claim is made from shadow-only intent counts; only a costed native replay can enter a delta.",
+    "Adaptive (V9) intervention arms are NOT_RUN because adaptive order side effects are disabled by design.",
+    "max_drawdown is peak-to-trough of the realized-equity curve (initial balance plus closed-campaign realized net PnL); open campaigns are counted, never marked into the realized curve."
+  ],
+  "schema_version": "v9.ablation.1",
+  "status": "PARTIAL",
+  "unsupported": {
+    "allocation_arm": [
+      "ADAPTIVE_ORDERS_DISABLED_SHADOW_ONLY"
+    ],
+    "baseline_v8_no_intervention": [
+      "MICROSTRUCTURE_UNSUPPORTED_NO_CAPTURED_BOOK_DEPTH"
+    ],
+    "belief_arm": [
+      "ADAPTIVE_ORDERS_DISABLED_SHADOW_ONLY"
+    ],
+    "entry_timing_arm": [
+      "ADAPTIVE_ORDERS_DISABLED_SHADOW_ONLY"
+    ],
+    "expert_routing_arm": [
+      "ADAPTIVE_ORDERS_DISABLED_SHADOW_ONLY"
+    ],
+    "position_thesis_arm": [
+      "ADAPTIVE_ORDERS_DISABLED_SHADOW_ONLY"
+    ]
+  }
+}
