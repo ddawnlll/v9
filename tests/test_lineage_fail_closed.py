@@ -11,6 +11,7 @@ from v8_next.audit.lineage import (
     CampaignMismatch,
     CompletenessVerdict,
     DuplicateFill,
+    DuplicateRecord,
     EventTimeInversion,
     LateRecord,
     LineageAuditor,
@@ -18,6 +19,7 @@ from v8_next.audit.lineage import (
     LineageChain,
     LineageDecision,
     LineageFill,
+    LineageOpportunity,
     LineageOrder,
     LineageViolation,
     LineageViolationCode,
@@ -30,6 +32,14 @@ from v8_next.audit.lineage import (
 )
 
 AS_OF_NS = 200
+
+OPPORTUNITY = LineageOpportunity(
+    opportunity_id="OPP-1",
+    campaign_id="CAMP-1",
+    instrument_id="BTCUSDT-PERP",
+    created_ns=90,
+    available_ns=91,
+)
 
 DECISION = LineageDecision(
     decision_id="DEC-1",
@@ -68,12 +78,19 @@ CASHFLOW = LineageCashflow(
 
 def _chain(
     *,
+    opportunities: tuple[LineageOpportunity, ...] = (OPPORTUNITY,),
     decisions: tuple[LineageDecision, ...] = (DECISION,),
     orders: tuple[LineageOrder, ...] = (ORDER,),
     fills: tuple[LineageFill, ...] = (FILL,),
     cashflows: tuple[LineageCashflow, ...] = (CASHFLOW,),
 ) -> LineageChain:
-    return LineageChain(decisions=decisions, orders=orders, fills=fills, cashflows=cashflows)
+    return LineageChain(
+        opportunities=opportunities,
+        decisions=decisions,
+        orders=orders,
+        fills=fills,
+        cashflows=cashflows,
+    )
 
 
 def _codes(violations: tuple[LineageViolation, ...]) -> set[LineageViolationCode]:
@@ -88,13 +105,19 @@ def test_complete_chain_certifies_with_every_join_checked() -> None:
     assert certification.verdict is CompletenessVerdict.COMPLETE
     assert certification.certified is True
     assert certification.violations == ()
-    assert certification.joins_checked == 3
+    assert certification.joins_checked == 4
     assert certification.campaign_ids == ("CAMP-1",)
     assert len(certification.provenance_digest) == 64
     require_complete(certification)
 
 
 def test_provenance_digest_is_order_independent() -> None:
+    opportunity_two = replace(
+        OPPORTUNITY,
+        opportunity_id="OPP-2",
+        created_ns=130,
+        available_ns=131,
+    )
     decision_two = replace(
         DECISION,
         decision_id="DEC-2",
@@ -122,6 +145,7 @@ def test_provenance_digest_is_order_independent() -> None:
     )
     forward = certify(
         LineageChain(
+            opportunities=(OPPORTUNITY, opportunity_two),
             decisions=(DECISION, decision_two),
             orders=(ORDER, order_two),
             fills=(FILL, fill_two),
@@ -130,6 +154,7 @@ def test_provenance_digest_is_order_independent() -> None:
         as_of_ns=AS_OF_NS,
     )
     reversed_chain = LineageChain(
+        opportunities=(opportunity_two, OPPORTUNITY),
         decisions=(decision_two, DECISION),
         orders=(order_two, ORDER),
         fills=(fill_two, FILL),
@@ -235,6 +260,94 @@ def test_fill_without_cashflow_evidence_is_a_missing_join() -> None:
         if isinstance(row, MissingJoin) and row.record_id == "FIL-2"
     ]
     assert join_violations
+    with pytest.raises(MissingJoin):
+        require_complete(certification)
+
+
+# --------------------------------------------------------------------------- #
+# B2. the opportunity layer is a real, required join
+# --------------------------------------------------------------------------- #
+def test_decision_with_unknown_opportunity_is_a_typed_missing_join() -> None:
+    certification = certify(
+        _chain(decisions=(replace(DECISION, opportunity_id="OPP-UNKNOWN"),)),
+        as_of_ns=AS_OF_NS,
+    )
+    assert certification.verdict is CompletenessVerdict.INCOMPLETE
+    assert certification.certified is False
+    assert LineageViolationCode.MISSING_JOIN in _codes(certification.violations)
+    join_violations = [
+        row
+        for row in certification.violations
+        if isinstance(row, MissingJoin) and row.record_id == "DEC-1"
+    ]
+    assert join_violations
+    assert "OPP-UNKNOWN" in join_violations[0].detail
+    with pytest.raises(MissingJoin):
+        require_complete(certification)
+
+
+def test_duplicated_opportunity_id_cannot_resolve_to_one_record() -> None:
+    duplicate = replace(OPPORTUNITY, available_ns=92)
+    certification = certify(
+        _chain(opportunities=(OPPORTUNITY, duplicate)),
+        as_of_ns=AS_OF_NS,
+    )
+    assert certification.verdict is CompletenessVerdict.INCOMPLETE
+    assert certification.certified is False
+    assert LineageViolationCode.DUPLICATE_RECORD in _codes(certification.violations)
+    typed = [
+        row
+        for row in certification.violations
+        if isinstance(row, DuplicateRecord) and row.record_id == "OPP-1"
+    ]
+    assert typed
+    # The decision naming the duplicated id cannot bind to a single opportunity.
+    ambiguous = [
+        row
+        for row in certification.violations
+        if isinstance(row, MissingJoin) and row.record_id == "DEC-1"
+    ]
+    assert ambiguous and "duplicated" in ambiguous[0].detail
+    with pytest.raises(LineageViolation):
+        require_complete(certification)
+
+
+def test_cross_campaign_opportunity_is_a_campaign_mismatch() -> None:
+    foreign = replace(OPPORTUNITY, campaign_id="CAMP-2")
+    certification = certify(_chain(opportunities=(foreign,)), as_of_ns=AS_OF_NS)
+    assert certification.verdict is CompletenessVerdict.INCOMPLETE
+    assert certification.certified is False
+    assert LineageViolationCode.CAMPAIGN_MISMATCH in _codes(certification.violations)
+    mismatch = [row for row in certification.violations if isinstance(row, CampaignMismatch)]
+    assert mismatch[0].record_id == "DEC-1"
+    with pytest.raises(CampaignMismatch):
+        require_complete(certification)
+
+
+def test_opportunity_instrument_mismatch_is_mislinked() -> None:
+    foreign = replace(OPPORTUNITY, instrument_id="ETHUSDT-PERP")
+    certification = certify(_chain(opportunities=(foreign,)), as_of_ns=AS_OF_NS)
+    assert certification.verdict is CompletenessVerdict.INCOMPLETE
+    mislinked = [
+        row
+        for row in certification.violations
+        if isinstance(row, MislinkedRecord) and row.record_id == "DEC-1"
+    ]
+    assert mislinked
+    with pytest.raises(MislinkedRecord):
+        require_complete(certification)
+
+
+def test_decisions_without_any_opportunity_layer_are_blocked() -> None:
+    certification = certify(_chain(opportunities=()), as_of_ns=AS_OF_NS)
+    assert certification.verdict is CompletenessVerdict.BLOCKED
+    assert certification.certified is False
+    layer_gap = [
+        row
+        for row in certification.violations
+        if isinstance(row, MissingJoin) and row.record_id == "<opportunities>"
+    ]
+    assert layer_gap
     with pytest.raises(MissingJoin):
         require_complete(certification)
 

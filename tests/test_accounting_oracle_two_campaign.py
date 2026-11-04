@@ -23,6 +23,7 @@ from v8_next.audit.oracle_two_campaign import (
     OrderSide,
     recompute,
     reconcile_aggregate,
+    reconcile_campaign_arithmetic,
 )
 
 D = Decimal
@@ -301,9 +302,7 @@ def test_cross_campaign_swap_is_rejected_even_when_internally_consistent() -> No
         for order in ORDERS
     )
     moved_fills = tuple(
-        replace(fill, campaign_id="campaign-beta")
-        if fill.order_id == "ORD-A2"
-        else fill
+        replace(fill, campaign_id="campaign-beta") if fill.order_id == "ORD-A2" else fill
         for fill in FILLS
     )
     with pytest.raises(OracleViolation) as excinfo:
@@ -361,6 +360,45 @@ def test_aggregate_mismatch_is_a_hard_failure() -> None:
     with pytest.raises(OracleViolation) as excinfo:
         reconcile_aggregate(report, {"campaign-alpha": D("1029.30")})
     assert _code(excinfo) is OracleViolationCode.ARITHMETIC_MISMATCH
+
+
+def _funding_for(campaign_id: str) -> tuple[FundingRecord, ...]:
+    return tuple(row for row in FUNDING if row.campaign_id == campaign_id)
+
+
+def test_arithmetic_reconciliation_closes_for_every_campaign() -> None:
+    report = _report()
+    for ledger in report.ledgers:
+        reconcile_campaign_arithmetic(ledger, funding_rows=_funding_for(ledger.campaign_id))
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ["final_equity", "realized_pnl", "fees", "funding"],
+)
+def test_mutated_campaign_total_raises_arithmetic_mismatch(field_name: str) -> None:
+    """The mismatch branch is reachable: corrupting one total fails reconciliation."""
+    alpha = _report().ledger("campaign-alpha")
+    mutated = replace(alpha, **{field_name: getattr(alpha, field_name) + D("1")})
+    with pytest.raises(OracleViolation) as excinfo:
+        reconcile_campaign_arithmetic(mutated, funding_rows=_funding_for("campaign-alpha"))
+    assert _code(excinfo) is OracleViolationCode.ARITHMETIC_MISMATCH
+    assert excinfo.value.record_id == "campaign-alpha"
+    assert field_name in excinfo.value.detail or "final_equity" in excinfo.value.detail
+
+
+def test_funding_row_from_another_campaign_is_rejected() -> None:
+    alpha = _report().ledger("campaign-alpha")
+    with pytest.raises(OracleViolation) as excinfo:
+        reconcile_campaign_arithmetic(
+            alpha,
+            funding_rows=(
+                FUNDING[0],
+                replace(FUNDING[0], funding_id="FUND-B1", campaign_id="campaign-beta"),
+            ),
+        )
+    assert _code(excinfo) is OracleViolationCode.CAMPAIGN_MISMATCH
+    assert excinfo.value.record_id == "FUND-B1"
 
 
 def test_money_must_be_decimal_not_float() -> None:

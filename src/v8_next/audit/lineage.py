@@ -15,7 +15,9 @@ neighbour and no campaign is ever substituted from a last-seen value. :func:`cer
 returns an explicit :class:`CompletenessVerdict` and a tuple of typed violations:
 
 * :class:`MissingJoin` — a record does not carry the key of its declared parent, a
-  layer is absent while a dependent layer exists, or a fill has no cashflow evidence;
+  layer is absent while a dependent layer exists, a decision's ``opportunity_id``
+  does not resolve to exactly one opportunity of the same campaign and instrument,
+  or a fill has no cashflow evidence;
 * :class:`OrphanRecord` — a join key is present but the parent record does not exist;
 * :class:`DuplicateFill` / :class:`DuplicateRecord` — an id appears twice;
 * :class:`LateRecord` — event or availability time lies after the certification cut;
@@ -23,7 +25,7 @@ returns an explicit :class:`CompletenessVerdict` and a tuple of typed violations
 * :class:`MislinkedRecord` — transitively inconsistent native ids or instruments;
 * :class:`EventTimeInversion` — a child precedes its parent in event time.
 
-A certification can only be ``COMPLETE`` when every join resolves and all four layers
+A certification can only be ``COMPLETE`` when every join resolves and all five layers
 hold evidence. Any missing join leaves it ``INCOMPLETE``; uncertifiable evidence (late
 arrival or an empty layer) leaves it ``BLOCKED``. :func:`require_complete` turns a
 non-complete verdict into the first typed failure, so a consumer cannot accidentally
@@ -53,6 +55,7 @@ __all__ = [
     "LineageChain",
     "LineageDecision",
     "LineageFill",
+    "LineageOpportunity",
     "LineageOrder",
     "LineageViolation",
     "LineageViolationCode",
@@ -203,8 +206,24 @@ class EventTimeInversion(LineageViolation):
 
 
 @dataclass(frozen=True, slots=True)
+class LineageOpportunity:
+    """An admitted opportunity: the documented root of the cashflow lineage chain.
+
+    ``created_ns`` is the event time at which the opportunity came into existence;
+    ``available_ns`` is when the audit could first observe it. Both are checked
+    against the certification cut, exactly like every other layer.
+    """
+
+    opportunity_id: str
+    campaign_id: str
+    instrument_id: str
+    created_ns: int
+    available_ns: int
+
+
+@dataclass(frozen=True, slots=True)
 class LineageDecision:
-    """An admitted opportunity decision; the root of a cashflow lineage chain."""
+    """An admitted opportunity decision; joins to exactly one opportunity."""
 
     decision_id: str
     opportunity_id: str
@@ -253,8 +272,9 @@ class LineageCashflow:
 
 @dataclass(frozen=True, slots=True)
 class LineageChain:
-    """The four explicitly supplied layers. Order is irrelevant; ids are the joins."""
+    """The five explicitly supplied layers. Order is irrelevant; ids are the joins."""
 
+    opportunities: tuple[LineageOpportunity, ...] = ()
     decisions: tuple[LineageDecision, ...] = ()
     orders: tuple[LineageOrder, ...] = ()
     fills: tuple[LineageFill, ...] = ()
@@ -270,6 +290,16 @@ class LineageChain:
     def digest(self) -> str:
         """Provenance digest over the records as supplied (order-independent)."""
         payload = {
+            "opportunities": [
+                [
+                    row.opportunity_id,
+                    row.campaign_id,
+                    row.instrument_id,
+                    row.created_ns,
+                    row.available_ns,
+                ]
+                for row in sorted(self.opportunities, key=lambda item: item.opportunity_id)
+            ],
             "decisions": [
                 [
                     row.decision_id,
@@ -396,6 +426,14 @@ def certify(chain: LineageChain, *, as_of_ns: int) -> LineageCertification:
     structural_gap = False
 
     # --- layer evidence ---------------------------------------------------- #
+    if chain.decisions and not chain.opportunities:
+        violations.append(
+            MissingJoin(
+                "<opportunities>",
+                "no opportunity evidence to certify decisions that reference one",
+            )
+        )
+        structural_gap = True
     if not chain.decisions:
         violations.append(MissingJoin("<decisions>", "no decision evidence to certify"))
         structural_gap = True
@@ -409,14 +447,52 @@ def certify(chain: LineageChain, *, as_of_ns: int) -> LineageCertification:
         violations.append(MissingJoin("<cashflows>", "no cashflow evidence to certify"))
         structural_gap = True
 
+    _unique(
+        [row.opportunity_id for row in chain.opportunities],
+        DuplicateRecord,
+        violations,
+        "opportunity",
+    )
     _unique([row.decision_id for row in chain.decisions], DuplicateRecord, violations, "decision")
     _unique([row.order_id for row in chain.orders], DuplicateRecord, violations, "order")
     _unique([row.fill_id for row in chain.fills], DuplicateFill, violations, "fill")
     _unique([row.cashflow_id for row in chain.cashflows], DuplicateRecord, violations, "cashflow")
 
+    # An opportunity id that appears twice cannot resolve to *exactly one* record;
+    # it is excluded from the index so a referencing decision cannot silently bind
+    # to whichever duplicate happened to be indexed last.
+    opportunity_counts: dict[str, int] = {}
+    for opportunity in chain.opportunities:
+        opportunity_counts[opportunity.opportunity_id] = (
+            opportunity_counts.get(opportunity.opportunity_id, 0) + 1
+        )
+    opportunities = {
+        row.opportunity_id: row
+        for row in chain.opportunities
+        if opportunity_counts[row.opportunity_id] == 1
+    }
+
     decisions = {row.decision_id: row for row in chain.decisions}
     orders = {row.order_id: row for row in chain.orders}
     fills = {row.fill_id: row for row in chain.fills}
+
+    # --- opportunities ----------------------------------------------------- #
+    for opportunity in chain.opportunities:
+        if _is_blank(opportunity.campaign_id):
+            violations.append(
+                MissingJoin(opportunity.opportunity_id, "opportunity carries no campaign_id")
+            )
+        if _is_blank(opportunity.instrument_id):
+            violations.append(
+                MissingJoin(opportunity.opportunity_id, "opportunity carries no instrument_id")
+            )
+        _check_late(
+            opportunity.opportunity_id,
+            opportunity.created_ns,
+            opportunity.available_ns,
+            as_of_ns,
+            violations,
+        )
 
     # --- decisions --------------------------------------------------------- #
     for decision in chain.decisions:
@@ -424,6 +500,36 @@ def certify(chain: LineageChain, *, as_of_ns: int) -> LineageCertification:
             violations.append(
                 MissingJoin(decision.decision_id, "decision carries no opportunity_id")
             )
+            parent_opportunity = None
+        else:
+            parent_opportunity = opportunities.get(decision.opportunity_id)
+            if parent_opportunity is None:
+                detail = (
+                    f"opportunity {decision.opportunity_id!r} is duplicated and cannot "
+                    "resolve to exactly one opportunity"
+                    if opportunity_counts.get(decision.opportunity_id, 0) > 1
+                    else f"opportunity {decision.opportunity_id!r} does not exist in the "
+                    "opportunity layer"
+                )
+                violations.append(MissingJoin(decision.decision_id, detail))
+        if parent_opportunity is not None:
+            joins_checked += 1
+            if decision.campaign_id != parent_opportunity.campaign_id:
+                violations.append(
+                    CampaignMismatch(
+                        decision.decision_id,
+                        f"decision campaign {decision.campaign_id!r} != opportunity campaign "
+                        f"{parent_opportunity.campaign_id!r}",
+                    )
+                )
+            if decision.instrument_id != parent_opportunity.instrument_id:
+                violations.append(
+                    MislinkedRecord(
+                        decision.decision_id,
+                        f"decision instrument {decision.instrument_id!r} != opportunity "
+                        f"instrument {parent_opportunity.instrument_id!r}",
+                    )
+                )
         if _is_blank(decision.campaign_id):
             violations.append(MissingJoin(decision.decision_id, "decision carries no campaign_id"))
         _check_late(
