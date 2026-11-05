@@ -114,3 +114,23 @@ def test_misaligned_grid_is_refused(tmp_path, monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="share one bar grid"):
         xs.load_panel(("AAAUSDT", "BBBUSDT"), start_ms=0, end_ms=10**13)
+
+
+def test_momentum_mode_is_the_exact_opposite_ranking() -> None:
+    panel = _panel({"AAA": [-0.05], "BBB": [0.0], "CCC": [0.05]})
+    reversal = xs.selection_events(
+        panel, symbols=("AAA", "BBB", "CCC"), lookback=4, legs=1, mode="reversal"
+    )
+    momentum = xs.selection_events(
+        panel, symbols=("AAA", "BBB", "CCC"), lookback=4, legs=1, mode="momentum"
+    )
+    assert reversal and momentum
+    assert {(e["bar_index"], e["symbol"]): e["direction"] for e in reversal} == {
+        (e["bar_index"], e["symbol"]): -e["direction"] for e in momentum
+    }
+
+
+def test_unknown_rank_mode_is_refused() -> None:
+    panel = _panel({"AAA": [-0.05], "BBB": [0.05]})
+    with pytest.raises(ValueError, match="unknown rank mode"):
+        xs.selection_events(panel, symbols=("AAA", "BBB"), lookback=4, legs=1, mode="carry")

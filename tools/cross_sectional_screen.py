@@ -175,6 +175,7 @@ def selection_events(
     symbols: tuple[str, ...],
     lookback: int,
     legs: int,
+    mode: str = "reversal",
 ) -> list[dict[str, Any]]:
     """Bars on which a symbol newly enters an extreme rank.
 
@@ -182,6 +183,11 @@ def selection_events(
     there: re-entering the same state is the same information, and repeating it
     would inflate the sample with overlapping copies of one observation.
     """
+    if mode not in ("reversal", "momentum"):
+        raise ValueError(f"unknown rank mode {mode!r}")
+    # reversal buys the weakest and sells the strongest; momentum is the exact
+    # opposite ranking rule with everything else held fixed.
+    long_rank = "bottom" if mode == "reversal" else "top"
     size = len(symbols)
     # The first bar on which a ranking exists is itself a transition: every
     # selected symbol moves from "not held" to "held".
@@ -192,9 +198,11 @@ def selection_events(
         ranked = sorted(symbols, key=lambda symbol: returns[symbol])
         state = {}
         for rank, symbol in enumerate(ranked):
-            if rank < legs:
+            in_bottom = rank < legs
+            in_top = rank >= size - legs
+            if (in_bottom and long_rank == "bottom") or (in_top and long_rank == "top"):
                 state[symbol] = 1
-            elif rank >= size - legs:
+            elif in_bottom or in_top:
                 state[symbol] = -1
             else:
                 state[symbol] = 0
@@ -274,10 +282,10 @@ def event_means(rows: list[dict[str, Any]]) -> list[float]:
     return [statistics.fmean(values) for values in grouped.values()]
 
 
-def run(*, start_ms: int, end_ms: int, lookback: int, legs: int) -> dict[str, Any]:
+def run(*, start_ms: int, end_ms: int, lookback: int, legs: int, mode: str = "reversal") -> dict[str, Any]:
     symbols = UNIVERSE
     bars, funding = load_panel(symbols, start_ms=start_ms, end_ms=end_ms)
-    events = selection_events(bars, symbols=symbols, lookback=lookback, legs=legs)
+    events = selection_events(bars, symbols=symbols, lookback=lookback, legs=legs, mode=mode)
     rows = event_legs(bars, funding, events)
     summary = metrics.summarize(rows, net_key="realized_net_r")
     per_symbol: dict[str, Any] = {}
@@ -309,6 +317,7 @@ def run(*, start_ms: int, end_ms: int, lookback: int, legs: int) -> dict[str, An
     )
     result = {
         "design": {
+            "mode": mode,
             "lookback_bars": lookback,
             "legs_per_side": legs,
             "events": len({row["bar_index"] for row in rows}),
@@ -372,6 +381,7 @@ def main() -> int:
     parser.add_argument("--start-ms", type=int, default=DEV_START_MS)
     parser.add_argument("--end-ms", type=int, default=DEV_END_MS)
     parser.add_argument("--sensitivity", action="store_true")
+    parser.add_argument("--mode", choices=("reversal", "momentum"), default="reversal")
     args = parser.parse_args()
 
     if args.start_ms >= HOLDOUT_START_MS and __import__("os").environ.get("V9_HOLDOUT_AUTHORIZED") != "1":
@@ -383,12 +393,14 @@ def main() -> int:
         end_ms=args.end_ms,
         lookback=int(CONFIG["lookback_bars"]),
         legs=int(CONFIG["legs_per_side"]),
+        mode=args.mode,
     )
     primary["assessment"] = assess(primary)
     (args.out / "primary.json").write_text(json.dumps(primary, indent=2, sort_keys=True), encoding="utf-8")
 
     payload: dict[str, Any] = {
         "primary": {
+            "mode": args.mode,
             "lookback_bars": CONFIG["lookback_bars"],
             "legs_per_side": CONFIG["legs_per_side"],
             **primary["pooled"],
@@ -400,7 +412,11 @@ def main() -> int:
         payload["sensitivity"] = {}
         for lookback, legs in ((4, 2), (72, 2), (24, 1), (24, 3)):
             variant = run(
-                start_ms=args.start_ms, end_ms=args.end_ms, lookback=lookback, legs=legs
+                start_ms=args.start_ms,
+                end_ms=args.end_ms,
+                lookback=lookback,
+                legs=legs,
+                mode=args.mode,
             )
             payload["sensitivity"][f"L{lookback}_k{legs}"] = {
                 "trades": variant["pooled"]["trades"],
