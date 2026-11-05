@@ -67,7 +67,7 @@ class HorizonAggregator:
         return {duration: len(bars) for duration, bars in self._pending.items()}
 
     def advance(self, candle: Candle, *, processing_ns: int,
-                quality: QualityState = QualityState.OK) -> tuple[CompletedHorizonBar, ...]:
+                quality: QualityState) -> tuple[CompletedHorizonBar, ...]:
         """Consume one known, closed source bar and emit completed targets."""
         if isinstance(processing_ns, bool) or not isinstance(processing_ns, int):
             raise ValueError("processing_ns must be an integer")

@@ -22,12 +22,12 @@ def test_completed_aggregate_and_availability_are_event_driven():
                                   target_durations_ns=(H4_NS, H1_NS))
     for i in range(15):
         source = bar(i)
-        events = aggregate.advance(source, processing_ns=source.available_ns)
+        events = aggregate.advance(source, processing_ns=source.available_ns, quality=QualityState.OK)
         assert [e.duration_ns for e in events] == ([H1_NS] if i % 4 == 3 else [])
         assert aggregate.pending_counts[H1_NS] <= 3
         assert aggregate.pending_counts[H4_NS] <= 15
     source = bar(15, delay=11)
-    events = aggregate.advance(source, processing_ns=source.available_ns + 17)
+    events = aggregate.advance(source, processing_ns=source.available_ns + 17, quality=QualityState.OK)
     assert [e.duration_ns for e in events] == [H1_NS, H4_NS]
     h4 = events[1]
     assert (h4.candle.start_ns, h4.candle.end_ns) == (0, H4_NS)
@@ -44,25 +44,25 @@ def test_start_mid_window_never_emits_partial_bar():
     results = []
     for i in range(1, 8):
         source = bar(i)
-        results.extend(aggregate.advance(source, processing_ns=source.available_ns))
+        results.extend(aggregate.advance(source, processing_ns=source.available_ns, quality=QualityState.OK))
     assert [(e.candle.start_ns, e.candle.end_ns) for e in results] == [(H1_NS, 2 * H1_NS)]
 
 
 def test_gap_and_unavailable_events_do_not_mutate_state():
     aggregate = HorizonAggregator("BTC", source_duration_ns=M15_NS, target_durations_ns=(H1_NS,))
     source = bar(0)
-    aggregate.advance(source, processing_ns=source.available_ns)
+    aggregate.advance(source, processing_ns=source.available_ns, quality=QualityState.OK)
     before = aggregate.pending_counts
     with pytest.raises(ValueError, match="gap"):
-        aggregate.advance(bar(2), processing_ns=bar(2).available_ns)
+        aggregate.advance(bar(2), processing_ns=bar(2).available_ns, quality=QualityState.OK)
     with pytest.raises(ValueError, match="unavailable"):
-        aggregate.advance(bar(1, delay=100), processing_ns=bar(1).end_ns)
+        aggregate.advance(bar(1, delay=100), processing_ns=bar(1).end_ns, quality=QualityState.OK)
     with pytest.raises(ValueError, match="quality"):
         aggregate.advance(bar(1), processing_ns=bar(1).end_ns, quality=QualityState.UNKNOWN)
     assert aggregate.pending_counts == before
     for i in range(1, 4):
         source = bar(i)
-        events = aggregate.advance(source, processing_ns=source.available_ns)
+        events = aggregate.advance(source, processing_ns=source.available_ns, quality=QualityState.OK)
     assert len(events) == 1
 
 
@@ -73,7 +73,7 @@ def test_identity_binds_source_content_availability_and_processing_time():
             source = bar(i)
             if i == 1 and changed:
                 source = replace(source, volume=Decimal("42"))
-            events = agg.advance(source, processing_ns=source.available_ns + extra_delay)
+            events = agg.advance(source, processing_ns=source.available_ns + extra_delay, quality=QualityState.OK)
         return events[0]
 
     assert run() == run()
@@ -85,7 +85,7 @@ def test_m1_to_m15_has_exact_count_and_duplicate_rejected():
     agg = HorizonAggregator("BTC", source_duration_ns=MINUTE_NS, target_durations_ns=(M15_NS,))
     for i in range(15):
         source = bar(i, duration=MINUTE_NS)
-        events = agg.advance(source, processing_ns=source.available_ns)
+        events = agg.advance(source, processing_ns=source.available_ns, quality=QualityState.OK)
     assert len(events) == 1 and len(events[0].source_ids) == 15
     with pytest.raises(ValueError, match="gap"):
-        agg.advance(source, processing_ns=source.available_ns)
+        agg.advance(source, processing_ns=source.available_ns, quality=QualityState.OK)
