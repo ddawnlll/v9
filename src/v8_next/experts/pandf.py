@@ -6,6 +6,7 @@ from decimal import Decimal
 from v8_next.domain.market import CausalFrame
 from v8_next.economics.decisions import Opportunity, Stance
 from v8_next.experts.common import context_reason, directional_stance
+from v8_next.experts.features import per_bar_memo
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,12 @@ class PointFigureSetup:
     steps: int
 
 
+@per_bar_memo
+def _frame_columns(frame: CausalFrame, box: Decimal) -> tuple[Column, ...]:
+    """Share the immutable transformation between variants on the same bar."""
+    return _columns_validated(tuple(c.close for c in frame.candles), box)
+
+
 def pandf_setup(frame: CausalFrame, variant: str = "a") -> PointFigureSetup | None:
     if variant not in ("a", "b", "c", "d"):
         raise ValueError("unsupported P&F variant")
@@ -81,7 +88,7 @@ def pandf_setup(frame: CausalFrame, variant: str = "a") -> PointFigureSetup | No
     # (Candle.__post_init__), so the validated core runs without rescanning
     # the whole prefix a second time. `box` is checked above; `columns` keeps
     # its own validation for direct callers.
-    transformed = _columns_validated(tuple(c.close for c in bars), box)
+    transformed = _frame_columns(frame, box)
     last = transformed[-1]
     direction = 1 if variant in ("a", "c") else -1
     needed = 2 if variant in ("a", "b") else 3

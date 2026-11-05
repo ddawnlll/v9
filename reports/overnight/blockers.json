@@ -1,0 +1,45 @@
+{
+  "blockers": [
+    {
+      "id": "BLOCKED-M4-04",
+      "issue": [
+        "M4-04"
+      ],
+      "status": "BLOCKED",
+      "detail": "No PIT altcoin-perpetual tape, delisting/metadata history or funding/mark history exists in-repo (only research/tape/btcusdt-1h-2025Q1). Economic qualification NOT_RUN; rule engine can still be implemented and tested."
+    },
+    {
+      "id": "BLOCKED-M4-05",
+      "issue": [
+        "M4-05"
+      ],
+      "status": "BLOCKED",
+      "detail": "Requires a 24-48h wall-clock shadow soak plus fault injection on a 4 GiB profile; not achievable in this session. Fault-injection fixtures can be built and run."
+    },
+    {
+      "id": "BLOCKED-M4-02-PARTIAL",
+      "issue": [
+        "M4-02"
+      ],
+      "status": "PARTIAL",
+      "detail": "Native costed replay is runnable on the 1-quarter BTC development tape only. No finalists exist yet from M3-07. Microstructure (queue position, partial-fill races) is UNSUPPORTED by 1H OHLC."
+    },
+    {
+      "id": "BLOCKED-M0-08-SCOPE",
+      "issue": [
+        "M0-08"
+      ],
+      "status": "PARTIAL",
+      "detail": "Measured 28-expert ensemble and feature-read workloads on 2160 bars; 40-leg/12-month scope NOT_RUN (no tape). Peak RSS measured on 18 GiB macOS host, not inside a 4 GiB cgroup."
+    },
+    {
+      "id": "BLOCKED-V9-ECONOMIC-ARMS",
+      "issue": [
+        "M4-02",
+        "M4-06"
+      ],
+      "status": "BLOCKED",
+      "detail": "All five V9 intervention arms are NOT_RUN because adaptive order side effects are disabled by policy (shadow-only). No costed V9 result exists, so ECONOMIC stays NOT_RUN and overall promotion stays BLOCKED. Requires an owner-authorized costed shadow-execution path."
+    }
+  ]
+}

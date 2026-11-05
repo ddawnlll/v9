@@ -14,6 +14,7 @@ import sys
 import time
 from bisect import bisect_right
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -25,11 +26,26 @@ from v8_next.audit.forensic import (
     AuditStore,
     EvidenceClass,
 )
+from v8_next.audit.lineage import (
+    LineageCashflow,
+    LineageChain,
+    LineageDecision,
+    LineageFill,
+    LineageOpportunity,
+    LineageOrder,
+)
 from v8_next.audit.native_telemetry import reconcile_fills
 from v8_next.audit.trade_metrics import (
     compute_post_exit,
     compute_trade_metrics,
     trade_facts_from_replay,
+)
+from v8_next.audit.verdicts import (
+    REQUIRED_SOURCE_IDS,
+    AuditVerdict,
+    VerdictState,
+    derive_verdict,
+    verdict_from_trade_metrics,
 )
 
 SCHEMA_VERSION = "AUDIT_EVENT_V1"
@@ -296,33 +312,64 @@ def enrich_ledger_from_native(run_dir: Path, native_reports: Mapping[str, Any]) 
 def assign_campaign_ids(run_dir: Path) -> int:
     """Attribute every ledger row to a position campaign, stably and in place.
 
-    Rule: campaign N begins at the N-th POSITION_OPENED and continues to the next
-    open. Because entry orders are submitted just before the position opens, the
-    entry leg (client id suffix -1) and the admission decision at the same
-    timestamp are attributed forward to the campaign they create. C%04d ids are
-    stable for a given tape and replay.
+    Rule: campaign N begins at the N-th POSITION_OPENED (``C0001`` is the first
+    campaign — there is no campaign 0) and continues to the next open. Identity
+    wins over position in the row stream: an event that names a ``decision_id``
+    inherits the campaign that decision opened, and an event that names a
+    ``client_order_id``/``venue_order_id`` inherits its order's campaign. That is
+    what attributes the entry leg and its admission decision, both emitted just
+    before POSITION_OPENED, forward to the campaign they create. Rows with no
+    identity and no open yet stay unattributed: an absent campaign is never
+    guessed. ``C%04d`` ids are a pure function of the persisted event order, so
+    re-deriving from the same tape/replay yields the same ids.
     """
     path = Path(run_dir) / "events.jsonl"
     events = read_events(path)
     opened = [e for e in events if e["event_type"] == "POSITION_OPENED"]
     open_sequences = [int(e["sequence_number"]) for e in opened]
-    open_time_to_campaign = {
-        int(e["event_time_ns"]): index + 1 for index, e in enumerate(opened)
-    }
-    forward_types = {
-        "ORDER_SUBMITTED",
-        "ORDER_ACCEPTED",
-        "ORDER_FILLED",
-        "ADMISSION_ACCEPTED",
-    }
+
+    campaign_by_decision: dict[str, int] = {}
+    for index, event in enumerate(opened):
+        decision = _text(event.get("decision_id"))
+        if decision is not None:
+            campaign_by_decision.setdefault(decision, index + 1)
+    campaign_by_order: dict[str, int] = {}
+    campaign_by_venue: dict[str, int] = {}
     for event in events:
-        campaign = bisect_right(open_sequences, int(event["sequence_number"]))
-        if campaign in open_time_to_campaign.values() and event["event_type"] in forward_types:
-            client_id = str(event.get("client_order_id") or "")
-            if open_time_to_campaign.get(int(event["event_time_ns"])) == campaign + 1 and (
-                client_id.endswith("-1") or event["event_type"].startswith("ADMISSION")
-            ):
-                campaign += 1
+        client_id = _text(event.get("client_order_id"))
+        decision = _text(event.get("decision_id"))
+        if client_id is None or decision is None:
+            continue
+        resolved_campaign = campaign_by_decision.get(decision)
+        if resolved_campaign is not None:
+            campaign_by_order.setdefault(client_id, resolved_campaign)
+    for event in events:
+        venue_id = _text(event.get("venue_order_id"))
+        client_id = _text(event.get("client_order_id"))
+        if venue_id is None or client_id is None:
+            continue
+        resolved_campaign = campaign_by_order.get(client_id)
+        if resolved_campaign is not None:
+            campaign_by_venue.setdefault(venue_id, resolved_campaign)
+
+    for event in events:
+        campaign: int | None = None
+        decision = _text(event.get("decision_id"))
+        if decision is not None:
+            campaign = campaign_by_decision.get(decision)
+        if campaign is None:
+            client_id = _text(event.get("client_order_id"))
+            if client_id is not None:
+                campaign = campaign_by_order.get(client_id)
+        if campaign is None:
+            venue_id = _text(event.get("venue_order_id"))
+            if venue_id is not None:
+                campaign = campaign_by_venue.get(venue_id)
+        if campaign is None:
+            # Position interval: the greatest open at or before this sequence
+            # owns the row. Nothing before the first open is claimed.
+            position = bisect_right(open_sequences, int(event.get("sequence_number") or 0))
+            campaign = position or None
         if campaign:
             event["campaign_id"] = f"C{campaign:04d}"
         else:
@@ -333,6 +380,46 @@ def assign_campaign_ids(run_dir: Path) -> int:
             handle.write(json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n")
     tmp.replace(path)
     return len(opened)
+
+
+def _order_identities(events: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, str]]:
+    """``client_order_id -> {campaign_id, decision_id}`` from the order rows.
+
+    An identity key is filled only from a row that carries it; a blank value is
+    never substituted from a neighbouring order.
+    """
+    identities: dict[str, dict[str, str]] = {}
+    for event in events:
+        client_id = _text(event.get("client_order_id"))
+        if client_id is None:
+            continue
+        slot = identities.setdefault(client_id, {"campaign_id": "", "decision_id": ""})
+        for key in ("campaign_id", "decision_id"):
+            if not slot[key]:
+                slot[key] = _text(event.get(key)) or ""
+    return identities
+
+
+def attach_fill_identities(
+    fills: Sequence[Mapping[str, Any]], events: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    """Attach campaign/decision to each fill row from the order it belongs to.
+
+    A fill whose ``client_order_id`` names no persisted order keeps neither key:
+    the row stays unattributed so the lineage audit reports the gap instead of
+    certifying a guessed campaign.
+    """
+    identities = _order_identities(events)
+    rows: list[dict[str, Any]] = []
+    for fill in fills:
+        row = dict(fill)
+        identity = identities.get(str(row.get("client_order_id") or ""))
+        for key in ("campaign_id", "decision_id"):
+            row.pop(key, None)
+            if identity is not None and identity[key]:
+                row[key] = identity[key]
+        rows.append(row)
+    return rows
 
 
 def write_family_artifacts(run_dir: Path, expert_filter: str | None) -> dict[str, int]:
@@ -1113,7 +1200,10 @@ def run_native_audit(
     all_events = read_events(run_dir / "events.jsonl")
 
     family_counts = write_family_artifacts(run_dir, expert)
-    _write_jsonl(run_dir / "fills.jsonl", _enrich_fill_rows(native_fills, result))
+    _write_jsonl(
+        run_dir / "fills.jsonl",
+        attach_fill_identities(_enrich_fill_rows(native_fills, result), all_events),
+    )
     _write_jsonl(run_dir / "trade_lifecycles.jsonl", lifecycles)
     _write_json(run_dir / "opportunity_funnel.json", funnel)
     _write_json(run_dir / "execution_metrics.json", execution_metrics)
@@ -1265,7 +1355,15 @@ def run_native_audit(
 
     from v8_next.audit.reporting import write_reports
 
-    write_reports(run_dir)
+    # Derive the verdict from the artifacts just written, never from the replay
+    # still held in memory, so a report-only re-render reaches the same label.
+    audit_inputs = derive_audit_inputs(run_dir)
+    write_reports(
+        run_dir,
+        verdict=audit_inputs.verdict,
+        lineage=audit_inputs.lineage,
+        as_of_ns=audit_inputs.as_of_ns,
+    )
     # Make the provisional manifest cover the reports before the final check, so
     # validation sees a complete digest set rather than its own in-flight state.
     refresh_manifest_digests(run_dir)
@@ -1275,7 +1373,12 @@ def run_native_audit(
 
     # Re-render reports so they cite the final validation status, then re-digest
     # every artifact. The manifest is the last file written.
-    write_reports(run_dir)
+    write_reports(
+        run_dir,
+        verdict=audit_inputs.verdict,
+        lineage=audit_inputs.lineage,
+        as_of_ns=audit_inputs.as_of_ns,
+    )
     refreshed = refresh_manifest_digests(run_dir)
     refreshed["validation_final_status"] = validation["status"]
     _write_json(run_dir / "run_manifest.json", refreshed)
@@ -1481,3 +1584,548 @@ def read_validation_gates(run_dir: Path) -> list[dict[str, Any]]:
     if not isinstance(gates, list):
         return []
     return [row for row in gates if isinstance(row, dict)]
+
+
+# --------------------------------------------------------------------------- #
+# audit verdict derivation (pure function of the persisted run dir)
+# --------------------------------------------------------------------------- #
+#: Event types that name the trade decision which submitted an entry order.
+_DECISION_EVENT_TYPES = frozenset({"ADMISSION_ACCEPTED"})
+#: Native/ledger order lifecycle events that name one order by ``client_order_id``.
+_ORDER_EVENT_TYPES = frozenset(
+    {
+        "ORDER_CREATED",
+        "ORDER_SUBMITTED",
+        "ORDER_ACCEPTED",
+        "ORDER_REJECTED",
+        "ORDER_CANCELED",
+        "ORDER_UPDATED",
+        "ORDER_PARTIALLY_FILLED",
+        "ORDER_FILLED",
+    }
+)
+#: Data-quality keys whose truthy value proves the run consumed future/OOS data.
+_LOOK_AHEAD_KEYS = (
+    "look_ahead",
+    "lookahead",
+    "look_ahead_detected",
+    "lookahead_detected",
+    "future_data_used",
+    "uses_future_data",
+    "oos_data_touched",
+)
+
+
+@dataclass(frozen=True)
+class AuditInputs:
+    """The verdict and lineage witness that one persisted run dir can support.
+
+    Every field is derived by reading the run directory; nothing is carried over
+    from the in-memory replay, so re-deriving from disk always yields the same
+    inputs and therefore the same report label.
+    """
+
+    verdict: AuditVerdict
+    lineage: LineageChain | None = None
+    as_of_ns: int | None = None
+
+
+def _text(value: Any) -> str | None:
+    """Non-empty stripped text, or None (an absent identity is never invented)."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _int_or_none(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _decimal_or_none(value: Any) -> Decimal | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        amount = value if isinstance(value, Decimal) else Decimal(str(value))
+    except (ArithmeticError, ValueError):
+        return None
+    return amount if amount.is_finite() else None
+
+
+def _jsonl_rows(store: AuditStore, name: str) -> list[dict[str, Any]]:
+    return list(store.iter_jsonl(name)) if store.exists(name) else []
+
+
+def _json_object(store: AuditStore, name: str) -> dict[str, Any]:
+    if not store.exists(name):
+        return {}
+    payload = store.read_json(name)
+    return payload if isinstance(payload, dict) else {}
+
+
+def _flag_set(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes"}
+    return False
+
+
+def _mechanical_section(
+    lifecycles: Sequence[Mapping[str, Any]],
+) -> tuple[VerdictState, tuple[str, ...], tuple[str, ...]]:
+    """Mechanical state of the whole run, from the persisted lifecycle rows.
+
+    Per-row rules stay in :func:`verdict_from_trade_metrics`; only the run-level
+    precedence is decided here. A tie the tape cannot resolve
+    (``NOT_IDENTIFIABLE``) is never upgraded to a pass, and an invalid row is a
+    failure of the mechanical dimension.
+    """
+    if not lifecycles:
+        return VerdictState.NOT_RUN, ("MECHANICAL_NO_TRADE_ROWS",), ()
+    states: list[VerdictState] = []
+    reasons: list[str] = []
+    labels: list[str] = []
+    for row in lifecycles:
+        row_verdict = verdict_from_trade_metrics(row)
+        states.append(row_verdict.mechanical)
+        reasons.extend(row_verdict.reasons)
+        labels.extend(row_verdict.labels)
+    if VerdictState.INVALID in states:
+        state = VerdictState.FAIL
+    elif VerdictState.NOT_IDENTIFIABLE in states:
+        state = VerdictState.NOT_IDENTIFIABLE
+    elif VerdictState.INCOMPLETE in states:
+        state = VerdictState.INCOMPLETE
+    elif VerdictState.NOT_RUN in states:
+        state = VerdictState.NOT_RUN
+    elif all(current is VerdictState.PASS for current in states):
+        state = VerdictState.PASS
+        labels.append("MECHANICAL_PATH_IDENTIFIED")
+    else:  # pragma: no cover - defensive: no other per-row state exists
+        state = VerdictState.FAIL
+        reasons.append("MECHANICAL_UNEXPECTED_ROW_STATE")
+    return state, tuple(dict.fromkeys(reasons)), tuple(dict.fromkeys(labels))
+
+
+def _economic_section(
+    store: AuditStore, lifecycles: Sequence[Mapping[str, Any]]
+) -> tuple[VerdictState, tuple[str, ...], tuple[str, ...]]:
+    """Economic state, from the run's own reconciliation evidence only.
+
+    ``PASS`` requires a closed campaign to exist, the published conservation
+    check to be present, within its own tolerance and free of unexplained
+    cashflows, and the realized PnL figure to be published. An open-only run is
+    ``INCOMPLETE`` (``ECONOMIC_NO_CLOSED_CAMPAIGN``): nothing was realized, so a
+    balanced reconciliation cannot evidence an economic outcome. A missing or
+    residual-failing reconciliation is ``INCOMPLETE`` — never a pass by omission.
+    """
+    if not lifecycles:
+        return VerdictState.NOT_RUN, ("ECONOMIC_NO_TRADE_ROWS",), ()
+    reconciliation = _json_object(store, "reconciliation.json")
+    if not reconciliation:
+        return VerdictState.NOT_RUN, ("ECONOMIC_RECONCILIATION_UNPUBLISHED",), ()
+    economic = _json_object(store, "economic_metrics.json")
+    residual = _decimal_or_none(reconciliation.get("conservation_residual_usdt"))
+    tolerance = _decimal_or_none(reconciliation.get("conservation_tolerance_usdt"))
+    realized = _decimal_or_none(economic.get("realized_net_trading_pnl"))
+    unexplained = _int_or_none(reconciliation.get("unexplained_cashflows"))
+    if residual is None or tolerance is None or realized is None or unexplained is None:
+        return VerdictState.INCOMPLETE, ("ECONOMIC_RECONCILIATION_INCOMPLETE",), ()
+    closed_rows = [
+        row
+        for row in lifecycles
+        if str(row.get("position_status") or "").upper() == "CLOSED"
+        or row.get("closed_ns") is not None
+    ]
+    if not closed_rows:
+        # A run that closed nothing has no realized economic outcome to reconcile.
+        # The reconciliation file may still balance (nothing moved, or the ledger
+        # only marks open campaigns), so a residual within tolerance is *not*
+        # evidence of a realized edge. Reporting PASS here would let an open-only
+        # run render AUDIT_COMPLETE.
+        return (
+            VerdictState.INCOMPLETE,
+            ("ECONOMIC_NO_CLOSED_CAMPAIGN",),
+            ("OPEN_ONLY_NO_CLOSED_CAMPAIGN",),
+        )
+    missing_pnl = sum(
+        1
+        for row in closed_rows
+        if row.get("gross_pnl_usdt") is None or row.get("realized_net_pnl_usdt") is None
+    )
+    if missing_pnl:
+        return (
+            VerdictState.INCOMPLETE,
+            (f"ECONOMIC_CLOSED_ROW_PNL_MISSING:{missing_pnl}/{len(closed_rows)}",),
+            ("UNREALIZED_AT_CUTOFF",),
+        )
+    if unexplained != 0:
+        return (
+            VerdictState.INCOMPLETE,
+            (f"ECONOMIC_UNEXPLAINED_CASHFLOWS:{unexplained}",),
+            ("UNEXPLAINED_CASHFLOW",),
+        )
+    if abs(residual) > tolerance:
+        return (
+            VerdictState.INCOMPLETE,
+            (f"ECONOMIC_CONSERVATION_RESIDUAL:{residual}",),
+            ("CONSERVATION_RESIDUAL",),
+        )
+    return VerdictState.PASS, (), ("REALIZED_PNL_RECONCILED",)
+
+
+def _pit_section(store: AuditStore) -> tuple[VerdictState, tuple[str, ...], tuple[str, ...]]:
+    """Point-in-time state: the data-quality evidence must exist and clear.
+
+    Absent or unusable data-quality evidence is ``NOT_RUN`` (it never became a
+    pass); an explicitly set look-ahead flag is ``FAIL`` — a detected violation,
+    not an omission, and never silently reported as "did not run".
+    """
+    if not store.exists("data_quality.json"):
+        return VerdictState.NOT_RUN, ("PIT_NO_DATA_QUALITY_EVIDENCE",), ()
+    quality = _json_object(store, "data_quality.json")
+    bars = _int_or_none(quality.get("bars"))
+    tape_sha = _text(quality.get("tape_sha256"))
+    if bars is None or bars <= 0 or tape_sha is None:
+        return VerdictState.NOT_RUN, ("PIT_DATA_QUALITY_EVIDENCE_INCOMPLETE",), ()
+    flagged = [key for key in _LOOK_AHEAD_KEYS if _flag_set(quality.get(key))]
+    if flagged:
+        return (
+            VerdictState.FAIL,
+            tuple(f"PIT_LOOK_AHEAD_FLAG:{key}" for key in flagged),
+            ("LOOK_AHEAD_DETECTED",),
+        )
+    return VerdictState.PASS, (), ("PIT_DATA_QUALITY_VERIFIED",)
+
+
+def _source_id_section(
+    rows: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, str | None], tuple[str, ...], tuple[str, ...]]:
+    """Required campaign identities, present in the persisted rows only.
+
+    A key is reported only when *every* row names it; otherwise the key is
+    withheld (so completeness is ``INCOMPLETE``) rather than borrowing one row's
+    value for the others. The witness values all come from one deterministic row
+    (the first campaign), so the tuple is a real identity rather than a mix; when
+    a key repeats across campaigns the ``MULTI_CAMPAIGN`` label says the run is
+    aggregated, not that the witness is fabricated.
+    """
+    if not rows:
+        return (
+            {key: None for key in REQUIRED_SOURCE_IDS},
+            ("SOURCE_ID_NO_PERSISTED_TRADE_ROWS",),
+            (),
+        )
+    ids: dict[str, str | None] = {}
+    reasons: list[str] = []
+    labels: list[str] = []
+    primary = min(
+        rows,
+        key=lambda row: (
+            str(row.get("campaign_id") or ""),
+            str(row.get("position_id") or ""),
+        ),
+    )
+    for key in REQUIRED_SOURCE_IDS:
+        values = [_text(row.get(key)) for row in rows]
+        missing = sum(1 for value in values if value is None)
+        if missing:
+            ids[key] = None
+            reasons.append(f"SOURCE_ID_UNRESOLVED:{key}:{missing}/{len(rows)}")
+            continue
+        # The witness is one real row's identity, never a mix of rows' values.
+        ids[key] = _text(primary.get(key))
+        distinct = sorted({value for value in values if value is not None})
+        if len(distinct) > 1:
+            labels.append("MULTI_CAMPAIGN")
+            reasons.append(f"SOURCE_ID_AGGREGATE:{key}:{len(distinct)}")
+    return ids, tuple(reasons), tuple(dict.fromkeys(labels))
+
+
+def _order_records(events: Sequence[Mapping[str, Any]]) -> dict[str, LineageOrder]:
+    """One lineage order per ``client_order_id``, at its first persisted event.
+
+    The decision is read from the order's own rows, never borrowed from the
+    campaign's single decision: an order that lost its ``decision_id`` must report
+    ``MISSING_JOIN`` and keep the report from certifying.
+    """
+    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    for event in events:
+        if event.get("event_type") not in _ORDER_EVENT_TYPES:
+            continue
+        order_id = _text(event.get("client_order_id"))
+        if order_id is None:
+            continue
+        grouped.setdefault(order_id, []).append(event)
+    records: dict[str, LineageOrder] = {}
+    for order_id, rows in grouped.items():
+        ordered = sorted(
+            rows,
+            key=lambda row: (
+                _int_or_none(row.get("event_time_ns")) or 0,
+                _int_or_none(row.get("sequence_number")) or 0,
+            ),
+        )
+        first = ordered[0]
+        campaign = next(
+            (found for found in (_text(row.get("campaign_id")) for row in ordered) if found),
+            None,
+        )
+        decision = next(
+            (found for found in (_text(row.get("decision_id")) for row in ordered) if found),
+            None,
+        )
+        records[order_id] = LineageOrder(
+            order_id=order_id,
+            decision_id=decision or "",
+            campaign_id=campaign or "",
+            instrument_id=_text(first.get("instrument_id")) or "",
+            event_time_ns=_int_or_none(first.get("event_time_ns")) or 0,
+            available_at_ns=_int_or_none(first.get("recorded_time_ns")) or 0,
+        )
+    return records
+
+
+def _venue_client_map(events: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+    """Venue order id -> client order id, only from rows that carry both."""
+    mapping: dict[str, str] = {}
+    for event in events:
+        venue = _text(event.get("venue_order_id"))
+        client = _text(event.get("client_order_id"))
+        if venue is not None and client is not None:
+            mapping[venue] = client
+    return mapping
+
+
+def _fill_records(
+    fills: Sequence[Mapping[str, Any]],
+    orders: Mapping[str, LineageOrder],
+    venue_client: Mapping[str, str],
+) -> list[LineageFill]:
+    """Persisted fills joined to their order; rows without an identity are skipped."""
+    records: list[LineageFill] = []
+    for fill in fills:
+        fill_id = (
+            _text(fill.get("last_trade_id"))
+            or _text(fill.get("trade_id"))
+            or _text(fill.get("fill_id"))
+        )
+        event_time_ns = _int_or_none(fill.get("ts_last")) or _int_or_none(
+            fill.get("event_time_ns")
+        )
+        if fill_id is None or event_time_ns is None:
+            continue
+        order_id = _text(fill.get("client_order_id"))
+        if order_id is None:
+            order_id = venue_client.get(_text(fill.get("venue_order_id")) or "")
+        order = orders.get(order_id or "")
+        records.append(
+            LineageFill(
+                fill_id=fill_id,
+                order_id=order_id or "",
+                decision_id=order.decision_id if order is not None else "",
+                campaign_id=order.campaign_id if order is not None else "",
+                instrument_id=_text(fill.get("instrument_id"))
+                or (order.instrument_id if order is not None else ""),
+                event_time_ns=event_time_ns,
+                available_at_ns=_int_or_none(fill.get("recorded_time_ns")) or event_time_ns,
+            )
+        )
+    return records
+
+
+def _cashflow_records(
+    events: Sequence[Mapping[str, Any]],
+    fills: Sequence[LineageFill],
+) -> list[LineageCashflow]:
+    """Terminal cash movements joined to a fill by ``trade_id``; unjoined stay unjoined.
+
+    The campaign is taken from the fill the cashflow settles, not from the
+    event's own ``campaign_id`` field: the ledger appends the derived fee
+    cashflows after the replay, so campaign attribution by sequence number stamps
+    them all with the last campaign. The explicit ``trade_id`` join is the fact;
+    the field would only import that mis-attribution.
+    """
+    campaign_by_fill = {fill.fill_id: fill.campaign_id for fill in fills}
+    records: list[LineageCashflow] = []
+    for event in events:
+        if event.get("event_type") != "CASHFLOW_RECORDED":
+            continue
+        amount = _decimal_or_none(event.get("amount"))
+        event_time_ns = _int_or_none(event.get("event_time_ns"))
+        if amount is None or event_time_ns is None:
+            continue
+        fill_id = _text(event.get("trade_id")) or ""
+        sequence = _int_or_none(event.get("sequence_number"))
+        cashflow_id = (
+            f"CF:{sequence}" if sequence is not None else f"CF:{fill_id}@{event_time_ns}"
+        )
+        records.append(
+            LineageCashflow(
+                cashflow_id=cashflow_id,
+                fill_id=fill_id,
+                campaign_id=campaign_by_fill.get(fill_id, ""),
+                event_time_ns=event_time_ns,
+                available_at_ns=_int_or_none(event.get("recorded_time_ns")) or event_time_ns,
+                amount=amount,
+            )
+        )
+    return records
+
+
+#: Keys that make a ``fills.jsonl`` line a persisted fill claim rather than a
+#: placeholder row. A row with none of them was never a fill to begin with.
+_FILL_ROW_KEYS = (
+    "last_trade_id",
+    "trade_id",
+    "fill_id",
+    "client_order_id",
+    "venue_order_id",
+    "ts_last",
+    "event_time_ns",
+)
+
+
+def _is_fill_row(fill: Mapping[str, Any]) -> bool:
+    return any(fill.get(key) is not None for key in _FILL_ROW_KEYS)
+
+
+def _lineage_from_disk(
+    store: AuditStore, fills: Sequence[Mapping[str, Any]]
+) -> tuple[LineageChain | None, int | None]:
+    """Build the five-layer lineage witness from persisted rows only.
+
+    Returns ``None`` when the run persisted no decision/order/fill/cashflow row,
+    so a run that never claimed a chain is not downgraded for the absence of one.
+    When rows *were* persisted but every one lacked the identity needed to join,
+    an empty ``LineageChain`` is returned with ``as_of_ns=0``: the claim exists,
+    it cannot be certified, and ``certify`` reports BLOCKED.
+    Every join is by an explicit id; a row that lacks its parent key keeps the
+    blank key and is reported as a violation by :func:`~v8_next.audit.lineage.certify`.
+    The certification cut is the latest availability persisted with the chain, so
+    re-deriving from the same directory can never produce a different label.
+    """
+    events = _jsonl_rows(store, "events.jsonl")
+    # Any persisted chain-layer row counts as a claim, even when every row later
+    # turns out to be unidentifiable. Dropping such rows and returning "no chain"
+    # would silently convert a broken ledger into "nothing was claimed" — and the
+    # report could then render COMPLETE for a run whose fills cannot be joined.
+    chain_row_persisted = any(_is_fill_row(fill) for fill in fills) or any(
+        str(event.get("event_type") or "") in _DECISION_EVENT_TYPES
+        or str(event.get("event_type") or "") in _ORDER_EVENT_TYPES
+        or str(event.get("event_type") or "") == "CASHFLOW_RECORDED"
+        for event in events
+    )
+    decisions = [
+        event
+        for event in events
+        if event.get("event_type") in _DECISION_EVENT_TYPES
+        and _text(event.get("decision_id")) is not None
+    ]
+    orders = _order_records(events)
+    fill_records = _fill_records(fills, orders, _venue_client_map(events))
+    cashflows = _cashflow_records(events, fill_records)
+    if not (decisions or orders or fill_records or cashflows):
+        if chain_row_persisted:
+            # The run persisted fills/orders/decisions/cashflows but none of them
+            # carried enough identity to join. Return an empty *declared* chain so
+            # ``certify`` reports the structural gap and the report is BLOCKED;
+            # returning no chain would treat the claim as absent and let the
+            # label reach COMPLETE.
+            return LineageChain(), 0
+        return None, None
+
+    decision_rows: list[LineageDecision] = []
+    admitted: dict[str, str] = {}
+    for event in decisions:
+        opportunity_id = _text(event.get("opportunity_id")) or ""
+        campaign_id = _text(event.get("campaign_id")) or ""
+        if opportunity_id and campaign_id:
+            admitted.setdefault(opportunity_id, campaign_id)
+        decision_rows.append(
+            LineageDecision(
+                decision_id=_text(event.get("decision_id")) or "",
+                opportunity_id=opportunity_id,
+                campaign_id=campaign_id,
+                instrument_id=_text(event.get("instrument_id")) or "",
+                decision_time_ns=_int_or_none(event.get("event_time_ns")) or 0,
+                available_at_ns=_int_or_none(event.get("recorded_time_ns")) or 0,
+            )
+        )
+
+    opportunity_rows: list[LineageOpportunity] = []
+    for event in events:
+        if event.get("event_type") != "OPPORTUNITY_DETECTED":
+            continue
+        detected_id = _text(event.get("opportunity_id"))
+        detected_campaign = admitted.get(detected_id or "")
+        detected_ns = _int_or_none(event.get("event_time_ns"))
+        if detected_id is None or detected_campaign is None or detected_ns is None:
+            continue
+        opportunity_rows.append(
+            LineageOpportunity(
+                opportunity_id=detected_id,
+                campaign_id=detected_campaign,
+                instrument_id=_text(event.get("instrument_id")) or "",
+                created_ns=detected_ns,
+                available_ns=_int_or_none(event.get("recorded_time_ns")) or detected_ns,
+            )
+        )
+
+    chain = LineageChain(
+        opportunities=tuple(opportunity_rows),
+        decisions=tuple(decision_rows),
+        orders=tuple(orders[key] for key in sorted(orders)),
+        fills=tuple(fill_records),
+        cashflows=tuple(cashflows),
+    )
+    cuts: list[int] = []
+    for row in opportunity_rows:
+        cuts.extend((row.created_ns, row.available_ns))
+    for decision_row in decision_rows:
+        cuts.extend((decision_row.decision_time_ns, decision_row.available_at_ns))
+    for order_row in chain.orders:
+        cuts.extend((order_row.event_time_ns, order_row.available_at_ns))
+    for fill_row in chain.fills:
+        cuts.extend((fill_row.event_time_ns, fill_row.available_at_ns))
+    for cashflow_row in cashflows:
+        cuts.extend((cashflow_row.event_time_ns, cashflow_row.available_at_ns))
+    return chain, (max(cuts) if cuts else None)
+
+
+def derive_audit_inputs(run_dir: Path) -> AuditInputs:
+    """Derive the audit verdict (and lineage witness) from a persisted run dir.
+
+    The derivation reads ``trade_lifecycles.jsonl``, ``fills.jsonl``,
+    ``reconciliation.json``, ``economic_metrics.json``, ``data_quality.json`` and
+    ``events.jsonl``; it never consults the in-memory replay. Completeness is
+    delegated to :func:`~v8_next.audit.verdicts.derive_verdict`, so a missing
+    source identity can never read as ``AUDIT_COMPLETE``.
+    """
+    store = AuditStore(Path(run_dir))
+    lifecycles = _jsonl_rows(store, "trade_lifecycles.jsonl")
+    fills = _jsonl_rows(store, "fills.jsonl")
+
+    mechanical, mech_reasons, mech_labels = _mechanical_section(lifecycles)
+    economic, econ_reasons, econ_labels = _economic_section(store, lifecycles)
+    pit, pit_reasons, pit_labels = _pit_section(store)
+    source_ids, id_reasons, id_labels = _source_id_section(lifecycles or fills)
+
+    verdict = derive_verdict(
+        mechanical=mechanical,
+        economic=economic,
+        pit=pit,
+        source_ids=source_ids,
+        labels=tuple(dict.fromkeys((*mech_labels, *econ_labels, *pit_labels, *id_labels))),
+        reasons=tuple(dict.fromkeys((*mech_reasons, *econ_reasons, *pit_reasons, *id_reasons))),
+    )
+    lineage, as_of_ns = _lineage_from_disk(store, fills)
+    return AuditInputs(verdict=verdict, lineage=lineage, as_of_ns=as_of_ns)

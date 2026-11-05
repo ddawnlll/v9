@@ -1,0 +1,44 @@
+{
+  "updated": "2026-11-05T02:20Z",
+  "director": "omp",
+  "wave3_claims": {
+    "M1-05": "w3a",
+    "M2-06": "w3b",
+    "M3-03": "w3c",
+    "M3-05": "w3d",
+    "M3-06": "w3e",
+    "M4-01": "w3f",
+    "M4-03": "w3f",
+    "M0-04": "w3g",
+    "M0-05": "w3h"
+  },
+  "already_merged_from_other_process": {
+    "M0-01": "audit-repaired",
+    "M0-02": "audited",
+    "M0-03": "audited+repaired",
+    "M0-06": "delivered-by-peer-not-yet-audited",
+    "M0-07": "audited+repaired",
+    "M1-01": "audited",
+    "M1-02": "audited",
+    "M1-03": "merged",
+    "M1-04": "merged",
+    "M1-06": "merged",
+    "M2-01": "merged",
+    "M2-02": "audited",
+    "M2-03": "audited",
+    "M2-04": "merged",
+    "M2-05": "merged",
+    "M3-01": "audited+repaired",
+    "M3-02": "delivered-by-peer-not-yet-audited",
+    "M3-04": "merged",
+    "F-01": "audited",
+    "F-02": "merged",
+    "F-03": "merged"
+  },
+  "wave4_candidates": [
+    "M3-07",
+    "M4-02",
+    "M4-06",
+    "DEBT-AUDIT-WIRING"
+  ]
+}

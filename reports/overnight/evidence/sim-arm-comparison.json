@@ -1,0 +1,71 @@
+{
+  "schema": "v9.sim-arm-comparison.v1",
+  "status": "MEASURED_INCONCLUSIVE_SAMPLE",
+  "claim": "NONE",
+  "qualification": {
+    "protection": "PASS: state PROTECTED at cutoff with an open position; 0 violations",
+    "sample": "INCONCLUSIVE: 24 closed < minimum_trades 30"
+  },
+  "baseline_parity": {
+    "sim_v8_net_pnl": -21.23495118,
+    "m402_portfolio_net_pnl": -21.23495118,
+    "parity": "EXACT",
+    "trades": 44,
+    "net_r": -0.021638104017588564,
+    "fee_total": 37.91535683,
+    "funding_attribution": "DIFFERENT: sim sums position adjustments (0.36718638); m402 uses funded-vs-unfunded balance difference (0.70494565); total net PnL parity is exact",
+    "cause_of_prior_gap": "position sizing: fixed 0.01 BTC vs per_leg_notional=1000; fixed by target_notional=1000"
+  },
+  "performance": {
+    "v9_seconds": 13.036,
+    "v8_seconds": 0.746,
+    "ratio": 17.48,
+    "optimization": "observation_id/candle caches + copy_inputs/assume_ordered build_view fast path",
+    "before_seconds": 95.827,
+    "profile_top": "build_view deepcopy/observation_id re-derivation; then expert evidence"
+  },
+  "v9": {
+    "arm_id": "v9_adaptive_sim_arm",
+    "costed": true,
+    "bars": 2160,
+    "trades": 24,
+    "open": 1,
+    "net_pnl": -23.10228485,
+    "net_r": -0.04925155935670389,
+    "max_drawdown": 0.017983725109556294,
+    "hit_rate": 0.3333333333333333,
+    "fees": 20.91868621,
+    "funding": 0.36718638,
+    "seconds": 13.036,
+    "protection_state": "PROTECTED",
+    "protection_violations": {},
+    "unsupported": [],
+    "tape_sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7"
+  },
+  "v8": {
+    "arm_id": "baseline_v8_no_intervention",
+    "costed": true,
+    "bars": 2160,
+    "trades": 44,
+    "open": 1,
+    "net_pnl": -21.23495118,
+    "net_r": -0.021638104017588564,
+    "max_drawdown": 0.01997754482695,
+    "hit_rate": 0.3409090909090909,
+    "fees": 37.91535683,
+    "funding": 0.36718638,
+    "seconds": 0.746,
+    "protection_state": "NOT_APPLICABLE",
+    "protection_violations": {},
+    "unsupported": [],
+    "tape_sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7"
+  },
+  "delta_v9_minus_v8": {
+    "net_pnl": -1.8673336700000007,
+    "net_r": -0.027613455339115325,
+    "max_drawdown": -0.0019938197173937078,
+    "fees": -16.99667062
+  },
+  "economic_claim": "NONE",
+  "control_arms": "NOT_RUN (matched random-entry pool not yet costed)"
+}

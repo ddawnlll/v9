@@ -1,0 +1,65 @@
+{
+  "baseline_tests": {
+    "deselected": 506,
+    "passed": 1089,
+    "skipped": 71
+  },
+  "code_sha": "0b69fc45c197354600256963249ca7b1f19b6bbd",
+  "config_files": [
+    {
+      "path": "pyproject.toml",
+      "sha256": "58e1582344a0e9ebc71efec3ae1d579b4c72b2dbed9aa53e32db8ea0cbd18530",
+      "size_bytes": 1618
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "2be9d91c78d495164400d4624d72e44563573c9fb74055cfa549af355952dc24",
+      "size_bytes": 2457
+    },
+    {
+      "path": "docs/V9_ARCHITECTURE_MONOGRAPH.md",
+      "sha256": "76332ba50caec98034ba31aceed3cc7283da38cc7031967f1bb5d69bfb771037",
+      "size_bytes": 120483
+    }
+  ],
+  "datasets": [
+    {
+      "path": "research/tape/btcusdt-1h-2025Q1/tape.jsonl",
+      "reason": null,
+      "sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7",
+      "size_bytes": 1340416,
+      "status": "AVAILABLE"
+    },
+    {
+      "path": "research/tape/canonical-10-symbol-3m/tape.jsonl",
+      "reason": "NOT_PROVISIONED_OFFLINE",
+      "sha256": null,
+      "size_bytes": null,
+      "status": "BLOCKED"
+    }
+  ],
+  "flags": {
+    "adaptive_orders": false,
+    "decision_policy": false,
+    "market_belief": false,
+    "portfolio_allocator": false,
+    "position_thesis": false
+  },
+  "generated_ns": 1762291200000000000,
+  "lockfile": {
+    "path": "uv.lock",
+    "sha256": "b3ee5c3836d26b8e6a598f6a9ffe1b50213939bd00efaceb0397d19b9f2b698b",
+    "size_bytes": 92293
+  },
+  "manifest_digest": "d47d8e2e89964afd6cc95e20f81265648e652df6289cd94f5567eb2cbd5999c3",
+  "package_versions": {
+    "nautilus-trader": "2.0.0rc4",
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "polars": "1.44.1",
+    "pydantic": "2.13.5"
+  },
+  "platform": "darwin-arm64",
+  "python_version": "3.12.12",
+  "schema_version": "v9-baseline-manifest-v1"
+}

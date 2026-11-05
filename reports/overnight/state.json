@@ -1,0 +1,328 @@
+{
+  "phase": "p0_p1_verified",
+  "head": "HEAD",
+  "baseline": {
+    "fast_suite": {
+      "passed": 1094,
+      "skipped": 66,
+      "deselected": 506,
+      "wall_s": 12.7,
+      "sha": "0b69fc4"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1,
+      "status": "integrated_audited",
+      "issues": [
+        "M0-01",
+        "M0-02",
+        "M0-03",
+        "M0-07",
+        "M1-01",
+        "M1-02",
+        "M2-02",
+        "M2-03",
+        "M3-01",
+        "F-01"
+      ],
+      "branches": [
+        "wave1/w1-pit-horizons",
+        "wave1/w2",
+        "wave1/w3",
+        "wave1/w4",
+        "wave1/w5",
+        "wave1/m0-01",
+        "wave2/m3-01"
+      ],
+      "integration_branch": "integration/wave1",
+      "integration_head": "7b288cc",
+      "t2": {
+        "passed": 1897,
+        "skipped": 66,
+        "deselected": 506,
+        "wall_s": 10.82
+      },
+      "t0": {
+        "ruff": "clean",
+        "mypy": "clean (219 modules)"
+      },
+      "audit": {
+        "agent": "WaveOneAudit",
+        "accepted": [
+          "M0-01",
+          "M0-02",
+          "M0-03",
+          "M0-07",
+          "M1-01",
+          "M1-02",
+          "M2-02",
+          "M2-03",
+          "F-01"
+        ],
+        "rejected": [
+          "M3-01"
+        ],
+        "defects_p2": 4,
+        "defects_p3": 3,
+        "blocked_at_report_level": [
+          "M0-01 baseline-off behaviour",
+          "M0-02 engine-aggregate reconcile",
+          "M0-03/M0-07 report-level closure",
+          "M1-01 receipt serialisation"
+        ]
+      },
+      "wall_minutes": 24,
+      "cost_usd": 0.34
+    },
+    {
+      "wave": 2,
+      "status": "verified_published",
+      "issues": [
+        "M0-06",
+        "M0-08",
+        "M1-03",
+        "M1-04",
+        "M1-06",
+        "M2-01",
+        "M2-04",
+        "M2-05",
+        "M3-02",
+        "M3-04",
+        "F-02",
+        "F-03"
+      ],
+      "integration_head": "d497540",
+      "prs": [
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52
+      ],
+      "t2_passed": 2151
+    },
+    {
+      "wave": 3,
+      "status": "integrated_pending_audit",
+      "issues": [
+        "M0-04",
+        "M0-05",
+        "M1-05",
+        "M2-06",
+        "M3-03",
+        "M3-05",
+        "M3-06",
+        "M4-01",
+        "M4-03"
+      ],
+      "branches": [
+        "wave3/w3a",
+        "wave3/w3b",
+        "wave3/w3c",
+        "wave3/w3d",
+        "wave3/w3e",
+        "wave3/w3f",
+        "wave3/w3g",
+        "wave3/w3h"
+      ],
+      "t2": {
+        "passed": 2485,
+        "skipped": 67,
+        "deselected": 513,
+        "wall_s": 12.26
+      },
+      "t0": {
+        "ruff": "clean",
+        "mypy": "clean (243 modules)"
+      },
+      "new_tests": 297,
+      "wall_minutes": 26
+    },
+    {
+      "wave": 4,
+      "status": "integrated_audited_repaired",
+      "issues": [
+        "M3-07",
+        "M4-04",
+        "M4-05",
+        "M4-06",
+        "DEBT-AUDIT-WIRING"
+      ],
+      "t2": {
+        "passed": 2624,
+        "skipped": 67,
+        "deselected": 513,
+        "wall_s": 13.98
+      },
+      "audit": {
+        "verdicts": {
+          "M3-07": "REJECT->repaired",
+          "M4-04": "ACCEPT",
+          "M4-05": "REJECT->repaired",
+          "M4-06": "REJECT->repaired",
+          "DEBT-AUDIT-WIRING": "REJECT->repaired"
+        },
+        "defects_found": 10,
+        "defects_repaired": 7
+      },
+      "wall_minutes": 30
+    },
+    {
+      "wave": 5,
+      "status": "integrated_validated",
+      "issues": [
+        "M4-02"
+      ],
+      "t2": {
+        "passed": 2728,
+        "skipped": 67,
+        "deselected": 512,
+        "wall_s": 16.3
+      },
+      "t0": {
+        "ruff": "clean",
+        "mypy": "clean (250 modules)"
+      },
+      "measured": {
+        "baseline_trades": 44,
+        "net_pnl_usdt": -21.23495118,
+        "net_r": -0.021638104,
+        "fee_total_usdt": 37.91535683,
+        "funding_total_usdt": 0.70494565,
+        "ci95": [
+          -0.4335917241,
+          0.3905151906
+        ],
+        "max_dd": 0.0199775448
+      },
+      "wall_minutes": 12
+    },
+    {
+      "wave": "final",
+      "status": "verified_published_no_main_merge",
+      "head": "7f1bcfe",
+      "prs": 28,
+      "t2_passed": 2676
+    }
+  ],
+  "resources": {
+    "host_ram_gib": 18,
+    "cpus": 11,
+    "product_target_gib": 4
+  },
+  "prs": {
+    "39": "M0-01",
+    "40": "M1-01/M1-02",
+    "41": "M2-02/M2-03",
+    "42": "M0-02/M0-03",
+    "43": "F-01",
+    "44": "M0-07",
+    "45": "M3-01 (stacked)",
+    "46": "M0-06",
+    "47": "M2-04/M2-05",
+    "48": "M1-03/M1-04",
+    "49": "M2-01/M3-04",
+    "50": "F-02/F-03",
+    "51": "M3-02",
+    "52": "M0-08/M1-06",
+    "53": "M2-06",
+    "54": "M3-03",
+    "55": "M3-05",
+    "56": "M3-06",
+    "57": "M4-01/M4-03",
+    "58": "M1-05",
+    "59": "M0-04",
+    "60": "M0-05"
+  },
+  "not_published": [
+    "wave2/m0-02 (superseded by integrated M0-02)",
+    "wave2/m0-03 (superseded by integrated M0-03)",
+    "wave1/w4 @ c18c6bc (unverified rewrite; integration pins 0a97167)"
+  ],
+  "repairs": [
+    {
+      "branch": "fix/audit-closure",
+      "issue": "M0-02/M0-03/M0-07",
+      "defects": [
+        "report did not consume audit verdict",
+        "oracle arithmetic closure",
+        "opportunity layer in lineage"
+      ]
+    },
+    {
+      "branch": "fix/entry-intent",
+      "issue": "M3-01",
+      "defects": [
+        "intent_id subset collision",
+        "fail-open evaluation defaults",
+        "post-only priced as taker"
+      ]
+    }
+  ],
+  "wave2_reverified": {
+    "head": "a6b5697",
+    "t0": "ruff clean; mypy clean (234 files)",
+    "t2": {
+      "passed": 2188,
+      "skipped": 66,
+      "deselected": 512,
+      "wall_s": 11.63
+    }
+  },
+  "final": {
+    "fast_suite": {
+      "passed": 2728,
+      "skipped": 67,
+      "deselected": 512
+    },
+    "ruff": "clean",
+    "mypy": "clean (250 modules)",
+    "issues_verified": 32,
+    "issues_partial": 4,
+    "issues_open": 0,
+    "files_changed": 152,
+    "insertions": 61003,
+    "new_src_modules": 41,
+    "new_test_files": 39
+  },
+  "not_run": {
+    "M0-04": "native OMS wiring",
+    "M0-05": "native callback trace",
+    "M0-06": "native replay",
+    "M0-08": "40-leg/12m and 4GiB cgroup",
+    "M3-06": "altcoin tape",
+    "M3-07": "real-tape replay",
+    "M4-02": "economic finalist + costed replay",
+    "M4-04": "altcoin tape + delisting history",
+    "M4-05": "24-48h soak + Linux 4GiB cgroup",
+    "M4-06": "economic evidence + owner approval",
+    "F-01/F-02": "production authority (forbidden by design)"
+  },
+  "p0": {
+    "native_audit": "AUDIT_COMPLETE",
+    "lineage_joins": 358,
+    "campaigns": 44,
+    "gates": "G1-G12 PASS",
+    "validation": "PASS 0 violations"
+  },
+  "p1": {
+    "sim_only": true,
+    "v9_net_pnl": -33.92107028,
+    "v8_net_pnl": -8.57430674,
+    "delta": -25.34676354,
+    "v9_trades": 24,
+    "v8_trades": 44,
+    "claim": "NONE",
+    "protection_caveat": "MISSING_ACK and netting-position conflicts reported"
+  },
+  "final_gate": {
+    "ruff": "clean",
+    "mypy": "clean 253 files",
+    "pytest_passed": 2796,
+    "skipped": 67,
+    "deselected": 512
+  }
+}

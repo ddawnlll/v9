@@ -1,0 +1,963 @@
+====================================================================================================
+# 2 [M0-01] Freeze migrated baseline and establish V9 provenance
+> **V9 RFC 1.4.1 · planned milestone:** M0 — Foundation & Safety
+> **Planning ID:** M0-01 · **Track:** core/safety · **Pinned review SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Pin the migrated V8 baseline and specify a reproducible, immutable reference for V9 changes.
+
+## Existing code / references
+README.md; MIGRATION_REPORT.md; pyproject.toml; docs/V9_ARCHITECTURE_MONOGRAPH.md; tests/
+
+## Scope / implementation constraints
+Capture code SHA, uv.lock hash, Python/Nautilus versions and baseline config. Record baseline trade/fill/decision identities for authorized fixtures; do not claim missing external tapes are available.
+
+## Acceptance criteria
+- [ ] Pinned reproducibility manifest exists; baseline-off behavior is regression-tested; missing tapes/evidence are explicit BLOCKED rather than PASS.
+- [ ] Add a failing negative/fail-closed regression case where meaningful.
+- [ ] Document commands, passed/failed/skipped tests, source SHA and evidence artifact location.
+- [ ] Preserve existing V8 behavior with new policy disabled; no economic or live-trading claim.
+
+## Dependencies
+none
+
+## Non-goals
+No second OMS, no unbenchmarked engine rewrite, no live order side effects; use existing V8/Nautilus facilities when sufficient.
+
+**Definition of done:** code + tests + verifiable receipt; absence of data is BLOCKED, not a fabricated PASS.
+====================================================================================================
+# 3 [M0-02] Build independent two-campaign accounting oracle
+> **V9 RFC 1.4.1 · planned milestone:** M0 — Foundation & Safety
+> **Planning ID:** M0-02 · **Track:** core/safety · **Pinned review SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Add an independent accounting oracle for two concurrent or sequential campaigns to challenge the engine's cashflow attribution.
+
+## Existing code / references
+src/v8_next/audit/{cashflow,lineage,reconciliation}.py; tests/test_audit_native.py
+
+## Scope / implementation constraints
+Oracle must independently recompute per-order fills, fee, funding, realized PnL, mark and final equity; source records and expected results are hand-constructed, not copied from the engine's own aggregate report.
+
+## Acceptance criteria
+- [ ] Fixture with two campaigns passes independently; deliberately swapped campaign IDs, duplicated fills or fees produce hard failures; provenance and arithmetic reconcile.
+- [ ] Add a failing negative/fail-closed regression case where meaningful.
+- [ ] Document commands, passed/failed/skipped tests, source SHA and evidence artifact location.
+- [ ] Preserve existing V8 behavior with new policy disabled; no economic or live-trading claim.
+
+## Dependencies
+M0-01
+
+## Non-goals
+No second OMS, no unbenchmarked engine rewrite, no live order side effects; use existing V8/Nautilus facilities when sufficient.
+
+**Definition of done:** code + tests + verifiable receipt; absence of data is BLOCKED, not a fabricated PASS.
+====================================================================================================
+# 4 [M0-03] Enforce opportunity-to-cashflow lineage with fail-closed joins
+> **V9 RFC 1.4.1 · planned milestone:** M0 — Foundation & Safety
+> **Planning ID:** M0-03 · **Track:** core/safety · **Pinned review SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Prove the complete opportunity → decision → order → fill → campaign → cashflow lineage and reject silent misattribution.
+
+## Existing code / references
+src/v8_next/audit/{lineage,reconciliation,cashflow}.py; src/v8_next/adapters/execution_telemetry.py
+
+## Scope / implementation constraints
+Carry stable event-time and native IDs across recorded decisions, orders, fills and cashflows; validate uniqueness and campaign membership; never substitute a last-seen campaign.
+
+## Acceptance criteria
+- [ ] Mislinked, orphaned, duplicate and late records are identified with typed failures; independent report cannot certify complete with missing joins; baseline replay parity retained.
+- [ ] Add a failing negative/fail-closed regression case where meaningful.
+- [ ] Document commands, passed/failed/skipped tests, source SHA and evidence artifact location.
+- [ ] Preserve existing V8 behavior with new policy disabled; no economic or live-trading claim.
+
+## Dependencies
+M0-01, M0-02
+
+## Non-goals
+No second OMS, no unbenchmarked engine rewrite, no live order side effects; use existing V8/Nautilus facilities when sufficient.
+
+**Definition of done:** code + tests + verifiable receipt; absence of data is BLOCKED, not a fabricated PASS.
+====================================================================================================
+# 5 [M0-04] Implement restart-safe DurableIntent and Outbox without duplicate risk
+> **V9 RFC 1.4.1 · planned milestone:** M0 — Foundation & Safety
+> **Planning ID:** M0-04 · **Track:** core/safety · **Pinned review SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Add durable, idempotent intent submission and reconciliation across crashes and native callback races.
+
+## Existing code / references
+src/v8_next/adapters/{expert_strategy,campaign}.py; src/v8_next/app/; RFC §8.8–8.10
+
+## Scope / implementation constraints
+Model intent identity, persisted outbox state, native client order IDs, reconciliation after restart and uncertainty; reuse native Nautilus OMS rather than creating another execution authority.
+
+## Acceptance criteria
+- [ ] Crash-before-submit, crash-after-submit, duplicate delivery, cancel/fill race and unknown venue status fixtures cannot create duplicate exposure; unknown stays fail-closed.
+- [ ] Add a failing negative/fail-closed regression case where meaningful.
+- [ ] Document commands, passed/failed/skipped tests, source SHA and evidence artifact location.
+- [ ] Preserve existing V8 behavior with new policy disabled; no economic or live-trading claim.
+
+## Dependencies
+M0-01, M0-05
+
+## Non-goals
+No second OMS, no unbenchmarked engine rewrite, no live order side effects; use existing V8/Nautilus facilities when sufficient.
+
+**Definition of done:** code + tests + verifiable receipt; absence of data is BLOCKED, not a fabricated PASS.
+====================================================================================================
+# 6 [M0-05] Qualify native bracket, reduce-only, partial-fill and protection invariants
+> **V9 RFC 1.4.1 · planned milestone:** M0 — Foundation & Safety
+> **Planning ID:** M0-05 · **Track:** core/safety · **Pinned review SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Close remaining native execution-safety gaps using real position/order identities; keep the single Nautilus execution authority.
+
+## Existing code / references
+src/v8_next/adapters/{expert_strategy,swing_engine}.py; tests/test_execution_safety_20261103.py
+
+## Scope / implementation constraints
+Audit inherited tests first; add missing restart, target/stop race, position ID, partial-fill quantity, cancel reject and protection-gap scenarios; no secondary OMS.
+
+## Acceptance criteria
+- [ ] All risky state transitions are replayed deterministically; protective order quantity tracks actual fill; reduce-only prevents reversal; reject/unknown cannot report PROTECTED.
+- [ ] Add a failing negative/fail-closed regression case where meaningful.
+- [ ] Document commands, passed/failed/skipped tests, source SHA and evidence artifact location.
+- [ ] Preserve existing V8 behavior with new policy disabled; no economic or live-trading claim.
+
+## Dependencies
+M0-01
+
+## Non-goals
+No second OMS, no unbenchmarked engine rewrite, no live order side effects; use existing V8/Nautilus facilities when sufficient.
+
+**Definition of done:** code + tests + verifiable receipt; absence of data is BLOCKED, not a fabricated PASS.
+====================================================================================================
+# 7 [M0-06] Reconcile funding boundary-time exposure, causal marks and account equity
+> **V9 RFC 1.4.1 · planned milestone:** M0 — Foundation & Safety
+> **Planning ID:** M0-06 · **Track:** core/safety · **Pinned review SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Validate final-funding attribution to boundary-time exposure and strictly causal mark/equity accounting.
+
+## Existing code / references
+src/v8_next/adapters/{settlements,portfolio_backtest}.py; tests/test_funding_boundary_attribution_20261104.py
+
+## Scope / implementation constraints
+Extend existing 2026-11-04 regression tests instead of reproducing them. Distinguish funding boundary vs receipt vs accounting finality; unknown mark and missed coverage must not become zero funding.
+
+## Acceptance criteria
+- [ ] Delayed funding, no future-bar mark, off-grid bar, netting position reuse and duplicate settlement fixtures pass an independent ledger reconciliation; unknowns are typed BLOCKED.
+- [ ] Add a failing negative/fail-closed regression case where meaningful.
+- [ ] Document commands, passed/failed/skipped tests, source SHA and evidence artifact location.
+- [ ] Preserve existing V8 behavior with new policy disabled; no economic or live-trading claim.
+
+## Dependencies
+M0-02, M0-03
+
+## Non-goals
+No second OMS, no unbenchmarked engine rewrite, no live order side effects; use existing V8/Nautilus facilities when sufficient.
+
+**Definition of done:** code + tests + verifiable receipt; absence of data is BLOCKED, not a fabricated PASS.
+====================================================================================================
+# 8 [M0-07] Repair same-bar trade metrics and independent audit verdicts
+> **V9 RFC 1.4.1 · planned milestone:** M0 — Foundation & Safety
+> **Planning ID:** M0-07 · **Track:** core/safety · **Pinned review SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Prevent future intrabar data and incomplete protective evidence from being presented as realized proof.
+
+## Existing code / references
+src/v8_next/audit/{trade_metrics,reporting,forensic}.py; RFC §12
+
+## Scope / implementation constraints
+Lock MFE/MAE to post-entry eligibility; enforce STOP-FIRST for unresolved OHLC ties or label not identifiable; separate mechanical, economic, PIT and audit completeness verdicts.
+
+## Acceptance criteria
+- [ ] Entry-bar future high/low mutation tests cannot change pre-entry information; missing source IDs stop AUDIT_COMPLETE; negative cases yield INVALID/NOT_IDENTIFIABLE.
+- [ ] Add a failing negative/fail-closed regression case where meaningful.
+- [ ] Document commands, passed/failed/skipped tests, source SHA and evidence artifact location.
+- [ ] Preserve existing V8 behavior with new policy disabled; no economic or live-trading claim.
+
+## Dependencies
+M0-02, M0-03
+
+## Non-goals
+No second OMS, no unbenchmarked engine rewrite, no live order side effects; use existing V8/Nautilus facilities when sufficient.
+
+**Definition of done:** code + tests + verifiable receipt; absence of data is BLOCKED, not a fabricated PASS.
+====================================================================================================
+# 9 [M0-08] Establish 4 GiB performance baseline, parity gate and incremental optimization
+> **V9 RFC 1.4.1 · planned milestone:** M0 — Foundation & Safety
+> **Planning ID:** M0-08 · **Track:** core/safety · **Pinned review SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Accept or amend existing performance PR evidence, then eliminate measured full-prefix and 28× indicator recomputation costs without changing trading outcomes.
+
+## Existing code / references
+PR #1 https://github.com/ddawnlll/v9/pull/1; src/v8_next/domain/market.py; src/v8_next/experts/features.py
+
+## Scope / implementation constraints
+Do not repeat PR #1 benchmark; use its 2-vCPU/4-GiB metrics as a proposed baseline subject to review. Phase optimizations: incremental CausalFrame, shared indicator cache, bounded stance telemetry; language rewrite deferred.
+
+## Acceptance criteria
+- [ ] Baseline vs optimized decision/order/fill/funding/report parity on real allowed tape; record median wall, peak RSS, cold run, OOM and hashes; label missing 40-leg/12-month measurements NOT_RUN.
+- [ ] Add a failing negative/fail-closed regression case where meaningful.
+- [ ] Document commands, passed/failed/skipped tests, source SHA and evidence artifact location.
+- [ ] Preserve existing V8 behavior with new policy disabled; no economic or live-trading claim.
+
+## Dependencies
+M0-01
+
+## Non-goals
+No second OMS, no unbenchmarked engine rewrite, no live order side effects; use existing V8/Nautilus facilities when sufficient.
+
+**Definition of done:** code + tests + verifiable receipt; absence of data is BLOCKED, not a fabricated PASS.
+====================================================================================================
+# 10 [M1-01] Implement PIT market observation and availability contract
+> **Planned GitHub milestone:** M1 — Market & Expert Intelligence
+> **Planning ID:** M1-01 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Introduce a versioned observation view that distinguishes event/exchange publication/local receipt/available_at/decision cut timestamps.
+
+## Existing implementation / reading
+src/v8_next/domain/market.py; src/v8_next/adapters/captured_market.py
+
+## Scope and design constraints
+Construct observations only from data known by decision cut; preserve input provenance and typed data-quality states; reject amended future values from historical decisions.
+
+## Acceptance tests
+- [ ] A mutation of future records, late funding/OI publication or unfinished candles cannot affect any prior decision; replay receipts include max input available_at.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M0-01 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 11 [M1-02] Build causal 15m/1h/4h multi-horizon context
+> **Planned GitHub milestone:** M1 — Market & Expert Intelligence
+> **Planning ID:** M1-02 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Implement PIT aggregation/joins for signal, context and regime horizons; avoid look-ahead when the higher timeframe is unfinished.
+
+## Existing implementation / reading
+src/v8_next/domain/market.py; src/v8_next/economics/regime.py
+
+## Scope and design constraints
+Keep horizon schema independent from strategy; report missing/late horizons explicitly; preserve existing 1H baseline semantics when V9 disabled.
+
+## Acceptance tests
+- [ ] No partial 1h/4h bar can appear in earlier 15m decisions; aligned/gapped/off-grid fixtures give deterministic context.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M1-01 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 12 [M1-03] Implement MarketBeliefV1 as a versioned market-state view
+> **Planned GitHub milestone:** M1 — Market & Expert Intelligence
+> **Planning ID:** M1-03 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Build the RFC 1.4.1 MarketBelief schema: regime, market structure, volatility, liquidity evidence, horizon alignment, uncertainty and provenance.
+
+## Existing implementation / reading
+RFC §4.3–4.7; src/v8_next/economics/regime.py; src/v8_next/domain/market.py
+
+## Scope and design constraints
+Distinguish score from calibrated probability; UNKNOWN and data-quality states are first-class; no new order authority.
+
+## Acceptance tests
+- [ ] Structured schema roundtrips and replay is deterministic; missing liquidity/mark is not fabricated; each belief binds to available PIT inputs and version hash.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M1-01, M1-02 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 13 [M1-04] Implement incremental belief updates, transitions and abstention
+> **Planned GitHub milestone:** M1 — Market & Expert Intelligence
+> **Planning ID:** M1-04 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Update MarketBelief on dependency invalidation and relevant observations; add transition hysteresis, stale-data handling and uncertainty.
+
+## Existing implementation / reading
+src/v8_next/telemetry/belief.py; RFC §4.4–4.7
+
+## Scope and design constraints
+Avoid computing all experts each tick; reuse existing telemetry and causal state helpers; any transition threshold has explicit version and test.
+
+## Acceptance tests
+- [ ] No stale belief treated as fresh; update replays are idempotent; UNKNOWN/ABSTAIN is observable; false transition fixture documents behavior.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M1-03 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 14 [M1-05] Integrate all 28 expert witnesses as context-aware evidence producers
+> **Planned GitHub milestone:** M1 — Market & Expert Intelligence
+> **Planning ID:** M1-05 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Reuse canonical 28 expert functions and expose versioned context-dependent support/contradict/abstain evidence without giving them opportunity or execution authority.
+
+## Existing implementation / reading
+src/v8_next/experts/{registry,features}.py; src/v8_next/economics/decisions.py
+
+## Scope and design constraints
+28/28 candidate coverage, explicit warmup/missing inputs, dedup dependency groups and provenance; contexts are inputs, not 28 separate opportunity creators.
+
+## Acceptance tests
+- [ ] 28 unique IDs exercised; duplicate observer cannot inflate opportunity count or capital; missing data produces abstention; baseline-off parity validated.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M1-03, M1-04 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 15 [M1-06] Share incremental indicators and feature cache across all experts
+> **Planned GitHub milestone:** M1 — Market & Expert Intelligence
+> **Planning ID:** M1-06 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Eliminate repeated full-history indicator computation and full-prefix revalidation using bounded, shared PIT feature state.
+
+## Existing implementation / reading
+src/v8_next/domain/market.py (frame_at_incremental); src/v8_next/experts/{features,registry}.py; PR #1
+
+## Scope and design constraints
+Optimize only benchmark-proven hot paths; track cache version and invalidation; test equality against baseline on real authorized tape.
+
+## Acceptance tests
+- [ ] 28 expert decisions and reason codes match old engine in policy-off mode; record end-to-end runtime, RSS and cache invalidation parity; no Goose rewrite assumed.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M0-08, M1-05 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 16 [M2-01] Extend canonical OpportunityBook for recurrent evaluations
+> **Planned GitHub milestone:** M2 — Continuous Trader Brain
+> **Planning ID:** M2-01 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Carry sovereign opportunity identity across time while separating watching/armed/admitted/invalidated/expired from orders and strategy callbacks.
+
+## Existing implementation / reading
+src/v8_next/opportunities/{book,models}.py; RFC §6
+
+## Scope and design constraints
+Preserve existing market-created episode IDs and opportunity status history; support recurrent snapshots with versioned event references; avoid imposing D4-specific waiting rules.
+
+## Acceptance tests
+- [ ] Duplicate witnesses cannot create duplicate opportunities; invalidation/expiry is deterministic and PIT; archived episodes trace to decision receipts.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M1-01, M1-05 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 17 [M2-02] Define typed TraderDecision, IntentKind and ReasonCode contracts
+> **Planned GitHub milestone:** M2 — Continuous Trader Brain
+> **Planning ID:** M2-02 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Define independent typed actions WAIT/ENTER/HOLD/REDUCE/EXIT/ABSTAIN, intent kinds, opportunity status, native venue status and decision reasons.
+
+## Existing implementation / reading
+RFC §7.2, §7.8–7.11; src/v8_next/economics/decisions.py
+
+## Scope and design constraints
+Schema-only initial integration; explicitly separate advisory decisions from risk permission and native order side effects; preserve policy/config version.
+
+## Acceptance tests
+- [ ] Distinct action/intent/venue states cannot be mixed; schema roundtrip, backward compatibility and invalid-state tests pass; no live order path.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M0-01, M1-03 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 18 [M2-03] Implement legal action priority and conflict-resolution policy
+> **Planned GitHub milestone:** M2 — Continuous Trader Brain
+> **Planning ID:** M2-03 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Formalize which actions are legal for no position, open position, pending intent and uncertain venue state.
+
+## Existing implementation / reading
+RFC §7.6–7.11; src/v8_next/economics/controller.py
+
+## Scope and design constraints
+Risk/venue uncertainty cannot be overridden by consensus; competing entries and position exits have documented deterministic precedence.
+
+## Acceptance tests
+- [ ] Table-driven legal-action fixtures include unknown venue state, stale inputs, duplicate action, conflicting expert and open-position cases.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M2-02, M0-05 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 19 [M2-04] Implement unified recurrent TraderDecisionPolicy in shadow mode
+> **Planned GitHub milestone:** M2 — Continuous Trader Brain
+> **Planning ID:** M2-04 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Produce one context-aware decision from MarketBelief + 28 expert stances + OpportunityBook + position/portfolio state instead of a single entry-veto gate.
+
+## Existing implementation / reading
+RFC §7; src/v8_next/economics/{controller,decisions}.py
+
+## Scope and design constraints
+Introduce one decision entrypoint with dependency-injected views; default new adaptive side effects OFF; support all six typed actions.
+
+## Acceptance tests
+- [ ] Controlled scenarios produce WAIT, ENTER, HOLD, REDUCE, EXIT, ABSTAIN; explainable decisions are deterministic and pass stale/unknown fail-closed cases.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M2-01, M2-02, M2-03, M1-05 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 20 [M2-05] Add immutable decision receipts and explainable policy provenance
+> **Planned GitHub milestone:** M2 — Continuous Trader Brain
+> **Planning ID:** M2-05 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Persist append-only decision snapshots including input event references, belief/version hashes, opportunity ID, policy hash, constraints and selected action.
+
+## Existing implementation / reading
+src/v8_next/telemetry/{belief,identity}.py; src/v8_next/audit/; RFC §7.5
+
+## Scope and design constraints
+Bind `decision_id` idempotently to the decision cut; do not treat proposed intent as executed trade or economic cashflow.
+
+## Acceptance tests
+- [ ] Same replay yields the same decision digest; no orphan decisions; all decision features PIT; structured reason codes support independent auditing.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M2-02, M2-04, M0-03 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 21 [M2-06] Prove V8 policy-off parity and replay decision consistency
+> **Planned GitHub milestone:** M2 — Continuous Trader Brain
+> **Planning ID:** M2-06 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Introduce an independent differential harness to ensure the V8 baseline stays unchanged with V9 disabled and V9 shadow decisions remain deterministic.
+
+## Existing implementation / reading
+src/v8_next/adapters/expert_strategy.py; tests/test_expert_bundle_parity.py; RFC §7.10
+
+## Scope and design constraints
+Lock fixtures for opportunity selection, native orders, stops, fills, funding and audit lineage; fail on silent numerical drift.
+
+## Acceptance tests
+- [ ] Policy-off baseline replay signatures match pinned reference; policy-on shadow makes zero new native mutations; repeat/reordered event fixtures yield legal outcomes.
+- [ ] Negative/fail-closed fixtures for unavailable, contradictory or future market data where relevant.
+- [ ] Record exact commands, executed/skipped tests, source/config hashes and evidence links.
+- [ ] Keep RFC 1.4.1's full adaptive-trader scope; all new native order side effects disabled by default.
+
+## Dependencies
+M0-01, M0-03, M2-04, M2-05 (planning IDs; resolve to issue links when available).
+
+## Non-goals
+No extra execution engine, second risk/OMS authority, automatic live orders or unproven economic superiority. Reuse existing V8 code before writing duplicates.
+
+**Done:** implemented and mechanically evidenced; economic promotion is a separate M4 decision.
+====================================================================================================
+# 22 [M3-01] Implement price-aware EntryIntent, order TTL and fill-uncertainty policy
+> **Planned milestone:** M3 — Adaptive Position & Portfolio
+> **Planning ID:** M3-01 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Translate advisory ENTER into a price-sensitive entry candidate with explicit market/limit assumptions, validity, cancellation and re-evaluation.
+
+## Existing implementation / references
+RFC §8; src/v8_next/adapters/{execution_models,expert_strategy}.py
+
+## Scope / non-goals
+Cost and liquidity proxies must be observed PIT. OHLC-only limits cannot imply queue-aware fills; every price/TTL revision is a new typed proposal.
+
+## Acceptance criteria
+- [ ] Scenarios cover improved/worsened price, expired entry, no spread data, delayed fill, cancellation and unknown order status; native side effects OFF.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M2-04, M2-05, M0-05 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 23 [M3-02] Implement immutable PositionThesis and recurrent position evaluation
+> **Planned milestone:** M3 — Adaptive Position & Portfolio
+> **Planning ID:** M3-02 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Record the original entry rationale as immutable thesis and evaluate its validity after each relevant market/position event.
+
+## Existing implementation / references
+RFC §9; src/v8_next/adapters/{campaign,swing_engine}.py; src/v8_next/economics/controller.py
+
+## Scope / non-goals
+Separate a position thesis from mutable current position state; include updated belief, expert contradictions, open exposure and data quality; preserve native position ID.
+
+## Acceptance criteria
+- [ ] Holding, weakening, invalidation and missing-input test cases result in explanatory evaluations; same replay identical thesis history; no stop mutation here.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M2-04, M2-05, M0-05 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 24 [M3-03] Implement HOLD, REDUCE, EXIT and protective-intent proposal policies
+> **Planned milestone:** M3 — Adaptive Position & Portfolio
+> **Planning ID:** M3-03 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Translate recurrent position evaluation into typed HOLD/REDUCE/EXIT advisories and separate protective-intent proposals.
+
+## Existing implementation / references
+RFC §9; src/v8_next/adapters/{expert_strategy,swing_engine}.py
+
+## Scope / non-goals
+Proposal and risk permission remain separate; existing native bracket and reduce-only authority is reused; no autonomous stop-widening or unprotected quantity.
+
+## Acceptance criteria
+- [ ] Tests cover thesis invalidation, partial reduction, conflicting EXIT/ENTER, fee-aware BE proposal, stop rejection and fail-closed protection state; no novel live orders.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M3-02, M2-03, M0-04, M0-05 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 25 [M3-04] Attribute factual occupancy and blocked portfolio opportunities
+> **Planned milestone:** M3 — Adaptive Position & Portfolio
+> **Planning ID:** M3-04 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Track opportunity choices denied by actual capacity, open position and risk reservations without mislabeling counterfactuals as realized money.
+
+## Existing implementation / references
+RFC §10; src/v8_next/economics/allocation.py; src/v8_next/opportunities/{book,exposure}.py
+
+## Scope / non-goals
+Distinguish factual decision log, matched alternatives and simulated counterfactual performance; use point-in-time capacity states.
+
+## Acceptance criteria
+- [ ] Deterministic multi-opportunity fixtures show occupied/blocked reasons and no double spending; realized PnL strictly separate from hypothetical values.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M2-01, M2-05, M0-03 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 26 [M3-05] Implement constraint-aware portfolio allocation as a shadow challenger
+> **Planned milestone:** M3 — Adaptive Position & Portfolio
+> **Planning ID:** M3-05 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Select among simultaneous opportunities under real equity, existing commitments, correlation/sector exposure and hard risk constraints.
+
+## Existing implementation / references
+RFC §10; src/v8_next/economics/allocation.py; src/v8_next/adapters/portfolio_risk.py
+
+## Scope / non-goals
+Reuse inherited allocator and Nautilus account instead of a second portfolio ledger; compare challenger against V8 allocator under identical opportunities.
+
+## Acceptance criteria
+- [ ] Multi-asset simultaneous opportunity fixtures respect cap, size precision, open/reserved exposure and risk priority; no shadow proposal is submitted natively.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M3-04, M2-04, M0-05 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 27 [M3-06] Validate PIT altcoin-perpetual universe and 20 USDT feasibility
+> **Planned milestone:** M3 — Adaptive Position & Portfolio
+> **Planning ID:** M3-06 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Build symbol eligibility and order feasibility checks for small-capital Binance USDT-M altcoin perpetual research.
+
+## Existing implementation / references
+RFC §10.6, §11.8; src/v8_next/adapters/{binance_instruments,risk_sizing}.py
+
+## Scope / non-goals
+As-of listing/trading/delisting, metadata history, quote volume, tick/lot/minNotional, funding, quantization and leverage/stop/liquidation separation; do not project BTC results.
+
+## Acceptance criteria
+- [ ] Listings/delists, stale 24h volume, contract changes, insufficient 20-USDT equity, minimum size and adverse fee/slippage fixtures yield explicit eligible/rejected status.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M1-01, M3-05 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 28 [M3-07] Deliver complete end-to-end Adaptive Shadow Trader vertical slice
+> **Planned milestone:** M3 — Adaptive Position & Portfolio
+> **Planning ID:** M3-07 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Wire PIT observations → MarketBelief → 28 experts → OpportunityBook → TraderDecision → Entry/Position/Portfolio proposals → hard risk observation → shadow receipts.
+
+## Existing implementation / references
+RFC §2 and §18; src/v8_next/adapters/expert_strategy.py; src/v8_next/audit/
+
+## Scope / non-goals
+Keep V8 native replay as the validated control arm, route all novel adaptive decisions to shadow only; don't collapse product into an entry veto.
+
+## Acceptance criteria
+- [ ] One deterministic multi-event trace demonstrates WAIT/ENTER/HOLD/REDUCE/EXIT/ABSTAIN and opportunity reassessment; all links/available_at valid; zero novel native order side effects; baseline parity.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M1-01..M1-06, M2-01..M2-06, M3-01..M3-06, M0 safety gates (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 29 [M4-01] Preregister economic hypotheses, matched baselines and acceptance gates
+> **Planned milestone:** M4 — Integrated Validation
+> **Planning ID:** M4-01 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Write explicit preregistration for V8 baseline, random-entry with matched exits, simple control policy and V9 behavioral interventions.
+
+## Existing implementation / references
+RFC §12; src/v8_next/evaluation/{economic_benchmark,runner}.py
+
+## Scope / non-goals
+Lock unit of comparison, dataset role, costs, fee/funding/slippage, test budgets, minimum trades, DD and negative verdicts before evaluating sealed data.
+
+## Acceptance criteria
+- [ ] Machine-readable preregistration exists; controls use same calendar/capital/venue and opportunity exposure; post-hoc experiments cannot claim primary OOS edge.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M3-07, M0-02 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 30 [M4-02] Run costed native finalist replay and single-intervention ablations
+> **Planned milestone:** M4 — Integrated Validation
+> **Planning ID:** M4-02 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Measure separately the incremental economic impact of MarketBelief, expert routing, entry timing, position thesis and allocation.
+
+## Existing implementation / references
+RFC §12.3–12.6; src/v8_next/adapters/{portfolio_backtest,expert_strategy}.py
+
+## Scope / non-goals
+Use Nautilus as authoritative native path; fee, funding, mark, stop-first tie, slippage and partial fills modeled/qualified; no economic claim from shadow-only intent counts.
+
+## Acceptance criteria
+- [ ] Per intervention full report includes trades, net-R, net PnL, drawdown, confidence intervals, fees/funding provenance and baseline comparison; missing microstructure tagged UNSUPPORTED.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M4-01, M3-07, M0-06, M0-07 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 31 [M4-03] Implement walk-forward, multiple-testing and sealed OOS protocol
+> **Planned milestone:** M4 — Integrated Validation
+> **Planning ID:** M4-03 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Enforce dataset roles, preregistered hypothesis budgets, purged walk-forward where needed, repeated testing corrections and sealed final evaluation.
+
+## Existing implementation / references
+RFC §12.4–12.9; src/v8_next/evaluation/; src/v8_next/oracle/
+
+## Scope / non-goals
+Persist data lineage and model/search degrees of freedom; sealed OOS read authority controlled separately; NO_EDGE and STOP are valid outcomes.
+
+## Acceptance criteria
+- [ ] Leakage/multiple-test negative fixtures detect reusing sealed data or changing gates post hoc; result report distinguishes development, validation and sealed OOS.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M4-01, M0-03 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 32 [M4-04] Qualify PIT altcoin universe and independent market regimes
+> **Planned milestone:** M4 — Integrated Validation
+> **Planning ID:** M4-04 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Re-evaluate finalists beyond the BTC 2025-01 to April-01 development slice using verified as-of universe, market regimes and delisting history.
+
+## Existing implementation / references
+RFC §11.8, §12; src/v8_next/adapters/{binance_capture,binance_instruments}.py
+
+## Scope / non-goals
+Compare matching windows and available data, avoid survivorship; no synthetic stand-in for actual altcoin market tape and no claim from missing data.
+
+## Acceptance criteria
+- [ ] Coverage report documents symbols, periods, delistings, missing bars, metadata/funding/mark history; independent regime results with explicit uncertainty and NO_EDGE capability.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M3-06, M4-01, M4-03 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 33 [M4-05] Run 24–48h shadow soak, fault injection and 4 GiB resource qualification
+> **Planned milestone:** M4 — Integrated Validation
+> **Planning ID:** M4-05 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Test long-running adaptive shadow operation, memory growth, crash recovery and venue/data failures within bounded VPS limits.
+
+## Existing implementation / references
+RFC §11.9 and §18; M0-08 benchmark; src/v8_next/adapters/shadow_ingest.py
+
+## Scope / non-goals
+Track RSS, OOM, CPU, throughput, swap, disk and restart; use actual hardware profile and declare unsupported where unavailable.
+
+## Acceptance criteria
+- [ ] 24–48h audit trail shows no unbounded memory growth/duplicate decisions; unknown venue, missed mark, disconnection and protection gaps remain fail-closed; no new live authority.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M3-07, M0-04, M0-08 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 34 [M4-06] Publish independent V9 scientific verdict and promotion matrix
+> **Planned milestone:** M4 — Integrated Validation
+> **Planning ID:** M4-06 · **Normative spec:** [RFC 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md) · **Starting SHA:** `71f4f69be2b6c3e9e1620d6147c5e5b36257affa`
+
+## Objective
+Publish a reproducible verdict separating mechanical correctness, PIT validity, economical net edge, resource qualification and live approval.
+
+## Existing implementation / references
+RFC §12.7–12.10, §17; src/v8_next/audit/reporting.py
+
+## Scope / non-goals
+Consolidate independent lineage, preregistration and ablations; support INVALID, INCONCLUSIVE, NO_EDGE and economic PASS only on justified evidence.
+
+## Acceptance criteria
+- [ ] Report links code/data/config hashes, commands, fees/funding, OOS roles, uncertainty and blocked prerequisites; no auto-promotion to live; external reviewer can reproduce verdict.
+- [ ] Verify positive and adversarial cases with deterministic fixtures; cite executed command, relevant source/dataset/config hashes and failing/blocking outcomes.
+- [ ] Treat absent evidence as NOT_RUN/BLOCKED, never fabricate data or economic success.
+- [ ] New adaptive orders remain shadow-only until independent native safety, research and owner approval gates.
+
+## Dependencies
+M4-01..M4-05, M0-02, M0-03 (planning IDs; reconcile to GitHub issue numbers).
+
+## Implementation policy
+Minimum necessary change, reuse existing V8/Nautilus facilities, no separate OMS/ledger, no unbenchmarked execution rewrite. Every risk-affecting branch needs a focused test.
+
+**Done:** independently inspectable artifact and corresponding mechanical/economic evidence, not mere code presence.
+====================================================================================================
+# 35 [F-01] Build durable GitHub issue queue, lease and crash recovery
+> **Track:** Cloud Development Factory (independent of the M0–M4 trading milestones)
+> **Planning ID:** F-01 · **RFC:** [V9 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md)
+
+## Objective
+Implement a bounded coordinator for unattended V9 engineering: claim an eligible GitHub issue, persist ownership/lease and recover after process restart.
+
+## References
+RFC §13.8–13.9; existing Pi Agent orchestration; GitHub issue IDs and run receipts
+
+## Scope and constraints
+Coordinator on 4–8 GiB VPS stores only leases, queues, budgets, status and telemetry; expensive backtests execute in disposable CPU workers. No new OMS or separate trading control plane.
+
+## Acceptance criteria
+- [ ] Concurrent workers cannot claim the same issue; expired leases are recovered idempotently; crashed coordinator resumes without duplicate PR/branch/issue ownership; retry budget prevents infinite auditor loops.
+- [ ] Evidence receipt includes code/config hashes, executed tests, walltime, memory high-water and budget use.
+- [ ] Owner review remains required: agent never gains production order, sealed-OOS, main-merge or deploy authority.
+
+## Dependencies
+M0-01
+
+## Non-goals
+Not a market-side trading daemon, not an LLM-driven runtime trader, not a default multi-agent swarm. Prefer existing repo/tool functionality and minimal reviewed changes.
+====================================================================================================
+# 36 [F-02] Implement bounded Pi issue-to-PR worker without production authority
+> **Track:** Cloud Development Factory (independent of the M0–M4 trading milestones)
+> **Planning ID:** F-02 · **RFC:** [V9 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md)
+
+## Objective
+Take one assigned V9 issue through isolated branch/worktree, minimal code/test/audit and a draft PR or typed BLOCKED receipt.
+
+## References
+RFC §13.9; AGENTS.md; https://github.com/DietrichGebert/ponytail
+
+## Scope and constraints
+Keep Pi as coding orchestrator; Ponytail's reuse-first minimalism may be evaluated as an optional skill, not assumed proven on V9. Explicit per-task token, CPU, wall, RSS limits. No live credentials, sealed OOS, auto-main merge or production deploy.
+
+## Acceptance criteria
+- [ ] One unattended issue→branch→tests→PR workflow records logs, base/head SHA, costs and review needs; deliberate CI failure yields BLOCKED; forced restart causes no duplicates.
+- [ ] Evidence receipt includes code/config hashes, executed tests, walltime, memory high-water and budget use.
+- [ ] Owner review remains required: agent never gains production order, sealed-OOS, main-merge or deploy authority.
+
+## Dependencies
+F-01, M0-01, M0-03
+
+## Non-goals
+Not a market-side trading daemon, not an LLM-driven runtime trader, not a default multi-agent swarm. Prefer existing repo/tool functionality and minimal reviewed changes.
+====================================================================================================
+# 37 [F-03] Build durable research memory, audit receipts and agent-efficiency benchmark
+> **Track:** Cloud Development Factory (independent of the M0–M4 trading milestones)
+> **Planning ID:** F-03 · **RFC:** [V9 1.4.1](https://github.com/ddawnlll/v9/blob/main/docs/V9_ARCHITECTURE_MONOGRAPH.md)
+
+## Objective
+Track attempts, failures, evidence, source provenance and verified findings per compute-hour for the autonomous development factory.
+
+## References
+RFC §13.5–13.9; existing research/ and evaluation/ ledger; https://github.com/DietrichGebert/ponytail
+
+## Scope and constraints
+Reuse V9 logs/ledger; test Ponytail-style reuse-first discipline as a controlled optional agent treatment if desired. Compare against same model/tasks/budget without it, with code correctness and safety tests.
+
+## Acceptance criteria
+- [ ] Report issue completion, verified findings, PR acceptance, token cost, CPU time, retry count and memory; negative/NO_EDGE/BLOCKED receipts survive restart; uncontrolled OOS access never occurs.
+- [ ] Evidence receipt includes code/config hashes, executed tests, walltime, memory high-water and budget use.
+- [ ] Owner review remains required: agent never gains production order, sealed-OOS, main-merge or deploy authority.
+
+## Dependencies
+F-01, F-02
+
+## Non-goals
+Not a market-side trading daemon, not an LLM-driven runtime trader, not a default multi-agent swarm. Prefer existing repo/tool functionality and minimal reviewed changes.

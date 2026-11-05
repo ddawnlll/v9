@@ -1,0 +1,134 @@
+{
+  "parity": {
+    "blocking_reasons": [
+      "DIGEST_MISSING:order:baseline+candidate",
+      "DIGEST_MISSING:fill:baseline+candidate",
+      "DIGEST_MISSING:funding:baseline+candidate",
+      "DIGEST_MISSING:report:baseline+candidate"
+    ],
+    "status": "BLOCKED",
+    "streams": [
+      {
+        "baseline_digest": "8ecef5f05713f19ea9195f8ed9e03d407c5fee5bdb730db993afa840d5ac9b16",
+        "candidate_digest": "8ecef5f05713f19ea9195f8ed9e03d407c5fee5bdb730db993afa840d5ac9b16",
+        "reason": null,
+        "status": "PASS",
+        "stream": "decision"
+      },
+      {
+        "baseline_digest": null,
+        "candidate_digest": null,
+        "reason": "DIGEST_MISSING:order:baseline+candidate",
+        "status": "BLOCKED",
+        "stream": "order"
+      },
+      {
+        "baseline_digest": null,
+        "candidate_digest": null,
+        "reason": "DIGEST_MISSING:fill:baseline+candidate",
+        "status": "BLOCKED",
+        "stream": "fill"
+      },
+      {
+        "baseline_digest": null,
+        "candidate_digest": null,
+        "reason": "DIGEST_MISSING:funding:baseline+candidate",
+        "status": "BLOCKED",
+        "stream": "funding"
+      },
+      {
+        "baseline_digest": null,
+        "candidate_digest": null,
+        "reason": "DIGEST_MISSING:report:baseline+candidate",
+        "status": "BLOCKED",
+        "stream": "report"
+      }
+    ]
+  },
+  "receipt": {
+    "cache": {
+      "bars_observed": 2160,
+      "computations": 0,
+      "entries": 0,
+      "estimated_bytes": 0,
+      "evictions": 0,
+      "extensions": 2159,
+      "hits": 0,
+      "invalidations": 0,
+      "max_entries": 512,
+      "misses": 0,
+      "reseeds": 0,
+      "version": "v9.feature-cache.1"
+    },
+    "code_sha": "0582143ed9c442313a969ff44e2cd8e481525070",
+    "cold": {
+      "max_wall_s": 0.6761712910083588,
+      "median_wall_s": 0.6761712910083588,
+      "min_wall_s": 0.6761712910083588,
+      "p95_wall_s": 0.6761712910083588,
+      "refusal_reason": null,
+      "repetitions": 1,
+      "status": "MEASURED"
+    },
+    "config_sha256": "cbffd0789fbb20517ad20d176e283aa52b7559712c8368b3d77ff7a7e72b5069",
+    "digests": {
+      "decision": "8ecef5f05713f19ea9195f8ed9e03d407c5fee5bdb730db993afa840d5ac9b16",
+      "fill": null,
+      "funding": null,
+      "order": null,
+      "report": null
+    },
+    "issue_id": "M0-08",
+    "memory": {
+      "peak_rss_bytes": 231620608,
+      "refusal_reason": null,
+      "ru_maxrss_raw": 231620608,
+      "ru_maxrss_unit": "bytes",
+      "status": "MEASURED"
+    },
+    "mode": "candidate",
+    "notes": [
+      "order/fill/funding/report digests are NOT_RUN: this slice measures the expert decision layer only and runs no economic execution or funding cashflow replay.",
+      "PR #1's 2-vCPU/4-GiB container figures are a proposed baseline and were not re-run; this receipt stands on its own measurement."
+    ],
+    "oom": false,
+    "receipt_version": "v9.resource-baseline.1",
+    "refusals": {},
+    "runtime": {
+      "nautilus_trader": "2.0.0rc4",
+      "numpy": "2.5.3",
+      "polars": "1.44.1",
+      "pydantic": "2.13.5",
+      "python": "3.12.12"
+    },
+    "scope": {
+      "legs": 1,
+      "months": 2.9568788501026693,
+      "refusal_reason": "SCOPE_BELOW_TARGET: measured 1 leg(s) / 2.96 month(s), target is 40 legs / 12 months",
+      "status": "NOT_RUN",
+      "target_legs": 40,
+      "target_months": 12.0
+    },
+    "tape": {
+      "bars": 2160,
+      "bytes": 1340416,
+      "instrument_id": "BTCUSDT-PERP.BINANCE",
+      "path": "research/tape/btcusdt-1h-2025Q1/tape.jsonl",
+      "refusal_reason": null,
+      "sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7",
+      "status": "MEASURED"
+    },
+    "target_peak_rss_bytes": 4294967296,
+    "warm": {
+      "max_wall_s": 0.7370427080022637,
+      "median_wall_s": 0.7051930000016,
+      "min_wall_s": 0.6718647910020081,
+      "p95_wall_s": 0.7370427080022637,
+      "refusal_reason": null,
+      "repetitions": 5,
+      "status": "MEASURED"
+    },
+    "within_rss_target": true,
+    "workload": "28-expert ensemble, per-bar observe_all_28 over real tape"
+  }
+}

@@ -3,6 +3,14 @@
 ``AUDIT_REPORT.md`` is the full forensic narrative; ``FINAL_DELIVERY_TR.md`` is
 the mandatory twelve-section Turkish deliverable. Both read the same validated
 JSON/JSONL artifacts and never re-run the engine or invent numbers.
+
+The overall status is fail-closed (see :func:`resolve_report_status`): it consumes
+an explicit :class:`~v8_next.audit.verdicts.AuditVerdict` and, when supplied,
+:func:`~v8_next.audit.lineage.certify`. Gates and validation can only downgrade
+it. A report rendered without a verdict — or with a verdict whose completeness is
+not ``PASS``, a failing/not-identifiable dimension, or a lineage certification
+that is not ``COMPLETE`` — is labelled with that blocking state, never
+``AUDIT_COMPLETE``.
 """
 
 from __future__ import annotations
@@ -13,6 +21,29 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from v8_next.audit.forensic import AuditStore
+from v8_next.audit.lineage import (
+    CompletenessVerdict,
+    LineageCertification,
+    LineageChain,
+    certify,
+)
+from v8_next.audit.verdicts import AuditVerdict, VerdictState
+
+#: The only report status that certifies a run as audited.
+REPORT_STATUS_COMPLETE = "AUDIT_COMPLETE"
+#: No audit input was supplied: completeness was never established.
+REPORT_STATUS_BLOCKED = "AUDIT_BLOCKED"
+
+#: Fail-closed ranking: a report takes the most severe label it can justify.
+_STATUS_SEVERITY: dict[str, int] = {
+    REPORT_STATUS_COMPLETE: 0,
+    "AUDIT_FAIL": 1,
+    "AUDIT_NOT_IDENTIFIABLE": 2,
+    "AUDIT_INVALID": 3,
+    "AUDIT_INCOMPLETE": 4,
+    "AUDIT_NOT_RUN": 5,
+    REPORT_STATUS_BLOCKED: 6,
+}
 
 TR_SECTIONS = (
     "Çalıştırma Kimliği",
@@ -60,7 +91,92 @@ def _gate_status(store: AuditStore) -> dict[str, str]:
     return {g["gate_id"]: g["status"] for g in data.get("gates", [])}
 
 
-def build_context(run_dir: Path) -> dict[str, Any]:
+def _state_label(state: VerdictState | CompletenessVerdict) -> str:
+    """The report label for one state: ``PASS`` is ``AUDIT_COMPLETE``, never ``AUDIT_PASS``."""
+    if state is VerdictState.PASS or state is CompletenessVerdict.COMPLETE:
+        return REPORT_STATUS_COMPLETE
+    return f"AUDIT_{state.value}"
+
+
+def resolve_report_status(
+    *,
+    verdict: AuditVerdict | None = None,
+    lineage: LineageCertification | None = None,
+    gates: Sequence[Mapping[str, Any]] = (),
+    validation: Mapping[str, Any] | None = None,
+) -> str:
+    """Merge the audit inputs into one fail-closed report label.
+
+    ``AUDIT_COMPLETE`` requires all of: an explicit :class:`AuditVerdict` whose
+    completeness is ``PASS``, every dimension resolved without ``FAIL`` /
+    ``NOT_IDENTIFIABLE``, a ``COMPLETE`` lineage certification when one is supplied,
+    no failing or blocked gate, and a ``PASS`` validation (absent validation
+    evidence counts as ``INCOMPLETE``, never as a pass). Anything absent is
+    treated as an unearned pass: with no verdict at all the label is
+    ``AUDIT_BLOCKED``, never ``AUDIT_COMPLETE``.
+    """
+    labels: list[str] = []
+    if verdict is None:
+        labels.append(REPORT_STATUS_BLOCKED)
+    else:
+        labels.extend(
+            _state_label(state)
+            for state in (
+                verdict.completeness,
+                verdict.mechanical,
+                verdict.economic,
+                verdict.pit,
+            )
+        )
+    if lineage is not None:
+        labels.append(_state_label(lineage.verdict))
+    for gate in gates:
+        status = str(gate.get("status") or "").strip().upper()
+        if status == "BLOCKED":
+            labels.append(REPORT_STATUS_BLOCKED)
+        elif status == "FAIL":
+            labels.append("AUDIT_FAIL")
+    if validation is None or str(validation.get("status") or "").strip().upper() != "PASS":
+        labels.append("AUDIT_INCOMPLETE")
+    return max(labels, key=lambda label: _STATUS_SEVERITY[label])
+
+
+def _audit_input_note(ctx: Mapping[str, Any]) -> str:
+    """Name the audit evidence the status was derived from, including its absence."""
+    verdict = ctx.get("audit_verdict")
+    if verdict is None:
+        verdict_note = "AuditVerdict yok — bütünlük hiç kurulmadı"
+    else:
+        verdict_note = (
+            f"verdict mechanical={verdict.mechanical.value} economic={verdict.economic.value} "
+            f"pit={verdict.pit.value} completeness={verdict.completeness.value}"
+        )
+    certification = ctx.get("lineage_certification")
+    lineage_note = (
+        "lineage yok"
+        if certification is None
+        else f"lineage={certification.verdict.value} joins={certification.joins_checked}"
+    )
+    return f"{verdict_note}; {lineage_note}"
+
+
+def _report_status(ctx: Mapping[str, Any]) -> str:
+    """Status for a context built by :func:`build_context` (also plain test contexts)."""
+    return resolve_report_status(
+        verdict=ctx.get("audit_verdict"),
+        lineage=ctx.get("lineage_certification"),
+        gates=ctx.get("gate_results", {}).get("gates", []),
+        validation=ctx.get("validation_results", {}),
+    )
+
+
+def build_context(
+    run_dir: Path,
+    *,
+    verdict: AuditVerdict | None = None,
+    lineage: LineageChain | LineageCertification | None = None,
+    as_of_ns: int | None = None,
+) -> dict[str, Any]:
     store = AuditStore(run_dir)
     ctx: dict[str, Any] = {"store": store}
     for name in (
@@ -85,12 +201,35 @@ def build_context(run_dir: Path) -> dict[str, Any]:
     ctx["cashflows"] = _rows(store, "cashflows.jsonl")
     ctx["expert_decisions"] = _rows(store, "expert_decisions.jsonl")
     ctx["opportunities"] = _rows(store, "opportunities.jsonl")
+    ctx["audit_verdict"] = verdict
+    ctx["lineage_certification"] = _certify_lineage(lineage, as_of_ns=as_of_ns)
     return ctx
 
 
-def write_reports(run_dir: Path) -> dict[str, str]:
+def _certify_lineage(
+    lineage: LineageChain | LineageCertification | None,
+    *,
+    as_of_ns: int | None,
+) -> LineageCertification | None:
+    """Certify a supplied chain; a chain without a cut cannot be certified at all."""
+    if lineage is None:
+        return None
+    if isinstance(lineage, LineageCertification):
+        return lineage
+    if as_of_ns is None:
+        raise ValueError("as_of_ns required to certify a lineage chain")
+    return certify(lineage, as_of_ns=as_of_ns)
+
+
+def write_reports(
+    run_dir: Path,
+    *,
+    verdict: AuditVerdict | None = None,
+    lineage: LineageChain | LineageCertification | None = None,
+    as_of_ns: int | None = None,
+) -> dict[str, str]:
     run_dir = Path(run_dir)
-    ctx = build_context(run_dir)
+    ctx = build_context(run_dir, verdict=verdict, lineage=lineage, as_of_ns=as_of_ns)
     audit_report = render_audit_report(ctx)
     turkish = render_turkish_delivery(ctx)
     (run_dir / "AUDIT_REPORT.md").write_text(audit_report, encoding="utf-8")
@@ -126,14 +265,10 @@ def render_turkish_delivery(ctx: Mapping[str, Any]) -> str:
     lifecycles = ctx["lifecycles"]
     gates = ctx["gate_results"].get("gates", [])
     validation = ctx["validation_results"]
-    statuses = Counter(g.get("status") for g in gates)
 
-    if statuses.get("FAIL") or statuses.get("BLOCKED"):
-        overall = "PARTIAL"
-    elif validation.get("status") != "PASS":
-        overall = "PARTIAL"
-    else:
-        overall = "COMPLETE"
+    # Fail-closed: the overall label is derived from the audit verdict and, when a
+    # chain is supplied, from lineage certification — never from gates alone.
+    overall = _report_status(ctx)
 
     exit_kinds = Counter(str(row.get("exit_kind")) for row in lifecycles)
     invalid_r = [row for row in lifecycles if row.get("risk_denominator_status") == "INVALID"]
@@ -312,6 +447,7 @@ def render_turkish_delivery(ctx: Mapping[str, Any]) -> str:
 
     section(12, TR_SECTIONS[11])
     lines += [
+        f"- Denetim durumu: **{overall}** ({_audit_input_note(ctx)})",
         f"- Doğrulama durumu: **{validation.get('status')}**; ihlal sayısı: {len(validation.get('violations') or [])}",
         f"- Mevcut zorunlu artefakt: {validation.get('artifact_count')}/{validation.get('mandatory_artifacts')}; "
         f"manifest tarafından özetlenen: {validation.get('validated_manifest_artifact_count')}",
@@ -346,12 +482,14 @@ def render_audit_report(ctx: Mapping[str, Any]) -> str:
     gates = ctx["gate_results"].get("gates", [])
     lifecycles = ctx["lifecycles"]
     exit_kinds = Counter(str(row.get("exit_kind")) for row in lifecycles)
+    overall = _report_status(ctx)
 
     lines: list[str] = [
         f"# Native Forensic Audit — {manifest.get('run_id')}",
         "",
         f"Authority: `{manifest.get('authority')}`  ",
         f"Schema: `{manifest.get('schema_version')}`  ",
+        f"Audit status: **{overall}** ({_audit_input_note(ctx)})  ",
         f"Validation: **{validation.get('status')}**  ",
         "Gates: " + ", ".join(f"{g['gate_id']}={g['status']}" for g in gates),
         "",

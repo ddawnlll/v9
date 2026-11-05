@@ -1,0 +1,13 @@
+{
+  "consumed_roles": [
+    "DEVELOPMENT"
+  ],
+  "note": "Only the development slice (BTCUSDT 1h 2025Q1) is provisioned. VALIDATION and SEALED_OOS are NOT_RUN: no sealed partition exists in-repo and no authorization was requested or consumed.",
+  "permitted_roles": [
+    "DEVELOPMENT"
+  ],
+  "preregistration_digest": "3510d1fad145ea0ccc340affad34aff228b8af743457f66c7517bca57fdbd066",
+  "schema": "v9-research-access-report-v1",
+  "sealed_authorized": false,
+  "sealed_tokens_issued": 0
+}
