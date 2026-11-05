@@ -1,0 +1,22 @@
+{
+  "archives": {
+    "BTCUSDT-15m-2025-01.zip": "0867b0b8e22069621de45df42cc49a8df1b8217cf777529b1df6d43253927588",
+    "BTCUSDT-15m-2025-02.zip": "44280cf80923ec6ee42e28e4606723b2f36909eab5c334ee5aee132ff989f12b",
+    "BTCUSDT-15m-2025-03.zip": "aea345f1561a16710812658f2d435f0e02de5fc25d7ba8ad821526d67b2ab229"
+  },
+  "channel_counts": {
+    "kline": 8640
+  },
+  "hash_manifest_required": true,
+  "instruments": {
+    "BTCUSDT": {
+      "first_open_ms": 1735689600000,
+      "funding_rows": 0,
+      "kline_rows": 8640,
+      "last_open_ms": 1743464700000
+    }
+  },
+  "rows": 8640,
+  "schema_version": "v9.tape.1",
+  "tape_sha256": "8fe713678c6262285ac2b9c594fbee4b79a4d0e9d15df7ae99859a08e6e73117"
+}

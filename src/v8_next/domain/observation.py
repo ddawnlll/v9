@@ -42,9 +42,10 @@ instrument's quality state).
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from types import MappingProxyType
@@ -343,6 +344,20 @@ def _candle_from_observation(observation: Observation, identity: str) -> Candle:
     return candle
 
 
+def _sort_key(observation: Observation) -> tuple[object, ...]:
+    """Deterministic, total order over usable observations."""
+    return (
+        observation.instrument_id,
+        observation.kind.value,
+        observation.event_time,
+        observation.sequence,
+        observation.source,
+        observation.available_at,
+        observation.received_at,
+        observation.quality.value,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ObservationView:
     """Immutable point-in-time snapshot of the market at ``cut_time_ns``.
@@ -363,6 +378,160 @@ class ObservationView:
     _usable_by_id: Mapping[str, Observation] = field(repr=False)
     _rejected_by_id: Mapping[str, ObservationRejection] = field(repr=False)
     _rejections: tuple[ObservationRejection, ...] = field(repr=False)
+    #: Sort key of the last usable observation; ``None`` when the view is empty.
+    _last_sort_key: tuple[object, ...] | None = field(default=None, repr=False)
+    #: Rolling digest over the usable observation ids in insertion order. It is
+    #: content identity, not a sort order, so it can be extended in O(new ids).
+    _content_digest: str | None = field(default=None, repr=False)
+    #: (available_at, running worst quality) sorted by availability, or ``None``
+    #: when the append order no longer lets ``quality_at`` bisect safely.
+    _quality_prefix: Mapping[
+        str, tuple[tuple[int, ...], tuple[QualityState, ...]]
+    ] | None = field(default=None, repr=False)
+
+    @property
+    def content_digest(self) -> str:
+        """Deterministic identity of this view's usable observation content."""
+        if self._content_digest is None:
+            return canonical_digest("observation-view-ids", list(self._observation_ids))
+        return self._content_digest
+
+    def extended(
+        self, observations: Iterable[Observation], *, cut_time_ns: int
+    ) -> ObservationView | None:
+        """Append observations to an already-validated view, or return ``None``.
+
+        The fast path is only taken when it is provably equivalent to
+        :func:`build_view` over the concatenation:
+
+        * the new cut does not move backwards and the previous view rejected
+          nothing (a rejection could become usable at the later cut),
+        * every new observation is available at the new cut and is not
+          ``AMENDED_FUTURE``,
+        * the new observations' sort keys are strictly increasing and follow the
+          previous view's last key, so no duplicate/contradictory key can exist
+          and the bar order stays sorted.
+
+        Anything else returns ``None``; the caller must then rebuild the view in
+        full. This is an optimisation of *how* the same view is produced, never a
+        relaxation of what a view may contain.
+        """
+        cut = _strict_int(cut_time_ns)
+        if cut < self.cut_time_ns or self._rejections:
+            return None
+        new = list(observations)
+        if not new:
+            # No new evidence: the same content is admissible at the later cut,
+            # so only the cut clock changes.
+            return replace(self, cut_time_ns=cut)
+        for observation in new:
+            if not isinstance(observation, Observation):
+                return None
+            if observation.quality is QualityState.AMENDED_FUTURE:
+                return None
+            if observation.available_at > cut:
+                return None
+        keys = [_sort_key(observation) for observation in new]
+        if any(b <= a for a, b in zip(keys, keys[1:], strict=False)):
+            return None
+        if self._last_sort_key is not None and keys[0] <= self._last_sort_key:
+            return None
+
+        grouped: dict[str, list[Observation]] = {
+            key: list(value) for key, value in self._observations.items()
+        }
+        bars: dict[str, list[Candle]] = {
+            key: list(value) for key, value in self._bars.items()
+        }
+        bars_by_start: dict[str, dict[int, Candle]] = {
+            key: dict(value) for key, value in self._bars_by_start.items()
+        }
+        blockers: dict[str, dict[int, RejectionReason]] = {
+            key: dict(value) for key, value in self._bar_blockers.items()
+        }
+        quality: dict[str, QualityState] = dict(self._quality)
+        atoms: dict[str, list[tuple[int, QualityState]]] = {
+            key: list(value) for key, value in self._quality_atoms.items()
+        }
+        prefix: dict[str, tuple[tuple[int, ...], tuple[QualityState, ...]]] | None = (
+            None
+            if self._quality_prefix is None
+            else {key: value for key, value in self._quality_prefix.items()}
+        )
+        prefix_ok = prefix is not None
+        usable_by_id: dict[str, Observation] = dict(self._usable_by_id)
+        identities: list[str] = list(self._observation_ids)
+        max_available = self.max_input_available_at
+
+        for observation in new:
+            instrument = observation.instrument_id
+            identity = observation_id(observation)
+            grouped.setdefault(instrument, []).append(observation)
+            usable_by_id[identity] = observation
+            identities.append(identity)
+            atoms.setdefault(instrument, []).append(
+                (observation.available_at, observation.quality)
+            )
+            previous = quality.get(instrument)
+            quality[instrument] = (
+                observation.quality
+                if previous is None
+                else worst_quality(previous, observation.quality)
+            )
+            if prefix_ok:
+                assert prefix is not None
+                times, states = prefix.get(instrument, ((), ()))
+                if times and observation.available_at < times[-1]:
+                    prefix_ok = False
+                else:
+                    running = (
+                        observation.quality
+                        if not states
+                        else worst_quality(states[-1], observation.quality)
+                    )
+                    prefix[instrument] = (
+                        (*times, observation.available_at),
+                        (*states, running),
+                    )
+            max_available = max(max_available, observation.available_at)
+            if observation.kind is not ObservationKind.BAR:
+                continue
+            if observation.quality not in _BAR_BUILDABLE_QUALITY:
+                blocked = blockers.setdefault(instrument, {})
+                blocked[observation.event_time] = RejectionReason.QUALITY_BLOCKED
+                continue
+            candle = _candle_from_observation(observation, identity)
+            bars.setdefault(instrument, []).append(candle)
+            bars_by_start.setdefault(instrument, {})[candle.start_ns] = candle
+
+        return ObservationView(
+            cut_time_ns=cut,
+            max_input_available_at=max_available,
+            _observations=MappingProxyType(
+                {key: tuple(value) for key, value in grouped.items()}
+            ),
+            _bars=MappingProxyType({key: tuple(value) for key, value in bars.items()}),
+            _bars_by_start=MappingProxyType(
+                {key: MappingProxyType(value) for key, value in bars_by_start.items()}
+            ),
+            _bar_blockers=MappingProxyType(
+                {key: MappingProxyType(value) for key, value in blockers.items()}
+            ),
+            _quality=MappingProxyType(quality),
+            _quality_atoms=MappingProxyType(
+                {key: tuple(value) for key, value in atoms.items()}
+            ),
+            _observation_ids=tuple(identities),
+            _usable_by_id=MappingProxyType(usable_by_id),
+            _rejected_by_id=self._rejected_by_id,
+            _rejections=(),
+            _last_sort_key=keys[-1],
+            _content_digest=canonical_digest(
+                "observation-view-ids-chain",
+                [self.content_digest, [observation_id(o) for o in new]],
+            ),
+            _quality_prefix=(MappingProxyType(prefix) if prefix_ok and prefix is not None else None),
+        )
 
     def bars(self, instrument_id: str) -> tuple[Candle, ...]:
         """Completed, trusted bars for ``instrument_id`` known at the cut, ordered by start."""
@@ -380,14 +549,25 @@ class ObservationView:
         without letting later quality judgements leak backwards.
         """
         at = _strict_int(at_ns)
+        effective = min(at, self.cut_time_ns)
+        prefix = self._quality_prefix
+        if prefix is not None:
+            times, states = prefix.get(instrument_id, ((), ()))
+            if not times:
+                return QualityState.MISSING
+            index = bisect_right(times, effective) - 1
+            if index < 0:
+                return QualityState.MISSING
+            return states[index]
         atoms = self._quality_atoms.get(instrument_id)
         if not atoms:
             return QualityState.MISSING
-        effective = min(at, self.cut_time_ns)
-        states = [state for available_at, state in atoms if available_at <= effective]
-        if not states:
+        observed_states = [
+            state for available_at, state in atoms if available_at <= effective
+        ]
+        if not observed_states:
             return QualityState.MISSING
-        return worst_quality(states[0], *states[1:])
+        return worst_quality(observed_states[0], *observed_states[1:])
 
     def observation_ids(self) -> tuple[str, ...]:
         """Content ids of the usable observations, in deterministic order."""
@@ -466,20 +646,8 @@ def build_view(
             observation.model_copy(deep=True) if copy_inputs else observation
         )
 
-    def sort_key(observation: Observation) -> tuple[object, ...]:
-        return (
-            observation.instrument_id,
-            observation.kind.value,
-            observation.event_time,
-            observation.sequence,
-            observation.source,
-            observation.available_at,
-            observation.received_at,
-            observation.quality.value,
-        )
-
     if not assume_ordered:
-        snapshot.sort(key=sort_key)
+        snapshot.sort(key=_sort_key)
 
     usable: list[Observation] = []
     rejections: list[ObservationRejection] = []
@@ -568,6 +736,18 @@ def build_view(
 
     max_available = max((observation.available_at for observation in deduped), default=cut)
 
+    quality_prefix: dict[str, tuple[tuple[int, ...], tuple[QualityState, ...]]] = {}
+    for instrument_id, atoms in quality_atoms.items():
+        ordered = sorted(atoms, key=lambda atom: atom[0])
+        prefix_times: list[int] = []
+        prefix_states: list[QualityState] = []
+        running = None
+        for available_at, state in ordered:
+            running = state if running is None else worst_quality(running, state)
+            prefix_times.append(available_at)
+            prefix_states.append(running)
+        quality_prefix[instrument_id] = (tuple(prefix_times), tuple(prefix_states))
+
     return ObservationView(
         cut_time_ns=cut,
         max_input_available_at=max_available,
@@ -581,4 +761,7 @@ def build_view(
         _usable_by_id=MappingProxyType(usable_by_id),
         _rejected_by_id=MappingProxyType(rejected_by_id),
         _rejections=tuple(rejections),
+        _last_sort_key=_sort_key(deduped[-1]) if deduped else None,
+        _content_digest=canonical_digest("observation-view-ids", identities),
+        _quality_prefix=MappingProxyType(quality_prefix),
     )

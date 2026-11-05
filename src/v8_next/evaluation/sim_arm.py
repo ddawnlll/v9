@@ -34,7 +34,8 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final
@@ -71,6 +72,7 @@ from v8_next.adapters.portfolio_backtest import (
     base_currency,
 )
 from v8_next.adapters.protection_invariants import BracketInvariantChecker
+from v8_next.domain.horizons import Timeframe
 from v8_next.domain.market import Candle
 from v8_next.evaluation.ablations import (
     BASELINE_ARM_ID,
@@ -92,12 +94,43 @@ __all__ = [
     "ADAPTIVE_ARM_ID",
     "AUTHORIZED_DEVELOPMENT_SLICE",
     "SimArmMeasurement",
+    "audit_protection_events",
     "run_baseline_arm",
     "run_sim_arm",
 ]
 
 #: The one tape the owner authorized for this arm's development measurement.
 AUTHORIZED_DEVELOPMENT_SLICE: Final[str] = "btcusdt-1h-2025Q1"
+
+#: The verified intraday slice supplying real M15 bars. It is a separate source
+#: tape: M15 is never interpolated from the H1 slice.
+AUTHORIZED_INTRADAY_SLICE: Final[str] = "btcusdt-15m-2025Q1"
+
+#: Explicit instrument allowlist for measured slices. This is a fixed, ex-ante
+#: liquidity list of major USD-M perpetuals, not a hindsight selection of the
+#: symbols that happened to work.
+AUTHORIZED_INSTRUMENTS: Final[frozenset[str]] = frozenset(
+    {
+        "btcusdt",
+        "ethusdt",
+        "solusdt",
+        "bnbusdt",
+        "xrpusdt",
+        "dogeusdt",
+        "adausdt",
+        "avaxusdt",
+        "linkusdt",
+        "dotusdt",
+        "ltcusdt",
+    }
+)
+
+#: Windows this repository has verified archive manifests for.
+AUTHORIZED_WINDOWS: Final[frozenset[str]] = frozenset({"2025Q1", "2025H1"})
+
+_SLICE_NAME: Final = re.compile(
+    r"^(?P<symbol>[a-z0-9]+)-(?P<family>1h|15m)-(?P<window>2025Q1|2025H1)$"
+)
 
 #: Directory shape a tape must have to be recognized as a repository slice.
 _SLICE_ROOT_NAMES: Final[tuple[str, str]] = ("research", "tape")
@@ -112,7 +145,59 @@ _ZERO: Final[Decimal] = Decimal("0")
 # --------------------------------------------------------------------------- #
 # authorization
 # --------------------------------------------------------------------------- #
-def _authorize_tape(tape: Path | str) -> tuple[Path, str]:
+def _slice_identity(
+    directory: Path,
+    *,
+    family: str | None = None,
+    symbol: str | None = None,
+    window: str | None = None,
+) -> tuple[str, str, str]:
+    match = _SLICE_NAME.match(directory.name)
+    if match is None:
+        raise SimArmRefused(
+            "TAPE_NOT_AUTHORIZED",
+            f"{directory.name!r} is not a declared <symbol>-<1h|15m>-<window> slice",
+        )
+    name_symbol, name_family, name_window = (
+        match.group("symbol"),
+        match.group("family"),
+        match.group("window"),
+    )
+    if name_symbol not in AUTHORIZED_INSTRUMENTS:
+        raise SimArmRefused(
+            "TAPE_NOT_AUTHORIZED",
+            f"{name_symbol!r} is not in the authorized instrument allowlist",
+        )
+    if name_window not in AUTHORIZED_WINDOWS:
+        raise SimArmRefused(
+            "TAPE_NOT_AUTHORIZED", f"{name_window!r} is not an authorized window"
+        )
+    if family is not None and name_family != family:
+        raise SimArmRefused(
+            "TAPE_NOT_AUTHORIZED",
+            f"{directory.name!r} is {name_family}, expected {family}",
+        )
+    if symbol is not None and name_symbol != symbol:
+        raise SimArmRefused(
+            "TAPE_NOT_AUTHORIZED",
+            f"{directory.name!r} carries {name_symbol}, expected {symbol}",
+        )
+    if window is not None and name_window != window:
+        raise SimArmRefused(
+            "TAPE_NOT_AUTHORIZED",
+            f"{directory.name!r} covers {name_window}, expected {window}",
+        )
+    return name_symbol, name_family, name_window
+
+
+def _authorize_tape(
+    tape: Path | str,
+    *,
+    expected: str | None = None,
+    family: str | None = None,
+    symbol: str | None = None,
+    window: str | None = None,
+) -> tuple[Path, str]:
     """Resolve the authorized slice and verify its bytes; refuse anything else.
 
     Authorization is by identity (the slice name inside a ``research/tape``
@@ -122,22 +207,26 @@ def _authorize_tape(tape: Path | str) -> tuple[Path, str]:
     """
     path = Path(tape)
     directory = path if path.is_dir() else path.parent
-    if directory.name != AUTHORIZED_DEVELOPMENT_SLICE:
-        raise SimArmRefused(
-            "TAPE_NOT_AUTHORIZED",
-            f"{directory.name!r} is not the authorized development slice "
-            f"{AUTHORIZED_DEVELOPMENT_SLICE!r}",
-        )
     if (
         directory.parent.name != _SLICE_ROOT_NAMES[1]
         or directory.parent.parent.name != _SLICE_ROOT_NAMES[0]
     ):
         raise SimArmRefused(
             "TAPE_NOT_AUTHORIZED",
-            f"{directory} is not laid out as research/tape/{AUTHORIZED_DEVELOPMENT_SLICE}; "
+            f"{directory} is not laid out as research/tape/{expected}; "
             "a relabelled copy is not the authorized slice",
         )
     jsonl = directory / "tape.jsonl"
+    if expected is not None:
+        if directory.name != expected:
+            raise SimArmRefused(
+                "TAPE_NOT_AUTHORIZED",
+                f"{directory.name!r} is not the authorized development slice "
+                f"{expected!r}",
+            )
+        _slice_identity(directory)
+    else:
+        _slice_identity(directory, family=family, symbol=symbol, window=window)
     if not jsonl.is_file():
         raise SimArmRefused("TAPE_NOT_AUTHORIZED", f"{jsonl} does not exist")
     manifest_path = directory / "tape.manifest.json"
@@ -159,6 +248,41 @@ def _authorize_tape(tape: Path | str) -> tuple[Path, str]:
 def _manifest_sha(directory: Path) -> str | None:
     manifest = directory / "tape.manifest.json"
     return sha256_file(manifest) if manifest.is_file() else None
+
+
+def _load_intraday_candles(
+    tape: Path | str,
+    config: SimArmConfig,
+    *,
+    symbol: str,
+    window: str,
+) -> tuple[tuple[Candle, ...], str]:
+    """Load the verified M15 slice, refusing any other resolution.
+
+    A slice whose bars are not 15 minutes would silently change the meaning of
+    "M15 primary horizon", so it is refused instead of reinterpreted.
+    """
+    jsonl, sha = _authorize_tape(
+        tape, family="15m", symbol=symbol, window=window
+    )
+    loaded = load_multitape(jsonl)
+    raw_symbol = config.instrument_id.split(".")[0].replace("-PERP", "")
+    candles = loaded.candles.get(raw_symbol)
+    if not candles:
+        raise SimArmRefused(
+            "TAPE_INSTRUMENT_MISSING",
+            f"{raw_symbol!r} is absent from the intraday tape; available: "
+            f"{sorted(loaded.candles)}",
+        )
+    expected_duration = Timeframe.M15.duration_ns
+    for candle in candles:
+        if candle.end_ns - candle.start_ns != expected_duration:
+            raise SimArmRefused(
+                "INTRADAY_RESOLUTION_MISMATCH",
+                f"{candle.start_ns}..{candle.end_ns} is not an M15 bar; a relabelled "
+                "slice must not become intraday context",
+            )
+    return tuple(candles), sha
 
 
 # --------------------------------------------------------------------------- #
@@ -198,6 +322,8 @@ class SimArmMeasurement:
     funding_coverage: str
     provenance: Provenance
     unsupported: tuple[str, ...] = ()
+    #: Runtime evidence that each expert read its declared primary horizon.
+    horizon_evidence: dict[str, Any] = field(default_factory=dict)
 
     def to_arm_result(self, *, intervention: Intervention | None = None) -> ArmResult:
         """The ablation-contract projection of this measurement."""
@@ -474,6 +600,44 @@ def _drive(
         engine.dispose()
 
 
+def audit_protection_events(events: list[Any] | tuple[Any, ...]) -> dict[str, Any]:
+    """Reduce the arm's protection ledger into the invariant verdict.
+
+    One observation unit is one engine step: a submission and the native
+    resolution delivered at the *same* ``ts_ns``. Batching is bounded by
+    timestamp, never by searching forward for the next matching id, so a
+    submission that waits a bar for its acknowledgement is still reported as a
+    genuine ``MISSING_ACK``. A protective order that resolves without ever being
+    acknowledged is a real telemetry gap and must stay visible.
+    """
+    checker = BracketInvariantChecker()
+    index = 0
+    total = len(events)
+    while index < total:
+        ts_ns = events[index].ts_ns
+        end = index + 1
+        while end < total and events[end].ts_ns == ts_ns:
+            end += 1
+        checker.apply_batch(events[index:end])
+        index = end
+    return {
+        "state": str(checker.state),
+        "violations": [
+            {
+                "code": violation.code.value,
+                "ts_ns": violation.ts_ns,
+                "position_id": violation.position_id,
+                "client_order_id": violation.client_order_id,
+                "detail": violation.detail,
+            }
+            for violation in checker.violations
+        ],
+        "events_applied": checker.events_applied,
+        "snapshot": checker.snapshot(),
+        "digest": checker.digest(),
+    }
+
+
 def _measure(
     *,
     arm_id: str,
@@ -483,6 +647,7 @@ def _measure(
     window: _Window,
     config: SimArmConfig,
     tape_sha256: str | None,
+    intraday_sha256: str = "",
     tape_dir: Path,
     initial_balance: Decimal,
     maker_fee: Decimal,
@@ -529,51 +694,7 @@ def _measure(
         orders = ledger["orders"]
         decisions_digest = str(ledger["decisions_digest"])
         orders_digest = str(ledger["digest"])
-        protection_events = list(strategy.protection_events)
-        checker = BracketInvariantChecker()
-        # A protective submission is one observation unit with its first native
-        # resolution (ACK, fill, cancel or reject). The ACK can arrive in the same
-        # engine step, and an order can fill before any observable ACK; publishing
-        # the submission alone would record a transient MISSING_ACK that the
-        # resolution immediately disproves. Unresolved submissions are still
-        # applied alone below and therefore still report a genuine gap.
-        resolution_kinds = {"ACK", "FILL", "PARTIAL_FILL", "CANCELED", "REJECTED"}
-        index = 0
-        while index < len(protection_events):
-            event = protection_events[index]
-            if event.kind.value == "ORDER_SUBMITTED":
-                resolved_at = next(
-                    (
-                        offset
-                        for offset in range(index + 1, len(protection_events))
-                        if protection_events[offset].client_order_id
-                        == event.client_order_id
-                        and protection_events[offset].kind.value in resolution_kinds
-                    ),
-                    None,
-                )
-                if resolved_at is not None:
-                    checker.apply_batch(protection_events[index : resolved_at + 1])
-                    index = resolved_at + 1
-                    continue
-            checker.apply_batch((event,))
-            index += 1
-        protection = {
-            "state": str(checker.state),
-            "violations": [
-                {
-                    "code": violation.code.value,
-                    "ts_ns": violation.ts_ns,
-                    "position_id": violation.position_id,
-                    "client_order_id": violation.client_order_id,
-                    "detail": violation.detail,
-                }
-                for violation in checker.violations
-            ],
-            "events_applied": checker.events_applied,
-            "snapshot": checker.snapshot(),
-            "digest": checker.digest(),
-        }
+        protection = audit_protection_events(strategy.protection_events)
         arm_kind_value = arm_kind
     else:
         decisions = []
@@ -614,6 +735,7 @@ def _measure(
             partial += 1
     provenance = Provenance(
         tape_sha256=tape_sha256 or "",
+        intraday_tape_sha256=intraday_sha256,
         tape_manifest_sha256=_manifest_sha(tape_dir),
         config_sha256=_config_sha(config),
         engine="nautilus_trader.BacktestEngine",
@@ -677,6 +799,11 @@ def _measure(
         ),
         provenance=provenance,
         unsupported=tuple(sorted(set(unsupported))),
+        horizon_evidence=(
+            dict(strategy.horizon_evidence())
+            if isinstance(strategy, AdaptiveSimStrategy)
+            else {}
+        ),
     )
 
 
@@ -701,6 +828,12 @@ def _config_sha(config: SimArmConfig) -> str:
                 else str(config.max_notional_per_order)
             ),
             "max_concurrent_positions": config.max_concurrent_positions,
+            "horizon_profiles_enabled": config.horizon_profiles_enabled,
+            "intraday_tape": config.intraday_tape,
+            "adaptive_management_enabled": config.adaptive_management_enabled,
+            "stop_amendments_enabled": config.stop_amendments_enabled,
+            "target_amendments_enabled": config.target_amendments_enabled,
+            "fee_bps": str(config.fee_bps),
         }
     )
 
@@ -713,6 +846,7 @@ def run_sim_arm(
     tape: Path | str,
     config: SimArmConfig,
     limit: int | None = None,
+    intraday_tape: Path | str | None = None,
     initial_balance: Decimal = Decimal("10000"),
     maker_fee: Decimal = Decimal("0.0002"),
     taker_fee: Decimal = Decimal("0.0005"),
@@ -728,12 +862,21 @@ def run_sim_arm(
         raise TypeError(f"expected SimArmConfig, got {type(config).__name__}")
     if config.enabled is not True:
         raise SimArmDisabled()
-    jsonl, tape_sha = _authorize_tape(tape)
+    jsonl, tape_sha = _authorize_tape(tape, family="1h")
+    slice_symbol, _, slice_window = _slice_identity(jsonl.parent)
     loaded = load_multitape(jsonl, limit=limit)
     window = _window(loaded, config, limit)
+    intraday_candles: tuple[Candle, ...] = ()
+    intraday_sha = ""
+    if intraday_tape is not None:
+        config = replace(config, intraday_tape=str(Path(intraday_tape)))
+        intraday_candles, intraday_sha = _load_intraday_candles(
+            intraday_tape, config, symbol=slice_symbol, window=slice_window
+        )
     strategy = AdaptiveSimStrategy(
         config,
         source_candles={candle.end_ns: candle for candle in window.candles},
+        intraday_candles=intraday_candles,
     )
     result = _drive(
         window=window,
@@ -752,6 +895,7 @@ def run_sim_arm(
         window=window,
         config=config,
         tape_sha256=tape_sha,
+        intraday_sha256=intraday_sha,
         tape_dir=jsonl.parent,
         initial_balance=initial_balance,
         maker_fee=maker_fee,
@@ -787,7 +931,7 @@ def run_baseline_arm(
             "the baseline config must be the mapping of the same SimArmConfig; "
             "a different baseline would confound the comparison",
         )
-    jsonl, tape_sha = _authorize_tape(tape)
+    jsonl, tape_sha = _authorize_tape(tape, family="1h")
     loaded = load_multitape(jsonl, limit=limit)
     window = _window(loaded, config, limit)
     strategy = ExpertEnsembleStrategy(

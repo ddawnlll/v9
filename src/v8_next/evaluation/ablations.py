@@ -208,6 +208,9 @@ class Provenance:
     slippage_basis: str
     partial_fills_basis: str
     cost_attribution_basis: str = COST_ATTRIBUTION_BASIS
+    #: SHA-256 of the verified M15 slice when one supplied intraday context; an
+    #: empty string means no intraday tape was used (never "M15 not needed").
+    intraday_tape_sha256: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -226,6 +229,7 @@ class Provenance:
             "intrabar_tie_basis": self.intrabar_tie_basis,
             "slippage_basis": self.slippage_basis,
             "partial_fills_basis": self.partial_fills_basis,
+            "intraday_tape_sha256": self.intraday_tape_sha256,
             "cost_attribution_basis": self.cost_attribution_basis,
         }
 
@@ -1086,7 +1090,17 @@ def run_native_baseline(
     if not funding:
         funding_total = None
     elif signature_ok and balance is not None and nofund_balance is not None:
+        # The funded pass also feeds mark-price updates, so the balance delta is
+        # an UPPER BOUND on funding (measured 0.70494565 vs 0.36718638 booked
+        # adjustments, ~1.9x). It is published as such, never as the funding
+        # cost. Reconciling the two requires the mark feed to be held constant
+        # across the pair, which this runner does not do yet.
         funding_total = float(balance) - float(nofund_balance)
+        unsupported.append(
+            "FUNDING_BALANCE_DELTA_UPPER_BOUND: the funded pass also feeds mark-price "
+            "updates, so this figure overstates the booked funding adjustments and is "
+            "not comparable with the single-arm adjustment sum"
+        )
     else:
         unsupported.append(
             "FUNDING_ISOLATION_UNSUPPORTED: funding and no-funding replays diverged on "

@@ -115,6 +115,9 @@ class ProtectionEventKind(StrEnum):
 
     ORDER_SUBMITTED = "ORDER_SUBMITTED"
     ACK = "ACK"
+    #: A native amendment of an existing protective order (price and/or quantity).
+    #: It keeps the same order identity and does not create a second protection.
+    AMENDED = "AMENDED"
     PARTIAL_FILL = "PARTIAL_FILL"
     FILL = "FILL"
     CANCEL_REQUEST = "CANCEL_REQUEST"
@@ -448,6 +451,8 @@ class BracketInvariantChecker:
                 self._on_submitted(event)
             case ProtectionEventKind.ACK:
                 self._on_ack(event)
+            case ProtectionEventKind.AMENDED:
+                self._on_amended(event)
             case ProtectionEventKind.PARTIAL_FILL | ProtectionEventKind.FILL:
                 self._on_fill(event)
             case ProtectionEventKind.CANCEL_REQUEST:
@@ -773,6 +778,34 @@ class BracketInvariantChecker:
             order.reduce_only = True
         if not order.position_id:
             order.position_id = event.position_id
+
+    def _on_amended(self, event: ProtectionEvent) -> None:
+        """Reduce a native amendment: same identity, updated price/quantity.
+
+        An amendment is not a new order. Reusing the order identity is what makes
+        a cancel/replace-free tight stop possible without counting the same open
+        quantity as protected twice.
+        """
+        order = self._orders.get(event.client_order_id)
+        if order is None:
+            if event.role in _PROTECTIVE_ROLES:
+                self._record_event(
+                    ViolationCode.UNKNOWN_ORDER_REFERENCE,
+                    event,
+                    detail="amendment for a protective order never submitted",
+                )
+            return
+        if event.quantity > ZERO:
+            order.quantity = event.quantity
+        if event.direction is not None:
+            order.direction = event.direction
+        if event.side is not None:
+            order.side = event.side
+        if event.price is not None:
+            order.price = event.price
+        if event.reduce_only:
+            order.reduce_only = True
+        order.acked = True
 
     def _on_fill(self, event: ProtectionEvent) -> None:
         order = self._orders.get(event.client_order_id)

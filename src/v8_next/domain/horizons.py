@@ -143,16 +143,21 @@ def _alignment(
         )
 
     duration = timeframe.duration_ns
-    admissible = [
-        bar
-        for bar in view.bars(instrument_id)
-        if bar.start_ns + duration <= decision_time_ns
-        and bar.end_ns <= decision_time_ns
-        and bar.available_ns is not None
-        and bar.available_ns <= decision_time_ns
-    ]
+    # Bars are ordered by (start_ns, end_ns), so the latest admissible bar is
+    # found by scanning the suffix: once a bar fails the two-sided admissibility
+    # test, only strictly earlier bars remain candidates.
+    selected = None
+    for bar in reversed(view.bars(instrument_id)):
+        if (
+            bar.start_ns + duration <= decision_time_ns
+            and bar.end_ns <= decision_time_ns
+            and bar.available_ns is not None
+            and bar.available_ns <= decision_time_ns
+        ):
+            selected = bar
+            break
     quality = view.quality_at(instrument_id, decision_time_ns)
-    if not admissible:
+    if selected is None:
         return HorizonAlignment(
             timeframe=timeframe,
             as_of_ns=0,
@@ -160,7 +165,6 @@ def _alignment(
             quality=worst_quality(quality, QualityState.MISSING),
         )
 
-    selected = max(admissible, key=lambda bar: (bar.start_ns, bar.end_ns))
     complete = selected.end_ns - selected.start_ns >= duration
     if not complete:
         quality = worst_quality(quality, QualityState.STALE)

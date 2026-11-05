@@ -62,12 +62,13 @@ from v8_next.domain.market import CausalFrame
 from v8_next.domain.observation import (
     ObservationView,
     QualityState,
-    observation_id,
+    build_view,
     worst_quality,
 )
 from v8_next.domain.positioning import PositioningReading
 from v8_next.economics.decisions import Opportunity, StanceKind
 from v8_next.experts.cache import FeatureCache
+from v8_next.experts.horizon_profiles import ExpertHorizonProfile
 from v8_next.experts.registry import (
     CANONICAL_28_EXPERTS,
     ExpertSpec,
@@ -83,6 +84,7 @@ __all__ = [
     "ExpertEvidenceV1",
     "dependency_group_key",
     "produce_evidence",
+    "produce_evidence_multi",
 ]
 
 #: Bumped whenever the meaning of an evidence row changes (a stance convention,
@@ -387,14 +389,6 @@ def _frame_content_digest(frame: CausalFrame, view: ObservationView) -> str:
     """
     candles = frame.candles
     last = candles[-1] if candles else None
-    usable = tuple(
-        sorted(
-            {
-                observation_id(observation)
-                for observation in view.observations(frame.instrument_id)
-            }
-        )
-    )
     return canonical_digest(
         "expert-evidence-frame",
         {
@@ -411,7 +405,10 @@ def _frame_content_digest(frame: CausalFrame, view: ObservationView) -> str:
                     "source_hash": last.source_hash,
                 }
             ),
-            "observation_ids": list(usable),
+            # ``content_digest`` is a rolling identity over the view's usable
+            # observations: deterministic for the same content and O(1) here, so
+            # the per-bar provenance does not re-hash the whole history.
+            "observation_content_digest": view.content_digest,
         },
     )
 
@@ -455,6 +452,38 @@ def _horizon_reason(context: HorizonContext, frame: CausalFrame) -> EvidenceReas
     return None
 
 
+def _profile_reason(
+    spec: ExpertSpec,
+    context: HorizonContext,
+    profiles: Mapping[str, ExpertHorizonProfile] | None,
+    decision_time_ns: int,
+) -> EvidenceReason | None:
+    """Apply the expert's declared primary horizon, staleness and confirmations.
+
+    The profile gate runs *before* warmup and quality so a horizon the tape
+    cannot supply is reported as ``CONTEXT_INCOMPLETE`` rather than as an empty
+    frame that happens to be short. A typed table is required: an expert without
+    a profile abstains instead of silently falling back to a default horizon.
+    """
+    if profiles is None:
+        return None
+    profile = profiles.get(spec.expert_id)
+    if profile is None:
+        return EvidenceReason.CONTEXT_INCOMPLETE
+    alignment = context.alignment(profile.primary)
+    if not alignment.complete or alignment.as_of_ns == 0:
+        return EvidenceReason.CONTEXT_INCOMPLETE
+    if alignment.quality in _BLOCKING_QUALITY:
+        return EvidenceReason.CONTEXT_INCOMPLETE
+    if decision_time_ns - alignment.as_of_ns > profile.max_staleness_ns:
+        return EvidenceReason.CONTEXT_INCOMPLETE
+    for timeframe in profile.required_confirmations:
+        confirmation = context.alignment(timeframe)
+        if not confirmation.complete or confirmation.quality in _BLOCKING_QUALITY:
+            return EvidenceReason.CONTEXT_INCOMPLETE
+    return None
+
+
 def _gate_reason(
     spec: ExpertSpec,
     *,
@@ -463,8 +492,11 @@ def _gate_reason(
     quality_reason: EvidenceReason | None,
     horizon_reason: EvidenceReason | None,
     readings_missing: bool,
+    profile_reason: EvidenceReason | None = None,
 ) -> EvidenceReason | None:
     """First declared shortfall wins; the order is part of the documented contract."""
+    if profile_reason is not None:
+        return profile_reason
     if spec.dependency_group in unavailable or not unavailable.isdisjoint(spec.requires):
         return EvidenceReason.DEPENDENCY_UNAVAILABLE
     if not warmup_ok:
@@ -553,6 +585,8 @@ def _context_rows(
     unavailable: frozenset[str],
     quality_reason: EvidenceReason | None,
     horizon_reason: EvidenceReason | None,
+    context: HorizonContext | None = None,
+    profiles: Mapping[str, ExpertHorizonProfile] | None = None,
 ) -> list[_Row]:
     """V9 context layer enabled: gate first, dispatch only what has its inputs.
 
@@ -566,6 +600,11 @@ def _context_rows(
     with cache.scoped(frame):
         for spec in specs:
             warmup_ok = candles >= spec.warmup
+            profile_reason = (
+                _profile_reason(spec, context, profiles, context.decision_time_ns)
+                if context is not None
+                else None
+            )
             reason = _gate_reason(
                 spec,
                 unavailable=unavailable,
@@ -573,6 +612,7 @@ def _context_rows(
                 quality_reason=quality_reason,
                 horizon_reason=horizon_reason,
                 readings_missing=not readings,
+                profile_reason=profile_reason,
             )
             if reason is not None:
                 rows.append(_Row(spec, StanceKind.ABSTAIN, reason.value, warmup_ok))
@@ -698,6 +738,182 @@ def produce_evidence(
         duplicate_witness_ids=duplicates,
         coverage=len(evidence),
         input_dependency_groups=tuple(sorted({row.input_dependency_group for row in evidence})),
+        provenance=provenance,
+        context_layer_enabled=context_layer,
+    )
+
+
+def _context_ref_multi(
+    views: Sequence[ObservationView],
+    context: HorizonContext,
+    belief_version_hash: str,
+) -> str:
+    """Bind one multi-horizon evidence set to every view that fed it."""
+    return canonical_digest(
+        "expert-evidence-context",
+        [
+            belief_version_hash or "NO_BELIEF",
+            _horizon_shape(context),
+            [view.content_digest for view in views],
+        ],
+    )
+
+
+def produce_evidence_multi(
+    *,
+    views: Mapping[Timeframe, ObservationView],
+    frames: Mapping[Timeframe, CausalFrame],
+    caches: Mapping[Timeframe, FeatureCache],
+    context: HorizonContext,
+    profiles: Mapping[str, ExpertHorizonProfile],
+    belief: MarketBeliefV1 | None = None,
+    opportunity: Opportunity | None = None,
+    readings: tuple[PositioningReading, ...] = (),
+    observers: Sequence[str] | None = None,
+    unavailable_dependency_groups: Iterable[str] = (),
+    context_layer: bool = True,
+) -> EvidenceBundle:
+    """Produce one evidence set where each expert reads its declared horizon.
+
+    The 28 witnesses are grouped by ``profiles[expert_id].primary`` and each
+    group is dispatched on that horizon's own frame and point-in-time view. A
+    horizon with no real data is passed as an *empty* frame plus an empty view;
+    the profile gate then abstains with ``CONTEXT_INCOMPLETE`` instead of the
+    witness reasoning on zero bars.
+
+    The returned bundle is a single canonical-order set bound to one
+    ``context_ref`` that covers every contributing view, so a consumer cannot
+    mistake it for 28 witnesses reading one frame.
+    """
+    if profiles is None:
+        raise ValueError("produce_evidence_multi requires an explicit profile table")
+    if context.instrument_id == "":
+        raise ValueError("context instrument cannot be empty")
+
+    belief_hash = ""
+    if belief is not None:
+        if belief.instrument_id != context.instrument_id:
+            raise ValueError(
+                f"belief instrument {belief.instrument_id!r} does not match context "
+                f"instrument {context.instrument_id!r}"
+            )
+        if belief.decision_time_ns != context.decision_time_ns:
+            raise ValueError(
+                f"belief decision time {belief.decision_time_ns} does not match context "
+                f"decision time {context.decision_time_ns}"
+            )
+        verify_version_hash(belief)
+        belief_hash = belief.version_hash
+
+    specs, duplicates = _selected_specs(observers)
+    for spec in specs:
+        if spec.expert_id not in profiles:
+            raise ValueError(
+                f"expert {spec.expert_id!r} has no declared horizon profile; a missing "
+                "profile must be fixed in the table, not defaulted at runtime"
+            )
+
+    groups: dict[Timeframe, list[ExpertSpec]] = {}
+    for spec in specs:
+        groups.setdefault(profiles[spec.expert_id].primary, []).append(spec)
+
+    cut = context.decision_time_ns
+    context_ref = _context_ref_multi(list(views.values()), context, belief_hash)
+    unavailable = frozenset(unavailable_dependency_groups)
+    rows: list[_Row] = []
+    for timeframe in Timeframe:
+        group = groups.get(timeframe)
+        if not group:
+            continue
+        frame = frames.get(timeframe)
+        if frame is None:
+            frame = CausalFrame(context.instrument_id, cut, ())
+        else:
+            _require_aligned(context, frame)
+        view = views.get(timeframe)
+        if view is None:
+            view = build_view((), cut_time_ns=cut, copy_inputs=False)
+        if view.cut_time_ns > frame.decision_ns:
+            raise ValueError(
+                f"view cut {view.cut_time_ns} is after the decision time {frame.decision_ns}: "
+                "future input cannot produce evidence"
+            )
+        cache = caches.get(timeframe)
+        if cache is None:
+            raise ValueError(f"no feature cache supplied for horizon {timeframe.value}")
+        if context_layer:
+            rows.extend(
+                _context_rows(
+                    tuple(group),
+                    frame,
+                    cache,
+                    opportunity,
+                    readings,
+                    unavailable=unavailable,
+                    quality_reason=_blocking_quality(view, frame, belief),
+                    horizon_reason=_horizon_reason(context, frame),
+                    context=context,
+                    profiles=profiles,
+                )
+            )
+        else:
+            rows.extend(_baseline_rows(tuple(group), frame, cache, opportunity, readings))
+
+    rows.sort(key=lambda row: _REGISTRY_ORDER[row.spec.expert_id])
+    evidence = tuple(
+        _evidence_row(
+            row.spec,
+            row.stance,
+            row.reason,
+            warmup_ok=row.warmup_ok,
+            instrument=context.instrument_id,
+            decision_ns=cut,
+            context_ref=context_ref,
+        )
+        for row in rows
+    )
+    frame_digests = {
+        timeframe.value: _frame_content_digest(frame, view)
+        for timeframe, view in views.items()
+        if timeframe in frames
+        for frame in (frames[timeframe],)
+    }
+    provenance = canonical_digest(
+        "expert-evidence-provenance",
+        {
+            "version": EVIDENCE_VERSION,
+            "registry": [spec.expert_id for spec in specs],
+            "expert_versions": [
+                [spec.expert_id, spec.version, spec.dependency_group] for spec in specs
+            ],
+            "horizon_profiles": [
+                [spec.expert_id, profiles[spec.expert_id].version, profiles[spec.expert_id].primary.value]
+                for spec in specs
+            ],
+            "cache_versions": {
+                timeframe.value: cache.version
+                for timeframe, cache in sorted(caches.items(), key=lambda item: item[0].value)
+            },
+            "frame_digests": frame_digests,
+            "context_ref": context_ref,
+            "belief_version_hash": belief_hash,
+            "context_layer": context_layer,
+            "unavailable_dependency_groups": sorted(unavailable),
+            "readings": len(readings),
+        },
+    )
+    return EvidenceBundle(
+        instrument=context.instrument_id,
+        decision_time_ns=cut,
+        belief_version_hash=belief_hash,
+        context_ref=context_ref,
+        evidence=evidence,
+        abstain_count=sum(1 for row in evidence if row.stance is StanceKind.ABSTAIN),
+        duplicate_witness_ids=duplicates,
+        coverage=len(evidence),
+        input_dependency_groups=tuple(
+            sorted({row.input_dependency_group for row in evidence})
+        ),
         provenance=provenance,
         context_layer_enabled=context_layer,
     )
