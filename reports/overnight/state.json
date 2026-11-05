@@ -1,6 +1,6 @@
 {
-  "phase": "complete_with_declared_blockers",
-  "head": "7f1bcfe",
+  "phase": "p0_p1_verified",
+  "head": "HEAD",
   "baseline": {
     "fast_suite": {
       "passed": 1094,
@@ -300,5 +300,29 @@
     "M4-05": "24-48h soak + Linux 4GiB cgroup",
     "M4-06": "economic evidence + owner approval",
     "F-01/F-02": "production authority (forbidden by design)"
+  },
+  "p0": {
+    "native_audit": "AUDIT_COMPLETE",
+    "lineage_joins": 358,
+    "campaigns": 44,
+    "gates": "G1-G12 PASS",
+    "validation": "PASS 0 violations"
+  },
+  "p1": {
+    "sim_only": true,
+    "v9_net_pnl": -33.92107028,
+    "v8_net_pnl": -8.57430674,
+    "delta": -25.34676354,
+    "v9_trades": 24,
+    "v8_trades": 44,
+    "claim": "NONE",
+    "protection_caveat": "MISSING_ACK and netting-position conflicts reported"
+  },
+  "final_gate": {
+    "ruff": "clean",
+    "mypy": "clean 253 files",
+    "pytest_passed": 2796,
+    "skipped": 67,
+    "deselected": 512
   }
 }
