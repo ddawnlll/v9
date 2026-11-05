@@ -156,3 +156,13 @@ strongest two, and compare with a random two-and-two selection at the same bars.
 The construction is dollar- and direction-balanced by design, so the window's
 beta cannot explain a positive result.
 
+
+---
+
+## 2026-11-05 — E-005: cross-sectional relative strength
+
+* Preregistration: `reports/research/PREREGISTRATION_cross_sectional.json` (code `cf8ca77`).
+* Long the two weakest trailing-24h symbols, short the two strongest, on rank
+  state transitions; matched null is a random two-and-two at the same bars, so
+  long/short counts, timing, bracket and costs are identical.
+* Status: `PREREGISTERED` (results pending).
