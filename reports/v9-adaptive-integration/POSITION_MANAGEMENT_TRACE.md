@@ -1,0 +1,3 @@
+# Position management trace
+
+No native adaptive stop amendment, target management action, or thesis-driven execution has been verified in this work. The existing strategy uses a static bracket on entry and does not construct or evaluate `PositionThesis` in its native lifecycle. Previous REDUCE/EXIT paths canceled the only existing protection before an exit order was confirmed; they are now explicitly blocked until a safe, independently verified native handoff exists. This is a safety restriction, not completion of the management architecture. There is no native adaptive order timeline to report.

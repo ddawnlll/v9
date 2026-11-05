@@ -104,7 +104,8 @@ def test_costed_smoke_run_on_the_authorized_tape() -> None:
     assert measurement.costed is True
     assert measurement.bars == 60
     assert measurement.decision_count >= 54
-    assert measurement.unsupported == ()
+    assert "PROTECTION_NOT_QUALIFIED_BUFFERED_NATIVE_CALLBACKS" in measurement.unsupported
+    assert measurement.protection["qualification"] == "NOT_QUALIFIED"
     assert measurement.provenance.tape_sha256
     assert measurement.orders_digest
     assert measurement.decisions_digest

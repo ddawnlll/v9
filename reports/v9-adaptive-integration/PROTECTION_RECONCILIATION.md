@@ -1,0 +1,11 @@
+# Protection reconciliation
+
+Base `d0430a64ebdeb44545115826e06a2e00caa36bea`; H1 replay at integration checkout after commits `2775ced`, `fb93f26` and `5412cad` (the independent experimental profile commit `4ef4b7f` is not used by this H1 arm). Tape SHA-256 `84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7`.
+
+`uv run --locked --extra dev python /tmp/v9_adaptive_measure.py` executed both native arms sequentially on 2,160 bars. The adaptive audit observed `MISSING_ACK=46`, `UNKNOWN_ORDER_REFERENCE=4`, and `POSITION_QUANTITY_CONFLICT=4`. Its final state was `PROTECTED`; this is a cutoff state, not proof of uninterrupted coverage. These observations differ from the earlier `MISSING_ACK=50` and other counts because audit/event handling changed. They cannot yet be assigned individually to exposure, ordering, telemetry, identity, or strategy defects: the strategy buffers and reorders some callbacks before this ledger sees them.
+
+The old checker loop grouped a submission through its next resolution, suppressing intervening checks. The replacement checks every *published* event. `tests/test_protection_audit_regressions.py` verifies that intervening conflicts are not lost and mismatched ACKs do not establish protection. Published events are not yet a complete raw native event record. The prior full-lifecycle PASS is therefore unsupported. `SimArmMeasurement.protection.qualification` is `NOT_QUALIFIED` and the arm's unsupported list records the incomplete callback audit.
+
+The previously implemented REDUCE/EXIT flow canceled native protection before exit execution; until a verified native handoff exists those side effects return a blocked reason and leave existing protection untouched. This does not prove the rest of the lifecycle safe, nor implement adaptive management. Initial entry brackets remain the existing native strategy implementation.
+
+Focused integration check `uv run --locked --extra dev pytest -q tests/test_sim_adaptive_arm.py tests/test_protection_audit_regressions.py tests/test_protection_invariants.py tests/test_accounting_contract.py tests/test_expert_horizon_profiles.py tests/test_multi_horizon.py`: **54 passed, 1 failed**. The existing `test_protection_audit_is_clean_over_500_bars` fails with 13 reported violations; it was not weakened. This is a qualification blocker, not an economic PASS.

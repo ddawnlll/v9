@@ -568,8 +568,13 @@ def _measure(
         orders_digest = str(ledger["digest"])
         protection_events = list(strategy.protection_events)
         checker, protection_transitions = _audit_protection(protection_events)
+        # The producer still buffers some native callbacks before publishing
+        # them, so even a clean observed ledger cannot establish continuous
+        # coverage. A cutoff snapshot is not a lifecycle qualification.
+        unsupported.append("PROTECTION_NOT_QUALIFIED_BUFFERED_NATIVE_CALLBACKS")
         protection = {
             "state": str(checker.state),
+            "qualification": "NOT_QUALIFIED",
             "violations": [
                 {
                     "code": violation.code.value,
