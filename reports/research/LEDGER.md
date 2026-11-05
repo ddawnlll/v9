@@ -221,3 +221,46 @@ preregistered test with its parameters frozen before the holdout is touched.
   new hypothesis motivated by E-005's gross measurement, not independent
   evidence; the sealed holdout is its first confirmatory test.
 * Status: `PREREGISTERED` (results pending).
+
+### E-006 — results (2026-11-05)
+
+| Metric | Value |
+|---|---:|
+| Events | 1,653 |
+| Legs priced | 2,114 |
+| Net expectancy per leg | **−0.0353 R** |
+| Gross expectancy per leg | +0.0107 R |
+| Matched random two-and-two (200 draws) | −0.0490 R |
+| Control p (one-sided) | 0.0796 |
+| Positive symbols | 5 / 10 |
+| Net profit factor | 0.947 |
+| Leg mean 95% CI | [−0.097, +0.020] |
+| Symbol mean 95% CI | [−0.097, +0.010] |
+
+Sensitivity: L24_k3 **+0.0513** (6/10 positive, 2,617 legs), L72_k2 +0.0172 (4/10),
+L4_k2 −0.0312 (4/10), L24_k1 −0.0870 (2/10). Status: `NO_EDGE`.
+
+#### Diagnosis
+
+1. The mirror is **not** the arithmetic negation of E-005. E-005's reversal lost
+   0.0795 R gross; E-006's momentum earns only +0.0107 R gross. Reversing the
+   direction moves the 2% stop and 4% target to the other side of the entry, and
+   with stop-first intrabar resolution the two paths are not symmetric. Momentum
+   also enters on a different set of state transitions. The "free mirror" does
+   not exist.
+2. Momentum is better than the matched null (−0.035 vs −0.049) but the
+   improvement (0.014 R) is less than the residual cost drag and the p-value
+   (0.080) does not clear the registered alpha. Five of ten symbols are positive;
+   ADAUSDT alone is −0.242 R.
+3. The positive cell (k=3) is a **declared sensitivity variant, not selectable**.
+   Choosing it now would be the post-hoc selection the protocol exists to
+   prevent, and its neighbours (k=1, L=72, L=4) do not corroborate it.
+
+#### Next hypothesis
+
+`cross_sectional_flow_imbalance`: rank the ten perpetuals at each aligned bar by
+**aggressive taker-buy share** of quote volume, which is an information source
+none of E-001..E-006 used (price rank and volume spikes only). Long the symbols
+with the strongest buy-side aggression and short the weakest, with the same
+dollar-neutral construction, costs and random two-and-two null.
+

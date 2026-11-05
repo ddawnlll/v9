@@ -2,14 +2,13 @@
   "assessment": {
     "reasons": [
       "NON_POSITIVE_EXPECTANCY",
-      "NOT_ABOVE_MATCHED_CONTROL",
-      "CONCENTRATED:0<6",
+      "CONCENTRATED:5<6",
       "CONTROL_P_VALUE_NOT_SIGNIFICANT"
     ],
     "status": "NO_EDGE"
   },
   "claim_status": "MODEL_DERIVED_DEV_SCREEN",
-  "code_sha": "fb5d409ddef2edb7c48857220943ec687056b019",
+  "code_sha": "8c530528b3d5cbed3c824cde5ac558e5e7761578",
   "control": {
     "distribution_head": [
       -0.0471238201483089,
@@ -43,7 +42,7 @@
     "legs": 2114,
     "legs_per_side": 2,
     "lookback_bars": 24,
-    "mode": "reversal",
+    "mode": "momentum",
     "window": {
       "end_ms": 1746057600000,
       "start_ms": 1735689600000
@@ -51,87 +50,87 @@
   },
   "pooled": {
     "control_mean_r": -0.04900950949117815,
-    "control_p_value": 1.0,
-    "gross_expectancy_r": -0.07950192519635763,
+    "control_p_value": 0.07960199004975124,
+    "gross_expectancy_r": 0.010658254449810773,
     "leg_mean_ci": {
       "alpha": 0.05,
-      "ci_high": -0.06898229519011399,
-      "ci_low": -0.1823980649916296,
-      "contains_zero": false,
-      "estimate": -0.12501705416438033,
+      "ci_high": 0.020156056334153273,
+      "ci_low": -0.09664066633959364,
+      "contains_zero": true,
+      "estimate": -0.035255815562772,
       "n": 2114,
       "resamples": 2000,
       "seed": 20260102
     },
-    "maximum_drawdown_usdt": 28173.51806905905,
-    "net_expectancy_r": -0.12501705416438033,
-    "net_profit_factor": 0.8214474566571923,
-    "positive_symbols": 0,
+    "maximum_drawdown_usdt": 16822.617635896415,
+    "net_expectancy_r": -0.035255815562772,
+    "net_profit_factor": 0.9472844373734169,
+    "positive_symbols": 5,
     "symbol_mean_ci": {
       "alpha": 0.05,
-      "ci_high": -0.08596171996176162,
-      "ci_low": -0.1645015478787974,
-      "contains_zero": false,
-      "estimate": -0.12326510410771022,
+      "ci_high": 0.01033459101134653,
+      "ci_low": -0.09700794834891238,
+      "contains_zero": true,
+      "estimate": -0.03726227760611219,
       "n": 10,
       "resamples": 2000,
       "seed": 20260101
     },
     "symbols_with_trades": 10,
-    "total_net_pnl_usdt": -26428.6052503892,
+    "total_net_pnl_usdt": -7453.0794100100975,
     "trades": 2114,
-    "treatment_event_mean_r": -0.12220659655628151,
-    "win_rate": 0.3273415326395459
+    "treatment_event_mean_r": -0.02595305591559286,
+    "win_rate": 0.35808893093661304
   },
   "symbols": {
     "ADAUSDT": {
-      "gross_expectancy_r": -0.066358782379798,
-      "net_expectancy_r": -0.11094918507222222,
+      "gross_expectancy_r": -0.19423605222020204,
+      "net_expectancy_r": -0.2425087287919192,
       "trades": 198
     },
     "AVAXUSDT": {
-      "gross_expectancy_r": -0.005535699320975627,
-      "net_expectancy_r": -0.04973750048487804,
+      "gross_expectancy_r": 0.10146017954243901,
+      "net_expectancy_r": 0.05467329831268293,
       "trades": 205
     },
     "BNBUSDT": {
-      "gross_expectancy_r": -0.11543271795560539,
-      "net_expectancy_r": -0.16365414436188339,
+      "gross_expectancy_r": 0.06948012852780268,
+      "net_expectancy_r": 0.023581807054260093,
       "trades": 223
     },
     "DOGEUSDT": {
-      "gross_expectancy_r": 0.0052957459659459276,
-      "net_expectancy_r": -0.039794631888108105,
+      "gross_expectancy_r": -0.003799901013513525,
+      "net_expectancy_r": -0.04925796199189189,
       "trades": 185
     },
     "DOTUSDT": {
-      "gross_expectancy_r": -0.1865607575962617,
-      "net_expectancy_r": -0.23397885312476635,
+      "gross_expectancy_r": 0.07024944516401868,
+      "net_expectancy_r": 0.025730183027570092,
       "trades": 214
     },
     "ETHUSDT": {
-      "gross_expectancy_r": -0.14196857316243905,
-      "net_expectancy_r": -0.18790986632926832,
+      "gross_expectancy_r": -0.0061435789400000156,
+      "net_expectancy_r": -0.05217512105219513,
       "trades": 205
     },
     "LINKUSDT": {
-      "gross_expectancy_r": -0.002362169385167479,
-      "net_expectancy_r": -0.0457673654722488,
+      "gross_expectancy_r": -0.047077593154066996,
+      "net_expectancy_r": -0.0938675778555024,
       "trades": 209
     },
     "LTCUSDT": {
-      "gross_expectancy_r": -0.10804273132640693,
-      "net_expectancy_r": -0.15355905624978355,
+      "gross_expectancy_r": 0.05631703040389609,
+      "net_expectancy_r": 0.011900958837229435,
       "trades": 231
     },
     "SOLUSDT": {
-      "gross_expectancy_r": -0.11214299510504588,
-      "net_expectancy_r": -0.15692154812889908,
+      "gross_expectancy_r": 0.08987020663394495,
+      "net_expectancy_r": 0.04389397943669724,
       "trades": 218
     },
     "XRPUSDT": {
-      "gross_expectancy_r": -0.044712976097345154,
-      "net_expectancy_r": -0.09037888996504424,
+      "gross_expectancy_r": -0.04927347440973453,
+      "net_expectancy_r": -0.0945936130380531,
       "trades": 226
     }
   }
