@@ -760,6 +760,25 @@ class BracketInvariantChecker:
                     event,
                     detail="acknowledgement for a protective order never submitted",
                 )
+        # A callback for the same client id cannot authenticate a different
+        # protective role or position. Never let a mismatched ACK establish
+        # coverage for the original position.
+        if (
+            order.role is not event.role
+            or (order.position_id and event.position_id and order.position_id != event.position_id)
+        ):
+            self._record_event(
+                ViolationCode.ORDER_IDENTITY_CONFLICT,
+                event,
+                position_id=order.position_id,
+                detail=(
+                    f"ack role={event.role.value} position={event.position_id!r} "
+                    f"does not match submitted role={order.role.value} "
+                    f"position={order.position_id!r}"
+                ),
+            )
+            order.unknown = True
+            return
         order.acked = True
         if event.quantity > ZERO:
             order.quantity = event.quantity

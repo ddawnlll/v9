@@ -70,7 +70,10 @@ from v8_next.adapters.portfolio_backtest import (
     _plan_funding_events,
     base_currency,
 )
-from v8_next.adapters.protection_invariants import BracketInvariantChecker
+from v8_next.adapters.protection_invariants import (
+    BracketInvariantChecker,
+    ProtectionEvent,
+)
 from v8_next.domain.market import Candle
 from v8_next.evaluation.ablations import (
     BASELINE_ARM_ID,
@@ -474,6 +477,40 @@ def _drive(
         engine.dispose()
 
 
+def _audit_protection(
+    events: list[ProtectionEvent],
+) -> tuple[BracketInvariantChecker, list[dict[str, Any]]]:
+    """Audit every observed callback; no assumed atomicity across callbacks.
+
+    Transitions describe observed states, not duration or proof that the event
+    producer captured every venue callback. An unacknowledged order stays a gap
+    until an acceptance or fill is observed.
+    """
+    checker = BracketInvariantChecker()
+    transitions: list[dict[str, Any]] = []
+    previous: dict[str, tuple[str, str]] = {}
+    for event in events:
+        checker.apply(event)
+        positions = checker.snapshot()["positions"]
+        assert isinstance(positions, dict)
+        for position_id in positions:
+            quantity = checker.position_quantity(position_id)
+            state = checker.state_of(position_id).value
+            observed = (state, str(quantity))
+            if previous.get(position_id) != observed:
+                transitions.append(
+                    {
+                        "ts_ns": event.ts_ns,
+                        "event_kind": event.kind.value,
+                        "position_id": position_id,
+                        "quantity": str(quantity),
+                        "state": state,
+                    }
+                )
+                previous[position_id] = observed
+    return checker, transitions
+
+
 def _measure(
     *,
     arm_id: str,
@@ -530,34 +567,7 @@ def _measure(
         decisions_digest = str(ledger["decisions_digest"])
         orders_digest = str(ledger["digest"])
         protection_events = list(strategy.protection_events)
-        checker = BracketInvariantChecker()
-        # A protective submission is one observation unit with its first native
-        # resolution (ACK, fill, cancel or reject). The ACK can arrive in the same
-        # engine step, and an order can fill before any observable ACK; publishing
-        # the submission alone would record a transient MISSING_ACK that the
-        # resolution immediately disproves. Unresolved submissions are still
-        # applied alone below and therefore still report a genuine gap.
-        resolution_kinds = {"ACK", "FILL", "PARTIAL_FILL", "CANCELED", "REJECTED"}
-        index = 0
-        while index < len(protection_events):
-            event = protection_events[index]
-            if event.kind.value == "ORDER_SUBMITTED":
-                resolved_at = next(
-                    (
-                        offset
-                        for offset in range(index + 1, len(protection_events))
-                        if protection_events[offset].client_order_id
-                        == event.client_order_id
-                        and protection_events[offset].kind.value in resolution_kinds
-                    ),
-                    None,
-                )
-                if resolved_at is not None:
-                    checker.apply_batch(protection_events[index : resolved_at + 1])
-                    index = resolved_at + 1
-                    continue
-            checker.apply_batch((event,))
-            index += 1
+        checker, protection_transitions = _audit_protection(protection_events)
         protection = {
             "state": str(checker.state),
             "violations": [
@@ -571,6 +581,7 @@ def _measure(
                 for violation in checker.violations
             ],
             "events_applied": checker.events_applied,
+            "transitions": protection_transitions,
             "snapshot": checker.snapshot(),
             "digest": checker.digest(),
         }
