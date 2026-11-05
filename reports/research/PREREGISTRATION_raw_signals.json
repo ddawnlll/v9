@@ -2,26 +2,40 @@
   "schema_version": "v9.raw-signal-preregistration.1",
   "created_ns": 1793836800000000000,
   "created_utc": "2026-11-05T00:00:00Z",
-  "code_sha": "0157fc4",
+  "code_sha": "6929314",
   "implementation_sha256": {
     "tools/signal_screen.py": "f4fa03abd75dfcf884e844f91d3dabfe4871a718008bed4b301b2f983d059276",
     "src/v8_next/research/signals.py": "d8c3f290bdb9d159c8271b29c222f7ad5b3aa6116eb2eb3b3d950dfd695aec91",
-    "src/v8_next/research/screen.py": "45f2273ba9dab3c396d57b9e7b4730e87091865e3926495e7a452ef1cf32d8b0"
+    "src/v8_next/research/screen.py": "44973248c0fd779b8c19d417ce547b66ee09d62798bb66e4dbaa99ec86d57cf0"
   },
   "authority": "OFFLINE_MODEL_DERIVED",
   "claim_status": "NO_ECONOMIC_CLAIM_DEV_SCREEN_ONLY",
   "dataset": {
     "role": "DEVELOPMENT",
-    "window_utc": ["2025-01-01T00:00:00Z", "2025-05-01T00:00:00Z"],
+    "window_utc": [
+      "2025-01-01T00:00:00Z",
+      "2025-05-01T00:00:00Z"
+    ],
     "bar_interval": "1h",
     "universe": [
-      "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT",
-      "ADAUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT", "LTCUSDT"
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "XRPUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "AVAXUSDT",
+      "LINKUSDT",
+      "DOTUSDT",
+      "LTCUSDT"
     ],
     "universe_rule": "Fixed ex-ante liquidity list of USD-M perpetuals carried by the verified 2025-H1 tapes; identical for every candidate and every control draw.",
     "tape_identity": "research/tape/<symbol>-1h-2025H1, tape_sha256 recorded per run from tape.manifest.json",
     "holdout": {
-      "window_utc": ["2025-05-01T00:00:00Z", "2025-07-01T00:00:00Z"],
+      "window_utc": [
+        "2025-05-01T00:00:00Z",
+        "2025-07-01T00:00:00Z"
+      ],
       "state": "SEALED",
       "unseal_rule": "Only after a candidate and all of its parameters are frozen in reports/research/LEDGER.md; the runner refuses a start >= 2025-05-01 unless V9_HOLDOUT_AUTHORIZED=1."
     }
@@ -31,7 +45,10 @@
     "exit": "static bracket, stop 2% / target 4% of entry, stop evaluated before target inside a bar (STOP_FIRST), flat time exit at the close of the 48th held bar",
     "target_fill": "MAKER_LIMIT at the target price",
     "market_fill_slippage_bps_per_side": 2.0,
-    "fee_bps_per_side": {"taker": 5.0, "maker": 2.0},
+    "fee_bps_per_side": {
+      "taker": 5.0,
+      "maker": 2.0
+    },
     "funding": "actual venue settlements inside the holding window; positive rate paid by longs",
     "sizing": "risk 100 USDT per campaign (1% of a 10,000 USDT book); R = net PnL / 100",
     "evidence_class": "MODEL_DERIVED"
@@ -41,7 +58,10 @@
       "hypothesis_id": "H-RAW-001",
       "candidate_id": "bollinger_reversion",
       "statement": "A one-bar H1 close outside a 2-sigma band of the trailing 20 closes mean-reverts in the opposite direction by more than the round-trip cost, and by more than a random entry at the same eligible times under identical exits.",
-      "parameters": {"window": 20, "k": 2.0},
+      "parameters": {
+        "window": 20,
+        "k": 2.0
+      },
       "direction_rule": "LONG below the lower band, SHORT above the upper band",
       "falsified_by": "net expectancy <= 0, or not above the matched random-entry control, or concentration in fewer than 6 of 10 symbols"
     },
@@ -49,7 +69,11 @@
       "hypothesis_id": "H-RAW-002",
       "candidate_id": "volume_climax_reversal",
       "statement": "An H1 bar with volume at least 4x the median of the prior 50 bars that closes in the extreme 40% of its own range marks exhaustion, and the next bar reverses it by more than the round-trip cost.",
-      "parameters": {"window": 50, "multiple": 4.0, "close_extreme": 0.4},
+      "parameters": {
+        "window": 50,
+        "multiple": 4.0,
+        "close_extreme": 0.4
+      },
       "direction_rule": "down-climax at the low -> LONG, up-climax at the high -> SHORT",
       "falsified_by": "net expectancy <= 0, or not above the matched random-entry control, or concentration in fewer than 6 of 10 symbols"
     },
@@ -57,7 +81,9 @@
       "hypothesis_id": "H-RAW-003",
       "candidate_id": "liquidity_sweep_reclaim",
       "statement": "An H1 bar that trades through the prior 24-bar extreme and closes back inside the range continues in the reclaim direction by more than the round-trip cost.",
-      "parameters": {"lookback": 24},
+      "parameters": {
+        "lookback": 24
+      },
       "direction_rule": "sweep of the prior low with close above it -> LONG, sweep of the prior high with close below it -> SHORT",
       "falsified_by": "net expectancy <= 0, or not above the matched random-entry control, or concentration in fewer than 6 of 10 symbols"
     }
@@ -91,7 +117,11 @@
     "multiple_testing": "Holm over the three primary candidates tested in one run",
     "max_drawdown_gate": 1.0
   },
-  "accepted_outcomes": ["NO_EDGE", "STOP", "INCONCLUSIVE"],
+  "accepted_outcomes": [
+    "NO_EDGE",
+    "STOP",
+    "INCONCLUSIVE"
+  ],
   "decision_rule": "DEV_CANDIDATE only when every gate passes; otherwise NO_EDGE, or INCONCLUSIVE when the trade count is below the minimum. DEV_CANDIDATE nominates a candidate for native validation and is not an economic edge claim. PASS can never be awarded by this screen.",
   "hypothesis_budget": {
     "family": "v9-raw-signal-screen-2025H1",
@@ -107,5 +137,14 @@
     "funding uses entry notional, not the continuously varying notional",
     "dev and holdout share one six-month regime; the holdout is time-separated, not regime-separated",
     "the screen can nominate but never promote; only a native replay may"
+  ],
+  "amendments": [
+    {
+      "sequence": 1,
+      "code_sha_before": "0157fc4",
+      "code_sha_after": "6929314",
+      "reason": "load_bars exposed tape milliseconds as end_ns; a native ns timestamp compared against a bar close skipped every bar and funding could never be attributed. The first execution of the screen was therefore invalid before any result was read: its output was discarded and is not recorded in the ledger.",
+      "scope": "unit conversion plus a regression test; hypotheses, parameters, costs, controls, gates and budgets are unchanged"
+    }
   ]
 }
