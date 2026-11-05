@@ -166,3 +166,59 @@ Review and merge the 28 draft PRs into `main` in dependency order (M0 → M1 →
 Factory), or review the verified union on `integration/wave1` at `7f1bcfe`. Do **not** merge to
 `main` automatically, and do not enable adaptive order side effects: the promotion matrix still
 reads `BLOCKED` and `live_approved=False`.
+
+---
+
+## 9. Addendum — P0/P1 execution (2026-11-05, after review)
+
+Verified code head: `integration/wave1` @ `079d33c` (main remains `0b69fc4`).
+
+### P0 — native ledger identity (fixed and proven)
+
+The first campaign's entry leg had no `campaign_id`, native order callbacks had no `decision_id`,
+and fills could only resolve through an unjoined order. The producer and audit pipeline now carry
+explicit decision/opportunity/campaign identities. A real Nautilus audit on the authorized tape:
+
+| Check | Result |
+|---|---|
+| Gates G1–G12 | **all PASS** |
+| Validation | PASS, 0 violations |
+| Lineage | **COMPLETE, 358 joins, 44 campaigns** |
+| Rendered label | **`AUDIT_COMPLETE`** |
+| Trades / fills | 44 closed / 89 native fills |
+
+The former `MECHANICAL PASS` vs `AUDIT_INCOMPLETE` contradiction is closed on a real run.
+
+### P1 — simulation-only V9 execution and costed comparison
+
+`AdaptiveSimStrategy` + `sim_arm` run only under `BacktestEngine`, are disabled unless
+`SimArmConfig(enabled=True)`, and import no venue adapter or credential source. Audit repairs in
+the arm: native float `avg_px_open`, V8-baseline gate mismatch, protective ACK ordering, deferred
+position snapshot and a fail-closed overlap guard.
+
+| Full slice (2,160 bars) | V9 | V8 | Δ |
+|---|---|---|---|
+| Closed campaigns | 24 | 44 | −20 |
+| Net PnL (USDT) | **−33.92107028** | **−8.57430674** | **−25.34676354** |
+| Mean net R | −0.049252 | −0.021638 | −0.027613 |
+| Max DD | 1.847% | 1.804% | +0.043 pp |
+| Fees | 20.5712 | 36.7661 | −16.1948 |
+
+**V9 underperformed V8 on this single slice.** Descriptive only, claim `NONE`. Protection findings
+(`MISSING_ACK`, quantity/netting conflicts) are reported, not suppressed; the arm is not claimed
+production-ready. Matched random-entry controls and PIT regime splits are implemented; their
+end-to-end comparison awaits a costed V9 treatment pool. The measured V8 baseline replay
+(`per_leg_notional=1000`) remains available; its −21.235 USDT result uses a different accounting
+basis from the −8.574 sim-arm baseline and must not be compared without equalisation.
+
+### Gates on `079d33c`
+
+- `ruff check src tests`: clean
+- `mypy src`: clean, 253 files
+- `pytest -q`: **2796 passed, 67 skipped, 512 deselected, 12.86 s**
+- GitHub Actions V9 gate: runs on push/PR for this head
+
+### Still not claimed
+
+No economic edge, no live approval, no 24–48 h soak, no altcoin qualification, no sealed-OOS read.
+PR #67 remains a draft and must not be merged automatically.
