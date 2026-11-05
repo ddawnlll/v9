@@ -52,6 +52,8 @@ from v8_next.adapters.expert_strategy import (
     ExpertStrategyConfig,
     _bar_duration_ns,
 )
+from v8_next.adapters.horizon_shadow import MultiHorizonShadowPipeline
+from v8_next.adapters.native_callback_trace import capture_native_callback
 from v8_next.adapters.protection_invariants import (
     Direction,
     OrderRole,
@@ -68,6 +70,7 @@ from v8_next.domain.decision import (
     VenueOrderStatus,
     lifecycle_of,
 )
+from v8_next.domain.horizon_aggregation import M15_NS
 from v8_next.domain.horizons import Timeframe, assemble_context
 from v8_next.domain.market import Candle, CausalFrame, frame_at_incremental
 from v8_next.domain.observation import (
@@ -77,7 +80,7 @@ from v8_next.domain.observation import (
     build_view,
 )
 from v8_next.domain.positioning import PositioningReading
-from v8_next.economics.decisions import Opportunity, StanceKind, opportunity_at
+from v8_next.economics.decisions import Opportunity, StanceKind, linear_exposure_id, opportunity_at
 from v8_next.economics.grammar import grammar_opportunity
 from v8_next.economics.legality import PositionPresence
 from v8_next.economics.policy import (
@@ -174,6 +177,7 @@ class SimArmConfig:
     enabled: bool = False
     instrument_id: str = "BTCUSDT-PERP.BINANCE"
     bar_type_str: str = "BTCUSDT-PERP.BINANCE-1-HOUR-LAST-EXTERNAL"
+    multi_horizon_shadow: bool = False
     grammar_policy: str = "range-breakout-48-v1"
     min_support_quorum: int = 1
     #: Matches the V8 audit/portfolio baseline gate (`audit.pipeline._config`:
@@ -191,6 +195,10 @@ class SimArmConfig:
     max_concurrent_positions: int = 1
 
     def __post_init__(self) -> None:
+        if not isinstance(self.multi_horizon_shadow, bool):
+            raise TypeError("multi_horizon_shadow must be a bool")
+        if self.multi_horizon_shadow and self.bar_type_str != f"{self.instrument_id}-15-MINUTE-LAST-EXTERNAL":
+            raise ValueError("multi-horizon shadow requires an explicit M15 source bar type")
         if not isinstance(self.enabled, bool):
             raise TypeError("enabled must be a bool")
         if not self.instrument_id.strip():
@@ -342,6 +350,7 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         config: SimArmConfig,
         *,
         source_candles: dict[int, Candle] | None = None,
+        source_quality: dict[int, QualityState] | None = None,
         readings: tuple[PositioningReading, ...] = (),
         audit_recorder: Any | None = None,
     ) -> None:
@@ -359,9 +368,11 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             audit_recorder=audit_recorder,
         )
         self.sim_config = config
+        self._source_quality = dict(source_quality or {})
         # ---- V9 chain state -------------------------------------------------
         self._policy = TraderDecisionPolicy()
         self._feature_cache = FeatureCache()
+        self._horizon_shadow = MultiHorizonShadowPipeline(config.instrument_id) if config.multi_horizon_shadow else None
         self._belief: MarketBeliefV1 | None = None
         self._observations: list[Observation] = []
         self._frame: CausalFrame | None = None
@@ -372,6 +383,7 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self.order_markers: list[ArmOrderMarker] = []
         #: Protection-invariants input, in observed native order.
         self.protection_events: list[ProtectionEvent] = []
+        self.native_callback_trace: list[dict[str, Any]] = []
         self.book_transitions: list[dict[str, Any]] = []
         # ---- native order bookkeeping ---------------------------------------
         self._order_facts: dict[str, _OrderFacts] = {}
@@ -381,14 +393,10 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self._pending_protective: dict[str, ProtectionEvent] = {}
         self._pending_protective_ack: dict[str, ProtectionEvent] = {}
         self._position_decision: dict[str, str] = {}
+        self._entry_opportunities: dict[str, str] = {}
         self._reduce_decision: dict[str, str] = {}
         self._live_protection: dict[str, str] = {}
         self._pending_flat: dict[str, ProtectionEvent] = {}
-        #: Opened-position snapshots are published on the next bar, after the
-        #: bracket children's ACK callbacks for the opening batch, so the
-        #: invariant checker does not report a transient missing ACK that the
-        #: venue answers later in the same event batch.
-        self._pending_snapshots: dict[str, tuple[int, Decimal, Direction | None]] = {}
         #: Positions this session has seen open and not yet seen close. Used as a
         #: fail-closed overlap guard: a cache miss must never permit a second
         #: entry that would leave the first bracket under-sized.
@@ -399,15 +407,34 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
     # ------------------------------------------------------------------ entry
     def on_bar(self, bar: Bar) -> None:
         """One closed bar: advance the V9 chain, then act on its decision."""
+        if self._horizon_shadow is not None:
+            if getattr(bar, "bar_type", None) != self.bar_type:
+                raise SimArmRefused(
+                    "SHADOW_BAR_TYPE_MISMATCH", "native bar type differs from the subscribed M15 feed"
+                )
+            source = self.source_candles.get(int(bar.ts_event))
+            if (source is None or source.end_ns != int(bar.ts_event)
+                or source.available_ns != source.end_ns or int(bar.ts_init) != source.end_ns
+                or source.instrument_id != str(self.instrument_id)
+                or source.end_ns - source.start_ns != M15_NS or source.start_ns % M15_NS
+                or source.received_ns > source.end_ns
+                or self._source_quality.get(source.end_ns) is not QualityState.OK):
+                raise SimArmRefused("SHADOW_AVAILABILITY_UNPROVEN",
+                                    "M15 source must be explicitly available at the native callback")
+            if (source.open != bar.open.as_decimal() or source.high != bar.high.as_decimal()
+                or source.low != bar.low.as_decimal() or source.close != bar.close.as_decimal()
+                or source.volume != bar.volume.as_decimal()):
+                raise SimArmRefused("SHADOW_SOURCE_BAR_MISMATCH",
+                                    "native event values differ from verified source candle")
         candle = self._candle_from(bar)
         self.candles.append(candle)
         self._observations.append(_observation_of(candle, len(self._observations)))
         cut = candle.end_ns
 
         self._flush_pending_flat(unconditional=True)
-        self._flush_pending_snapshots()
         self._flush_pending_pairs()
-        self._reprotect_remaining(candle)
+        if self._horizon_shadow is None:
+            self._reprotect_remaining(candle)
         for transitioned in self.opportunity_book.on_candle(candle):
             self.book_transitions.append(
                 {
@@ -431,20 +458,38 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         context = assemble_context(
             {Timeframe.H1: view}, instrument_id=str(self.instrument_id), decision_time_ns=cut
         )
-        belief = advance(self._belief, view, context, now_ns=cut)
-        self._belief = belief
-
         opportunity = self._detect(frame)
+        if self._horizon_shadow is not None and opportunity is not None:
+            if (opportunity.instrument_id != candle.instrument_id
+                    or opportunity.exposure_id != linear_exposure_id(candle.instrument_id)
+                    or opportunity.identity_status != "CANONICAL"
+                    or opportunity.direction not in {"LONG", "SHORT"}
+                    or opportunity.anchor_ns != candle.end_ns
+                    or opportunity.expires_ns <= candle.end_ns
+                    or not opportunity.opportunity_id.strip()):
+                raise SimArmRefused("SHADOW_OPPORTUNITY_UNVERIFIED",
+                                    "grammar episode identity and market binding are required")
         record = self._remember_opportunity(opportunity, candle)
-        bundle = produce_evidence(
-            view=view,
-            context=context,
-            frame=frame,
-            cache=self._feature_cache,
-            belief=belief,
-            opportunity=opportunity,
-            readings=self.readings,
-        )
+        if self._horizon_shadow is not None:
+            belief, bundle = self._horizon_shadow.advance(candle, cut=cut, opportunity=opportunity,
+                                                          quality=self._source_quality[cut], readings=self.readings)
+        else:
+            belief = advance(self._belief, view, context, now_ns=cut)
+            bundle = produce_evidence(
+                view=view,
+                context=context,
+                frame=frame,
+                cache=self._feature_cache,
+                belief=belief,
+                opportunity=opportunity,
+                readings=self.readings,
+            )
+        self._belief = belief
+        if self._horizon_shadow is not None and record is not None:
+            if (opportunity is None or record.lineage_hash != opportunity.opportunity_id
+                    or record.metadata.get("shadow_source_opportunity_id") != opportunity.opportunity_id):
+                raise SimArmRefused("SHADOW_OPPORTUNITY_LINEAGE_MISMATCH",
+                                    "expert opportunity must be bound to the book record")
         supported = record is not None and self._supported(bundle)
         if supported and record is not None:
             self.opportunity_book.update_status(
@@ -467,7 +512,14 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         request = self._request(cut, belief, opportunity_view, bundle, position)
         decision = self._policy.evaluate(request)
         explanation = self._policy.explain(request)
-        outcome = self._apply(decision.action, decision.decision_id, candle, position, direction)
+        if decision.action is DecisionAction.ENTER and opportunity_view is not None:
+            # Bind the actual entry decision before native submission callbacks
+            # can fire. A later opportunity must never replace the entry thesis.
+            self._entry_opportunities[decision.decision_id] = opportunity_view.opportunity_id
+        outcome = ("SHADOW_NO_EXECUTION" if self._horizon_shadow is not None else
+                   self._apply(decision.action, decision.decision_id, candle, position, direction))
+        if decision.action is DecisionAction.ENTER and not outcome.startswith("SUBMITTED_BRACKET_"):
+            self._entry_opportunities.pop(decision.decision_id, None)
 
         self.arm_decisions.append(
             {
@@ -498,7 +550,19 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 "evidence_quorum_met": supported,
                 "executed": outcome,
                 "sim_arm": True,
-                "advisory_only": False,
+                "advisory_only": self._horizon_shadow is not None,
+                **({"shadow_source_opportunity_id": (
+                    opportunity.opportunity_id if opportunity is not None else None
+                ), "shadow_book_opportunity_id": (
+                    record.opportunity_id if record is not None else None
+                ), "shadow_inputs": [
+                    {"expert_id": w.stance.observer_id, "source_opportunity_id": w.stance.opportunity_id,
+                     "primary": w.context.profile.primary.value,
+                     "provenance": w.context.input_provenance, "stance": row.stance.value,
+                     "reason": row.reason, "warmup_ok": row.warmup_ok}
+                    for w, row in zip(self._horizon_shadow.last_witnesses, bundle.evidence, strict=True)
+                ], "shadow_alignments": [a.model_dump(mode="json") for a in belief.horizons.alignments]}
+                if self._horizon_shadow is not None else {}),
             }
         )
 
@@ -590,6 +654,9 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             as_of_time_ns=candle.end_ns,
             valid_until_ns=opportunity.expires_ns,
             status=OpportunityStatus.CANDIDATE,
+            lineage_hash=(opportunity.opportunity_id if self._horizon_shadow is not None else ""),
+            metadata=({"shadow_source_opportunity_id": opportunity.opportunity_id}
+                      if self._horizon_shadow is not None else None),
         )
         self.opportunity_book.insert(record)
         return record
@@ -608,11 +675,10 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
     ) -> _OpportunityFacts | None:
         """The episode the policy may act on, as it was knowable at ``cut``.
 
-        While flat, only the episode *this bar detected* is offered: an episode
-        that stayed armed from an earlier bar is not a fresh entry signal, so it
-        must not become one (the V8 gate is per detection bar too). With an open
-        position the book's latest live episode is offered instead, because the
-        management actions need the identity the position was opened under.
+        While flat, only the episode *this bar detected* is offered. With an
+        open position, only the episode attached to its actual entry decision
+        may be used. A missing join fails closed instead of selecting a newer,
+        unrelated opportunity.
         """
         snapshot = self.opportunity_book.snapshot(cut)
         episodes = {episode.opportunity.opportunity_id: episode for episode in snapshot.episodes}
@@ -627,24 +693,15 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 lifecycle=lifecycle_of(episode.status),
                 as_of_ns=episode.opportunity.as_of_time_ns,
             )
-        live = [
-            episode
-            for episode in episodes.values()
-            if episode.opportunity.instrument_id == str(self.instrument_id)
-            and lifecycle_of(episode.status)
-            in (
-                OpportunityLifecycle.WATCHING,
-                OpportunityLifecycle.ARMED,
-                OpportunityLifecycle.ADMITTED,
-            )
-        ]
-        if not live:
+        entry_decision = self._position_decision.get(str(position.id))
+        opportunity_id = self._entry_opportunities.get(entry_decision or "")
+        episode = episodes.get(opportunity_id or "")
+        if episode is None or episode.opportunity.instrument_id != str(self.instrument_id):
             return None
-        latest = max(live, key=lambda episode: episode.opportunity.as_of_time_ns)
         return _OpportunityFacts(
-            opportunity_id=latest.opportunity.opportunity_id,
-            lifecycle=lifecycle_of(latest.status),
-            as_of_ns=latest.opportunity.as_of_time_ns,
+            opportunity_id=episode.opportunity.opportunity_id,
+            lifecycle=lifecycle_of(episode.status),
+            as_of_ns=episode.opportunity.as_of_time_ns,
         )
 
     def _request(
@@ -822,14 +879,13 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 direction=order_direction,
             )
             self._mark_order(client_order_id, decision_id, role)
-        self.submit_order_list(children)
-        self._any_order_seen = True
         self._audit(
-            "PROTECTIVE_STOP_CREATED",
+            "ORDER_CREATED",
             int(candle.end_ns),
             evidence=ARM_EVIDENCE_CLASS,
             decision_id=decision_id,
             arm_role="STOP",
+            client_order_id=str(children[1].client_order_id),
             order_role="STOP_LOSS",
             order_type="STOP_MARKET",
             trigger_price=str(sl_price),
@@ -839,11 +895,12 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             advisory_only=False,
         )
         self._audit(
-            "TARGET_CREATED",
+            "ORDER_CREATED",
             int(candle.end_ns),
             evidence=ARM_EVIDENCE_CLASS,
             decision_id=decision_id,
             arm_role="TARGET",
+            client_order_id=str(children[2].client_order_id),
             order_role="TAKE_PROFIT",
             order_type="LIMIT",
             price=str(tp_price),
@@ -852,6 +909,8 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             sim_arm=True,
             advisory_only=False,
         )
+        self.submit_order_list(children)
+        self._any_order_seen = True
         return f"SUBMITTED_BRACKET_{'LONG' if side is OrderSide.BUY else 'SHORT'}_{quantity}({sizing_note})"
 
     def _entry_quantity(self, instrument: Any, px: Decimal) -> tuple[Quantity | None, str]:
@@ -899,90 +958,17 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
     def _reduce(self, decision_id: str, position: Position | None) -> str:
         if position is None:
             return "REDUCE_WITHOUT_POSITION"
-        instrument = self.cache.instrument(self.instrument_id)
-        if instrument is None:
-            return "SKIPPED_NO_INSTRUMENT"
-        held = position.quantity.as_decimal()
-        step = instrument.size_increment.as_decimal()
-        half = ((held / 2) // step) * step if step > 0 else held / 2
-        if half <= 0 or half < instrument.min_quantity.as_decimal():
-            return "REDUCE_BELOW_MIN_QUANTITY"
-        self._cancel_protection()
-        quantity = Quantity.from_str(format(half, f".{instrument.size_precision}f"))
-        long_side = position_direction(position) is ExposureDirection.LONG
-        side = OrderSide.SELL if long_side else OrderSide.BUY
-        short = decision_id[:12]
-        order = self.order_factory.market(
-            instrument_id=self.instrument_id,
-            order_side=side,
-            quantity=quantity,
-            reduce_only=True,
-            tags=self._tags(decision_id, "REDUCE"),
-            client_order_id=ClientOrderId(f"S-{short}-R"),
-        )
-        client_order_id = str(order.client_order_id)
-        self._order_facts[client_order_id] = _OrderFacts(
-            role=OrderRole.OTHER,
-            arm_role="REDUCE",
-            decision_id=decision_id,
-            direction=Direction.LONG if long_side else Direction.SHORT,
-            position_id=str(position.id),
-        )
-        self._mark_order(client_order_id, decision_id, "REDUCE")
-        self.submit_order(order, position_id=position.id)
-        self._any_order_seen = True
-        self._reprotect.add(str(position.id))
-        self._reduce_decision[str(position.id)] = decision_id
-        return f"SUBMITTED_REDUCE_ONLY_{quantity}"
+        # Cancel-first reduction leaves exposure without its only verified stop.
+        # Until a native, independently audited transition preserves coverage,
+        # keep the advisory visible but refuse its order side effect.
+        return "REDUCE_BLOCKED_UNVERIFIED_PROTECTION_TRANSITION"
 
     def _exit(self, decision_id: str, position: Position | None) -> str:
         if position is None:
             return "EXIT_WITHOUT_POSITION"
-        self._cancel_protection()
-        long_side = position_direction(position) is ExposureDirection.LONG
-        side = OrderSide.SELL if long_side else OrderSide.BUY
-        short = decision_id[:12]
-        order = self.order_factory.market(
-            instrument_id=self.instrument_id,
-            order_side=side,
-            quantity=position.quantity,
-            reduce_only=True,
-            tags=self._tags(decision_id, "EXIT"),
-            client_order_id=ClientOrderId(f"S-{short}-X"),
-        )
-        client_order_id = str(order.client_order_id)
-        self._order_facts[client_order_id] = _OrderFacts(
-            role=OrderRole.OTHER,
-            arm_role="EXIT",
-            decision_id=decision_id,
-            direction=Direction.LONG if long_side else Direction.SHORT,
-            position_id=str(position.id),
-        )
-        self._mark_order(client_order_id, decision_id, "EXIT")
-        self.submit_order(order, position_id=position.id)
-        self._any_order_seen = True
-        self._reprotect.discard(str(position.id))
-        return f"SUBMITTED_EXIT_REDUCE_ONLY_{position.quantity}"
-
-    def _cancel_protection(self) -> int:
-        """Cancel live protective children before changing the exposure.
-
-        A partial or full exit that left a full-size stop resting would leave
-        protection larger than the position (``REDUCE_ONLY_OVER_QUANTITY``) or
-        protection standing after the position is flat
-        (``STALE_PROTECTION_ORDER``); the arm therefore cancels first and
-        re-protects only what remains.
-        """
-        cancelled = 0
-        for order in list(self.cache.orders_open(instrument_id=self.instrument_id)):
-            order_type = str(order.order_type).upper()
-            is_stop = "STOP" in order_type
-            is_target = "LIMIT" in order_type and bool(order.is_reduce_only)
-            if not (is_stop or is_target):
-                continue
-            self.cancel_order(order.client_order_id)
-            cancelled += 1
-        return cancelled
+        # A submitted market exit is not a fill; retain the verified stop while
+        # the native exit/protection handoff remains unqualified.
+        return "EXIT_BLOCKED_UNVERIFIED_PROTECTION_TRANSITION"
 
     # ------------------------------------------------------- re-protection
     def _reprotect_remaining(self, candle: Candle) -> None:
@@ -1057,21 +1043,22 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                     position_id=position_id,
                 )
                 self._mark_order(client_order_id, decision_id, arm_role)
+                self._audit(
+                    "ORDER_CREATED",
+                    int(candle.end_ns),
+                    evidence=ARM_EVIDENCE_CLASS,
+                    decision_id=decision_id,
+                    client_order_id=client_order_id,
+                    position_id=position_id,
+                    arm_role=arm_role,
+                    quantity=str(quantity),
+                    reason="REPROTECT_REDUCED_POSITION",
+                    sim_arm=True,
+                    advisory_only=False,
+                )
                 self.submit_order(order, position_id=position.id)
             self._any_order_seen = True
             self._reprotect.discard(position_id)
-            self._audit(
-                "PROTECTIVE_STOP_CREATED",
-                int(candle.end_ns),
-                evidence=ARM_EVIDENCE_CLASS,
-                decision_id=decision_id,
-                arm_role="STOP",
-                quantity=str(quantity),
-                trigger_price=str(stop_px),
-                reason="REPROTECT_REDUCED_POSITION",
-                sim_arm=True,
-                advisory_only=False,
-            )
 
     def _protection_in_flight(self, position_id: str) -> bool:
         """True while a reduce/exit order for this position has not resolved."""
@@ -1157,6 +1144,7 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
     # ------------------------------------------------- native event translation
     def on_order_event(self, event: Any) -> None:
         """Record the native event, then translate it into a protection event."""
+        capture_native_callback(self.native_callback_trace, "on_order_event", event)
         super().on_order_event(event)
         kind = _PROTECTION_KIND.get(type(event).__name__)
         if kind is None:
@@ -1228,6 +1216,8 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 submission = self._pending_protective.pop(client_id, None)
                 if submission is not None:
                     position_id = event.position_id or submission.position_id
+                    if not position_id and facts is not None:
+                        position_id = self._position_for_decision(facts.decision_id)
                     if position_id:
                         self._publish_protective(
                             replace(submission, position_id=position_id),
@@ -1248,12 +1238,19 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 ProtectionEventKind.FILL,
             ):
                 submission = self._pending_protective.pop(client_id, None)
+                acknowledgement = self._pending_protective_ack.pop(client_id, None)
                 if submission is not None:
-                    position_id = event.position_id or submission.position_id
-                    if position_id:
-                        submission = replace(submission, position_id=position_id)
-                        event = replace(event, position_id=position_id)
+                    # An unresolved ACK cannot be assigned to a position merely
+                    # because a later fill carries one. Keep the missing binding
+                    # visible to the checker and retain the callback in order.
+                    if acknowledgement is None:
+                        position_id = event.position_id or submission.position_id
+                        if position_id:
+                            submission = replace(submission, position_id=position_id)
+                            event = replace(event, position_id=position_id)
                     self.protection_events.append(submission)
+                if acknowledgement is not None:
+                    self.protection_events.append(acknowledgement)
                 self.protection_events.append(event)
                 if event.kind in (
                     ProtectionEventKind.CANCELED,
@@ -1287,28 +1284,38 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self._live_protection[acknowledgement.client_order_id] = acknowledgement.position_id
 
     def on_position_opened(self, event: Any) -> None:
+        capture_native_callback(self.native_callback_trace, "on_position_opened", event)
         super().on_position_opened(event)
         position_id = str(getattr(event, "position_id", "") or "")
         if not position_id:
             return
         self._seen_open_positions.add(position_id)
-        position = self.cache.position(event.position_id)
-        quantity = position.quantity.as_decimal() if position is not None else Decimal(0)
+        quantity = getattr(event, "quantity", None)
+        side = str(getattr(event, "side", "")).split(".")[-1].upper()
         direction = (
-            Direction.LONG
-            if position_direction(position) is ExposureDirection.LONG
-            else Direction.SHORT
+            Direction.LONG if side == "LONG" else Direction.SHORT if side == "SHORT" else None
         )
-        self._pending_snapshots[position_id] = (
-            int(getattr(event, "ts_event", 0) or 0),
-            quantity,
-            direction,
-        )
+        if quantity is not None:
+            self._append_snapshot(
+                int(getattr(event, "ts_event", 0) or 0),
+                position_id,
+                _as_decimal(quantity),
+                direction,
+            )
         self._flush_pending_children(position_id)
 
     def _flush_pending_children(self, position_id: str) -> None:
         """Append buffered protective submission/ACK events for ``position_id``."""
         self._flush_pending_pairs(position_id)
+
+    def _position_for_decision(self, decision_id: str) -> str:
+        if not decision_id:
+            return ""
+        matches = [
+            pid for pid, recorded in self._position_decision.items()
+            if recorded == decision_id and pid in self._seen_open_positions
+        ]
+        return matches[0] if len(matches) == 1 else ""
 
     def _flush_pending_pairs(self, position_id: str | None = None) -> None:
         """Publish any submission/ACK pair whose position id is now known."""
@@ -1317,11 +1324,10 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             submission = self._pending_protective.pop(client_id, None)
             if submission is None:
                 continue
-            resolved = acknowledgement.position_id or submission.position_id or position_id
-            if not resolved and len(self._seen_open_positions) == 1:
-                # Netting mode reuses one position id; while exactly one position
-                # is open, a protective ACK with no explicit id belongs to it.
-                resolved = next(iter(self._seen_open_positions))
+            resolved = acknowledgement.position_id or submission.position_id
+            facts = self._order_facts.get(client_id)
+            if not resolved and facts is not None:
+                resolved = self._position_for_decision(facts.decision_id)
             if not resolved:
                 # Keep the pair until a position callback supplies the id.
                 self._pending_protective_ack[client_id] = acknowledgement
@@ -1332,7 +1338,12 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 replace(acknowledgement, position_id=resolved),
             )
 
+    def on_position_changed(self, event: Any) -> None:
+        capture_native_callback(self.native_callback_trace, "on_position_changed", event)
+        super().on_position_changed(event)
+
     def on_position_closed(self, event: Any) -> None:
+        capture_native_callback(self.native_callback_trace, "on_position_closed", event)
         super().on_position_closed(event)
         position_id = str(getattr(event, "position_id", "") or "")
         if not position_id:
@@ -1346,6 +1357,9 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self._flush_pending_flat(position_id=position_id)
         self._seen_open_positions.discard(position_id)
         self._reprotect.discard(position_id)
+        decision_id = self._position_decision.pop(position_id, None)
+        if decision_id is not None:
+            self._entry_opportunities.pop(decision_id, None)
 
     def _append_snapshot(
         self, ts_ns: int, position_id: str, quantity: Decimal, direction: Direction | None
@@ -1359,11 +1373,6 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 quantity=quantity,
             )
         )
-
-    def _flush_pending_snapshots(self) -> None:
-        for position_id in sorted(self._pending_snapshots):
-            ts_ns, quantity, direction = self._pending_snapshots.pop(position_id)
-            self._append_snapshot(ts_ns, position_id, quantity, direction)
 
     def _flush_pending_flat(
         self, *, position_id: str | None = None, unconditional: bool = False

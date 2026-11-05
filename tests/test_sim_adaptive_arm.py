@@ -30,6 +30,7 @@ from v8_next.adapters.adaptive_strategy import (
     _as_decimal,
 )
 from v8_next.evaluation.sim_arm import run_baseline_arm, run_sim_arm
+from v8_next.opportunities.models import OpportunityStatus
 
 TAPE = Path(__file__).resolve().parents[1] / "research/tape/btcusdt-1h-2025Q1"
 
@@ -82,6 +83,47 @@ def test_consensus_gate_matches_the_measured_v8_baseline() -> None:
     assert config.baseline_config().target_notional == Decimal("1000")
 
 
+def test_management_side_effects_refuse_unverified_stop_handoff() -> None:
+    # No access to cache, cancel_order, or submit_order is available on this
+    # sentinel: the blocked path must not cancel the position's only stop.
+    strategy = SimpleNamespace()
+    position = SimpleNamespace()
+    assert AdaptiveSimStrategy._reduce(strategy, "decision", position) == (
+        "REDUCE_BLOCKED_UNVERIFIED_PROTECTION_TRANSITION"
+    )
+    assert AdaptiveSimStrategy._exit(strategy, "decision", position) == (
+        "EXIT_BLOCKED_UNVERIFIED_PROTECTION_TRANSITION"
+    )
+
+
+def test_open_position_uses_its_entry_opportunity_not_latest() -> None:
+    def episode(identity: str, at: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            opportunity=SimpleNamespace(
+                opportunity_id=identity, instrument_id="BTC", as_of_time_ns=at
+            ),
+            status=OpportunityStatus.CANDIDATE,
+        )
+
+    strategy = SimpleNamespace(
+        opportunity_book=SimpleNamespace(
+            snapshot=lambda _: SimpleNamespace(episodes=[episode("entry", 1), episode("new", 2)])
+        ),
+        instrument_id="BTC",
+        _position_decision={"position": "decision"},
+        _entry_opportunities={"decision": "entry"},
+    )
+    result = AdaptiveSimStrategy._opportunity_view(
+        strategy, 3, None, SimpleNamespace(id="position")
+    )
+    assert result is not None
+    assert result.opportunity_id == "entry"
+    strategy._entry_opportunities.clear()
+    assert AdaptiveSimStrategy._opportunity_view(
+        strategy, 3, None, SimpleNamespace(id="position")
+    ) is None
+
+
 def test_costed_smoke_run_on_the_authorized_tape() -> None:
     measurement = run_sim_arm(
         tape=TAPE,
@@ -91,7 +133,8 @@ def test_costed_smoke_run_on_the_authorized_tape() -> None:
     assert measurement.costed is True
     assert measurement.bars == 60
     assert measurement.decision_count >= 54
-    assert measurement.unsupported == ()
+    assert "PROTECTION_NOT_QUALIFIED_BUFFERED_NATIVE_CALLBACKS" in measurement.unsupported
+    assert measurement.protection["qualification"] == "NOT_QUALIFIED"
     assert measurement.provenance.tape_sha256
     assert measurement.orders_digest
     assert measurement.decisions_digest

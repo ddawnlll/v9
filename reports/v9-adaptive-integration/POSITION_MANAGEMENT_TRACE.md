@@ -1,0 +1,5 @@
+# Position management trace
+
+No native adaptive stop amendment, target management action, or thesis-driven execution has been verified in this work. The existing strategy uses a static bracket on entry and does not construct or evaluate `PositionThesis` in its native lifecycle. Previous REDUCE/EXIT paths canceled the only existing protection before an exit order was confirmed; they are now explicitly blocked until a safe, independently verified native handoff exists. This is a safety restriction, not completion of the management architecture. There is no native adaptive order timeline to report.
+
+A separate entry-identity correction binds an open position to the opportunity referenced by its actual entry decision. The previous implementation selected the most recent live episode, which could silently replace the position's original rationale. A missing entry join returns no opportunity. `tests/test_sim_adaptive_arm.py::test_open_position_uses_its_entry_opportunity_not_latest` covers this mechanical behavior; this does not create a `PositionThesis` or verify execution of management actions.

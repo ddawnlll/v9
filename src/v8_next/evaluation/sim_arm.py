@@ -70,7 +70,10 @@ from v8_next.adapters.portfolio_backtest import (
     _plan_funding_events,
     base_currency,
 )
-from v8_next.adapters.protection_invariants import BracketInvariantChecker
+from v8_next.adapters.protection_invariants import (
+    BracketInvariantChecker,
+    ProtectionEvent,
+)
 from v8_next.domain.market import Candle
 from v8_next.evaluation.ablations import (
     BASELINE_ARM_ID,
@@ -263,10 +266,13 @@ def _commission_total(fill_records: tuple[dict[str, Any], ...] | list[dict[str, 
     return float(total), unparsable
 
 
-def _funding_total(positions: list[dict[str, Any]]) -> tuple[float, int]:
-    """Funding cost carried by the engine's own position adjustments."""
+def _funding_total(
+    positions: list[dict[str, Any]], *, campaign_openings: int
+) -> tuple[float | None, int]:
+    """Sum a final snapshot only if it can contain the whole campaign history."""
+    if campaign_openings > 1 or bool(campaign_openings) != bool(positions):
+        return None, 0
     total = _ZERO
-    counted = 0
     unparsable = 0
     for position in positions:
         for adjustment in position.get("adjustments") or []:
@@ -277,8 +283,7 @@ def _funding_total(positions: list[dict[str, Any]]) -> tuple[float, int]:
                 unparsable += 1
                 continue
             total += parsed
-            counted += 1
-    return float(total), unparsable
+    return (None if unparsable else float(total)), unparsable
 
 
 def _campaign_metrics(
@@ -474,6 +479,40 @@ def _drive(
         engine.dispose()
 
 
+def _audit_protection(
+    events: list[ProtectionEvent],
+) -> tuple[BracketInvariantChecker, list[dict[str, Any]]]:
+    """Audit every observed callback; no assumed atomicity across callbacks.
+
+    Transitions describe observed states, not duration or proof that the event
+    producer captured every venue callback. An unacknowledged order stays a gap
+    until an acceptance or fill is observed.
+    """
+    checker = BracketInvariantChecker()
+    transitions: list[dict[str, Any]] = []
+    previous: dict[str, tuple[str, str]] = {}
+    for event in events:
+        checker.apply(event)
+        positions = checker.snapshot()["positions"]
+        assert isinstance(positions, dict)
+        for position_id in positions:
+            quantity = checker.position_quantity(position_id)
+            state = checker.state_of(position_id).value
+            observed = (state, str(quantity))
+            if previous.get(position_id) != observed:
+                transitions.append(
+                    {
+                        "ts_ns": event.ts_ns,
+                        "event_kind": event.kind.value,
+                        "position_id": position_id,
+                        "quantity": str(quantity),
+                        "state": state,
+                    }
+                )
+                previous[position_id] = observed
+    return checker, transitions
+
+
 def _measure(
     *,
     arm_id: str,
@@ -509,8 +548,19 @@ def _measure(
     if unparsable_fees:
         unsupported.append(f"FEE_TOTAL_PARTIAL:{unparsable_fees} fill(s) without a parsable commission")
     funding_total: float | None
-    funding_total, unparsable_funding = _funding_total(positions)
+    funding_total, unparsable_funding = _funding_total(
+        positions, campaign_openings=len(strategy.opened_positions)
+    )
+    # The NETTING cache holds only the latest incarnation for a reused position
+    # identity. A final snapshot cannot prove lifetime adjustments across
+    # multiple campaigns, even when its observed sum happens to be zero.
+    if len(strategy.opened_positions) > 1 or bool(strategy.opened_positions) != bool(positions):
+        unsupported.append(
+            "FUNDING_UNSUPPORTED_NETTING_CACHE_HISTORY: final position cache "
+            "cannot establish complete campaign adjustment history"
+        )
     if unparsable_funding:
+        funding_total = None
         unsupported.append(f"FUNDING_TOTAL_PARTIAL:{unparsable_funding} adjustment(s) unparsable")
     if not window.funding:
         funding_total = None
@@ -519,6 +569,7 @@ def _measure(
             "a zero here would be absence, not a measured cost"
         )
     elif result["funding_settlements_fed"] == 0:
+        funding_total = None
         unsupported.append("FUNDING_UNSUPPORTED_NO_SETTLEMENTS_IN_WINDOW")
 
     decisions: list[dict[str, Any]]
@@ -530,36 +581,14 @@ def _measure(
         decisions_digest = str(ledger["decisions_digest"])
         orders_digest = str(ledger["digest"])
         protection_events = list(strategy.protection_events)
-        checker = BracketInvariantChecker()
-        # A protective submission is one observation unit with its first native
-        # resolution (ACK, fill, cancel or reject). The ACK can arrive in the same
-        # engine step, and an order can fill before any observable ACK; publishing
-        # the submission alone would record a transient MISSING_ACK that the
-        # resolution immediately disproves. Unresolved submissions are still
-        # applied alone below and therefore still report a genuine gap.
-        resolution_kinds = {"ACK", "FILL", "PARTIAL_FILL", "CANCELED", "REJECTED"}
-        index = 0
-        while index < len(protection_events):
-            event = protection_events[index]
-            if event.kind.value == "ORDER_SUBMITTED":
-                resolved_at = next(
-                    (
-                        offset
-                        for offset in range(index + 1, len(protection_events))
-                        if protection_events[offset].client_order_id
-                        == event.client_order_id
-                        and protection_events[offset].kind.value in resolution_kinds
-                    ),
-                    None,
-                )
-                if resolved_at is not None:
-                    checker.apply_batch(protection_events[index : resolved_at + 1])
-                    index = resolved_at + 1
-                    continue
-            checker.apply_batch((event,))
-            index += 1
+        checker, protection_transitions = _audit_protection(protection_events)
+        # The producer still buffers some native callbacks before publishing
+        # them, so even a clean observed ledger cannot establish continuous
+        # coverage. A cutoff snapshot is not a lifecycle qualification.
+        unsupported.append("PROTECTION_NOT_QUALIFIED_BUFFERED_NATIVE_CALLBACKS")
         protection = {
             "state": str(checker.state),
+            "qualification": "NOT_QUALIFIED",
             "violations": [
                 {
                     "code": violation.code.value,
@@ -571,6 +600,8 @@ def _measure(
                 for violation in checker.violations
             ],
             "events_applied": checker.events_applied,
+            "transitions": protection_transitions,
+            "native_callback_trace": list(strategy.native_callback_trace),
             "snapshot": checker.snapshot(),
             "digest": checker.digest(),
         }
@@ -728,6 +759,9 @@ def run_sim_arm(
         raise TypeError(f"expected SimArmConfig, got {type(config).__name__}")
     if config.enabled is not True:
         raise SimArmDisabled()
+    if config.multi_horizon_shadow:
+        raise SimArmRefused("SHADOW_TAPE_AVAILABILITY_UNPROVEN",
+                            "load_multitape assumes close-time availability; use a verified shadow feed")
     jsonl, tape_sha = _authorize_tape(tape)
     loaded = load_multitape(jsonl, limit=limit)
     window = _window(loaded, config, limit)
@@ -780,6 +814,9 @@ def run_baseline_arm(
     """
     if not isinstance(config, SimArmConfig):
         raise TypeError(f"expected SimArmConfig, got {type(config).__name__}")
+    if config.multi_horizon_shadow:
+        raise SimArmRefused("SHADOW_TAPE_AVAILABILITY_UNPROVEN",
+                            "load_multitape assumes close-time availability; use a verified shadow feed")
     expected = config.baseline_config()
     if baseline_config is not None and baseline_config != expected:
         raise SimArmRefused(
