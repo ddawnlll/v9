@@ -1,26 +1,14 @@
 {
-  "L24_k1": {
-    "control_mean_r": -0.03286942200693509,
-    "net_expectancy_r": -0.08700160823641478,
+  "L1_k1": {
+    "control_mean_r": -0.042838854945902144,
+    "net_expectancy_r": -0.04194475139485105,
     "positive_symbols": 2,
-    "trades": 1244
+    "trades": 5069
   },
-  "L24_k3": {
-    "control_mean_r": -0.0417841999705554,
-    "net_expectancy_r": 0.051279755084371416,
-    "positive_symbols": 6,
-    "trades": 2617
-  },
-  "L4_k2": {
-    "control_mean_r": -0.045692076061067614,
-    "net_expectancy_r": -0.031175122818178153,
-    "positive_symbols": 4,
-    "trades": 4962
-  },
-  "L72_k2": {
-    "control_mean_r": -0.043378260253638674,
-    "net_expectancy_r": 0.017240388446640626,
-    "positive_symbols": 4,
-    "trades": 1280
+  "L1_k3": {
+    "control_mean_r": -0.0440123582518049,
+    "net_expectancy_r": -0.05712403513358153,
+    "positive_symbols": 1,
+    "trades": 11953
   }
 }

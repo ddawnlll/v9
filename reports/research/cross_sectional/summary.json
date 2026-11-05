@@ -1,71 +1,60 @@
 {
   "primary": {
-    "control_mean_r": -0.04900950949117815,
-    "control_p_value": 0.07960199004975124,
-    "gross_expectancy_r": 0.010658254449810773,
+    "control_mean_r": -0.04483708287584489,
+    "control_p_value": 1.0,
+    "gross_expectancy_r": -0.014769545631242434,
     "leg_mean_ci": {
       "alpha": 0.05,
-      "ci_high": 0.020156056334153273,
-      "ci_low": -0.09664066633959364,
-      "contains_zero": true,
-      "estimate": -0.035255815562772,
-      "n": 2114,
+      "ci_high": -0.031522625616856634,
+      "ci_low": -0.08888386146739627,
+      "contains_zero": false,
+      "estimate": -0.06028357232169551,
+      "n": 9071,
       "resamples": 2000,
       "seed": 20260102
     },
     "legs_per_side": 2,
     "lookback_bars": 24,
-    "maximum_drawdown_usdt": 16822.617635896415,
-    "mode": "momentum",
-    "net_expectancy_r": -0.035255815562772,
-    "net_profit_factor": 0.9472844373734169,
-    "positive_symbols": 5,
+    "maximum_drawdown_usdt": 59430.03159213462,
+    "mode": "flow",
+    "net_expectancy_r": -0.06028357232169551,
+    "net_profit_factor": 0.9114423088225762,
+    "positive_symbols": 1,
     "reasons": [
       "NON_POSITIVE_EXPECTANCY",
-      "CONCENTRATED:5<6",
+      "NOT_ABOVE_MATCHED_CONTROL",
+      "CONCENTRATED:1<6",
       "CONTROL_P_VALUE_NOT_SIGNIFICANT"
     ],
     "status": "NO_EDGE",
     "symbol_mean_ci": {
       "alpha": 0.05,
-      "ci_high": 0.01033459101134653,
-      "ci_low": -0.09700794834891238,
-      "contains_zero": true,
-      "estimate": -0.03726227760611219,
+      "ci_high": -0.030505468671080838,
+      "ci_low": -0.09331821277482491,
+      "contains_zero": false,
+      "estimate": -0.06081582715837667,
       "n": 10,
       "resamples": 2000,
       "seed": 20260101
     },
     "symbols_with_trades": 10,
-    "total_net_pnl_usdt": -7453.0794100100975,
-    "trades": 2114,
-    "treatment_event_mean_r": -0.02595305591559286,
-    "win_rate": 0.35808893093661304
+    "total_net_pnl_usdt": -54683.228452979994,
+    "trades": 9071,
+    "treatment_event_mean_r": -0.06496504802751042,
+    "win_rate": 0.3483629147833756
   },
   "sensitivity": {
-    "L24_k1": {
-      "control_mean_r": -0.03286942200693509,
-      "net_expectancy_r": -0.08700160823641478,
+    "L1_k1": {
+      "control_mean_r": -0.042838854945902144,
+      "net_expectancy_r": -0.04194475139485105,
       "positive_symbols": 2,
-      "trades": 1244
+      "trades": 5069
     },
-    "L24_k3": {
-      "control_mean_r": -0.0417841999705554,
-      "net_expectancy_r": 0.051279755084371416,
-      "positive_symbols": 6,
-      "trades": 2617
-    },
-    "L4_k2": {
-      "control_mean_r": -0.045692076061067614,
-      "net_expectancy_r": -0.031175122818178153,
-      "positive_symbols": 4,
-      "trades": 4962
-    },
-    "L72_k2": {
-      "control_mean_r": -0.043378260253638674,
-      "net_expectancy_r": 0.017240388446640626,
-      "positive_symbols": 4,
-      "trades": 1280
+    "L1_k3": {
+      "control_mean_r": -0.0440123582518049,
+      "net_expectancy_r": -0.05712403513358153,
+      "positive_symbols": 1,
+      "trades": 11953
     }
   }
 }

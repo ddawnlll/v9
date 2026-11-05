@@ -273,3 +273,71 @@ dollar-neutral construction, costs and random two-and-two null.
 * Rank by taker-buy share of quote volume; long the two highest, short the two
   lowest, on rank transitions. Matched random two-and-two null, 50 draws.
 * Status: `PREREGISTERED` (results pending).
+
+### E-007 — results (2026-11-05)
+
+| Metric | Value |
+|---|---:|
+| Events | 2,878 |
+| Legs priced | 9,071 |
+| Net expectancy per leg | **−0.0603 R** |
+| Gross expectancy per leg | −0.0148 R |
+| Matched random two-and-two (50 draws) | −0.0448 R |
+| Control p (one-sided) | 1.000 |
+| Positive symbols | 1 / 10 |
+| Net profit factor | 0.911 |
+| Leg mean 95% CI | [−0.089, −0.032] |
+| Symbol mean 95% CI | [−0.093, −0.031] |
+
+Sensitivity: legs 1 → −0.042, legs 3 → −0.057. Status: `NO_EDGE`.
+
+#### Diagnosis
+
+Aggressive taker-buy share has **no gross directional edge** at the one-hour
+horizon: −0.0148 R before fees, against the ~0.055 R cost drag. The treatment is
+worse than every control draw (p = 1.0) and only AVAXUSDT is positive. Unlike
+E-006, there is not even a positive-before-costs effect to explain; the feature
+is noise at this horizon on this universe.
+
+---
+
+## Program verdict — raw-signal search, 2025-01 development window
+
+Seven primary hypotheses were preregistered and tested; every one is `NO_EDGE`.
+The confirmatory holdout (2025-05-01 → 2025-07-01) remains **sealed and
+unread**, because no candidate froze: spending it on a known loser would destroy
+the only untouched data without testing anything.
+
+| ID | Mechanism | Feature | Net R/leg | Gross R/leg | Control R/leg | Status |
+|---|---|---|---:|---:|---:|---|
+| E-001 | band reversion | price | −0.123 | n/a | −0.044 | NO_EDGE |
+| E-002 | volume climax reversal | volume | −0.222 | n/a | −0.044 | NO_EDGE |
+| E-003 | sweep reclaim | price | −0.112 | n/a | −0.045 | NO_EDGE |
+| E-004 | funding crowding reversal | funding | −0.138 | n/a | −0.043 | NO_EDGE |
+| E-005 | cross-sectional reversal | price rank | −0.125 | −0.080 | −0.049 | NO_EDGE |
+| E-006 | cross-sectional momentum | price rank | −0.035 | +0.011 | −0.049 | NO_EDGE |
+| E-007 | cross-sectional flow | taker-buy share | −0.060 | −0.015 | −0.045 | NO_EDGE |
+
+### Measured bound
+
+Every gross effect in the two beta-free experiments (E-005, E-006, E-007) lies
+within ±8 bps of notional per campaign. The cost floor of the registered design
+is ~11 bps (5 bps taker entry + 5 bps taker/2 bps maker exit + 2 bps slippage
+per side). No tested mechanism clears it; the best cell anywhere in the grid is
+a *declared sensitivity variant* (L24_k3 momentum, +0.051 R net, 6/10 symbols),
+which the registration forbids selecting and which its neighbours do not
+corroborate.
+
+### What would justify another trial
+
+A mechanism whose measured gross effect exceeds the cost floor before any
+parameter search — for example a signed-trade order-flow feature or an event
+calendar unavailable in these archives. Re-testing the same price/volume/funding
+information under new exits or thresholds would be variance mining on the same
+window.
+
+### Holdout status
+
+`VALIDATION_DATA_UNSPENT`: sealed, never read. It is still available for a
+candidate that earns a `DEV_CANDIDATE` gate pass.
+
