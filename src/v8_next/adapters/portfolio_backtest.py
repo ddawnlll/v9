@@ -58,6 +58,7 @@ from v8_next.adapters.execution_telemetry import (
 from v8_next.adapters.expert_strategy import ExpertEnsembleStrategy, ExpertStrategyConfig
 from v8_next.domain.market import Candle
 from v8_next.domain.positioning import PositioningReading
+from v8_next.evaluation.instrument_metadata import InstrumentFilters
 from v8_next.evaluation.multitape import FundingRow
 
 #: Base currency per raw symbol, from the venue's instrument metadata for the
@@ -69,6 +70,7 @@ BASE_CURRENCIES = {
     "BNBUSDT": "BNB",
     "BTCUSDT": "BTC",
     "DOGEUSDT": "DOGE",
+    "DOTUSDT": "DOT",
     "ETHUSDT": "ETH",
     "LINKUSDT": "LINK",
     "LTCUSDT": "LTC",
@@ -200,39 +202,89 @@ def _instrument(
     currency: Currency,
     maker_fee: Decimal,
     taker_fee: Decimal,
+    filters: InstrumentFilters | None = None,
 ) -> CryptoPerpetual:
+    """Build the venue instrument.
+
+    ``filters`` carries verified venue metadata for multi-symbol measurement.
+    ``None`` keeps the frozen BTCUSDT development-slice values exactly (2-decimal
+    prices, 0.001 size, max 1000 units, 5 % maintenance margin), so the documented
+    single-symbol BTC measurement is reproducible field-for-field. Passing filters
+    changes only what prices and quantities the venue can represent — no signal,
+    threshold, stop, target or sizing formula reads it.
+    """
+    if filters is None:
+        return CryptoPerpetual(
+            instrument_id=InstrumentId.from_str(instrument_id),
+            raw_symbol=Symbol(raw_symbol),
+            base_currency=Currency.from_str(base),
+            quote_currency=currency,
+            settlement_currency=currency,
+            is_inverse=False,
+            price_precision=2,
+            size_precision=3,
+            price_increment=Price(0.01, 2),
+            size_increment=Quantity(0.001, 3),
+            min_quantity=Quantity(0.001, 3),
+            max_quantity=Quantity(1000.0, 3),
+            min_notional=Money(1, currency),
+            ts_event=0,
+            ts_init=0,
+            margin_init=Decimal("1"),
+            margin_maint=Decimal("0.05"),
+            maker_fee=maker_fee,
+            taker_fee=taker_fee,
+        )
+    if filters.symbol != raw_symbol:
+        raise ValueError(
+            f"instrument filters are for {filters.symbol!r} but the slice is {raw_symbol!r}"
+        )
     return CryptoPerpetual(
         instrument_id=InstrumentId.from_str(instrument_id),
         raw_symbol=Symbol(raw_symbol),
-        base_currency=Currency.from_str(base),
+        base_currency=Currency.from_str(filters.base_currency),
         quote_currency=currency,
         settlement_currency=currency,
         is_inverse=False,
-        price_precision=2,
-        size_precision=3,
-        price_increment=Price(0.01, 2),
-        size_increment=Quantity(0.001, 3),
-        min_quantity=Quantity(0.001, 3),
-        max_quantity=Quantity(1000.0, 3),
-        min_notional=Money(1, currency),
+        price_precision=filters.price_precision,
+        size_precision=filters.size_precision,
+        price_increment=_price(filters.price_increment, filters.price_precision),
+        size_increment=_quantity(filters.size_increment, filters.size_precision),
+        min_quantity=_quantity(filters.min_quantity, filters.size_precision),
+        max_quantity=_quantity(filters.max_quantity, filters.size_precision),
+        min_notional=Money(float(filters.min_notional), currency),
         ts_event=0,
         ts_init=0,
         margin_init=Decimal("1"),
-        margin_maint=Decimal("0.05"),
+        margin_maint=filters.maintenance_margin,
         maker_fee=maker_fee,
         taker_fee=taker_fee,
     )
 
 
-def _bars(candles: tuple[Candle, ...], bar_type: BarType) -> list[Bar]:
+def _price(value: Decimal, precision: int) -> Price:
+    return Price(float(value), precision)
+
+
+def _quantity(value: Decimal, precision: int) -> Quantity:
+    return Quantity(float(value), precision)
+
+
+def _bars(
+    candles: tuple[Candle, ...],
+    bar_type: BarType,
+    filters: InstrumentFilters | None = None,
+) -> list[Bar]:
+    price_precision = 2 if filters is None else filters.price_precision
+    size_precision = 3 if filters is None else filters.size_precision
     return [
         Bar(
             bar_type,
-            Price(float(c.open), 2),
-            Price(float(c.high), 2),
-            Price(float(c.low), 2),
-            Price(float(c.close), 2),
-            Quantity(float(c.volume), 3),
+            Price(float(c.open), price_precision),
+            Price(float(c.high), price_precision),
+            Price(float(c.low), price_precision),
+            Price(float(c.close), price_precision),
+            Quantity(float(c.volume), size_precision),
             c.end_ns,
             c.end_ns,
         )

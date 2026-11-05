@@ -1,0 +1,263 @@
+{
+  "code_hashes": {
+    "src/v8_next/adapters/adaptive_strategy.py": "ca8319cd103fb4ca1deb23d9396f367c6f0b6465c4efc6957d32a1b372f77494",
+    "src/v8_next/adapters/expert_strategy.py": "7c2a9acc1b18d4ff339c0d2945f294ad341c5f272eb97a107b6a0f93ecfbadc7",
+    "src/v8_next/adapters/portfolio_backtest.py": "0eaba2e49074972e15a4ba7512eb181ccd82644ca8d37c9cf6461c5167b2f9f9",
+    "src/v8_next/economics/decisions.py": "bc80b1dbc30b0c019467a3763d0928c0c32ffa73286deacd9f31e39cdc1c70d3",
+    "src/v8_next/economics/management.py": "cceaed8462b4afba8d0102fba80904f22ee9c49cb7d8dc957465cace046993fc",
+    "src/v8_next/evaluation/instrument_metadata.py": "13f44e8fe03c22fe435d534e1602c5fffe4bff674bc244ee3ae4ba083199bbc8",
+    "src/v8_next/evaluation/sim_arm.py": "6cd76bde8b89c4e050c660d4264b35ccec131a8e1e8adedcd4fc78450dee10bd",
+    "src/v8_next/experts/horizon_profiles.py": "2a5f81a9b52812797fd513365517c1b94161ec0ffd1bb6143329906fa5b28237",
+    "tools/build_tape.py": "233887df41a1b0898759c854288fa9ee1996930643c2956e16319c9e09fbf725",
+    "tools/cross_market_ablations.py": "20073f704c1d4ddbc61e31061b86b4187701746fb58edde1de946a79da698765",
+    "tools/cross_market_analysis.py": "628cbfb855d9e2121d7ba604a0cef5bdb5a879c9c2a831384d26b6d1be4c8394",
+    "tools/cross_market_build_tapes.py": "54c021670f5afc33fd5e4f3bd69c4afe4edc487a4f21dd75f73ee7ff644bdbf4",
+    "tools/cross_market_matrix.py": "02c596ce8191738c6f36fd3180b269fd5581900333e328391877cc0c7dfdc8d5"
+  },
+  "config_fingerprint": {
+    "execution_profile": {
+      "digest": "e7e76a80da65251433e15b67519050bee60ec737387a0b85484d79f6d1861760",
+      "name": "baseline"
+    },
+    "profile_table_version": "v9.expert-horizon-profiles.1",
+    "resolved_default_config": {
+      "adaptive_management_enabled": "True",
+      "bar_type_str": "ETHUSDT-PERP.BINANCE-1-HOUR-LAST-EXTERNAL",
+      "bracket_stop_pct": "0.02",
+      "bracket_target_pct": "0.04",
+      "enabled": "True",
+      "fee_bps": "5",
+      "grammar_policy": "range-breakout-48-v1",
+      "horizon_profiles_enabled": "True",
+      "instrument_id": "ETHUSDT-PERP.BINANCE",
+      "intraday_tape": "None",
+      "max_concurrent_positions": "1",
+      "max_contradiction_tolerance": "28",
+      "max_notional_per_order": "None",
+      "min_support_quorum": "1",
+      "order_quantity": "0.01",
+      "stop_amendments_enabled": "True",
+      "structural_stop_enabled": "True",
+      "structural_target_enabled": "True",
+      "target_amendments_enabled": "True",
+      "target_notional": "1000"
+    },
+    "sha256": "de45d3777be5b7dce874ce9d5ec230fe283838472f31edbc907baad64c588dee"
+  },
+  "data": {
+    "archive_hashes_sha256": "cc8aa40dd96b925a602e42b6debd9f66aeefcb05fda3913373e76ca0fff714a2",
+    "tape_manifests": {
+      "tape.manifest.json": "d86c3ff0facfba983d95eae6b57b89fa80092b4390df99a49b6240310214488a"
+    }
+  },
+  "dependency_lock": {
+    "pyproject_sha256": "58e1582344a0e9ebc71efec3ae1d579b4c72b2dbed9aa53e32db8ea0cbd18530",
+    "uv.lock_sha256": "b3ee5c3836d26b8e6a598f6a9ffe1b50213939bd00efaceb0397d19b9f2b698b"
+  },
+  "engine": {
+    "bar_execution": "engine default",
+    "fill_model": "default",
+    "nautilus_trader": "2.0.0rc4",
+    "python": "3.12.12"
+  },
+  "experiment": {
+    "accounts": "one independent account per symbol per arm, not a portfolio",
+    "bracket_stop_pct": "0.02",
+    "bracket_target_pct": "0.04",
+    "calendar_days": 181,
+    "decision_cadence": "H1 bar close (M15/H4 are context, not cadence)",
+    "grammar_policy": "range-breakout-48-v1",
+    "initial_balance_usdt_per_symbol_per_arm": 10000,
+    "maker_fee": "0.0002",
+    "max_concurrent_positions": 1,
+    "max_contradiction_tolerance": 28,
+    "min_support_quorum": 1,
+    "taker_fee": "0.0005",
+    "target_notional_usdt": "1000",
+    "universe": [
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "XRPUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "AVAXUSDT",
+      "LINKUSDT",
+      "DOTUSDT",
+      "LTCUSDT"
+    ],
+    "window_end_exclusive_utc": "2025-07-01T00:00:00Z",
+    "window_start_utc": "2025-01-01T00:00:00Z"
+  },
+  "experiment_provenance": {
+    "files_differing_from_frozen_candidate": [
+      {
+        "diffstat": "src/v8_next/evaluation/sim_arm.py | 56 +++++++++++++++++++++++++++++++++++++-- |  1 file changed, 54 insertions(+), 2 deletions(-)",
+        "file": "src/v8_next/evaluation/sim_arm.py",
+        "sha256_working_tree": "6cd76bde8b89c4e050c660d4264b35ccec131a8e1e8adedcd4fc78450dee10bd"
+      },
+      {
+        "diffstat": "src/v8_next/adapters/adaptive_strategy.py | 71 ++++++++++++++++++++++++------- |  1 file changed, 55 insertions(+), 16 deletions(-)",
+        "file": "src/v8_next/adapters/adaptive_strategy.py",
+        "sha256_working_tree": "ca8319cd103fb4ca1deb23d9396f367c6f0b6465c4efc6957d32a1b372f77494"
+      },
+      {
+        "diffstat": "src/v8_next/adapters/portfolio_backtest.py | 82 ++++++++++++++++++++++++------ |  1 file changed, 67 insertions(+), 15 deletions(-)",
+        "file": "src/v8_next/adapters/portfolio_backtest.py",
+        "sha256_working_tree": "0eaba2e49074972e15a4ba7512eb181ccd82644ca8d37c9cf6461c5167b2f9f9"
+      },
+      {
+        "diffstat": "src/v8_next/economics/decisions.py | 26 +++++++++++++++++++++----- |  1 file changed, 21 insertions(+), 5 deletions(-)",
+        "file": "src/v8_next/economics/decisions.py",
+        "sha256_working_tree": "bc80b1dbc30b0c019467a3763d0928c0c32ffa73286deacd9f31e39cdc1c70d3"
+      }
+    ],
+    "frozen_candidate": "09908af840864a20e5bc4836ea4d21f4ceb93b35",
+    "note": "A file appears here only when the validation branch changed it. Each change is recorded with its semantic-parity evidence in EXECUTION_SAFETY.md."
+  },
+  "frozen_candidate_commit": "09908af840864a20e5bc4836ea4d21f4ceb93b35",
+  "frozen_candidate_is_ancestor": true,
+  "generated_utc": "2026-11-05T13:28:50Z",
+  "instrument_filters": {
+    "ADAUSDT": {
+      "maintenance_margin": "0.0125",
+      "max_quantity": "30000000",
+      "min_notional": "5",
+      "min_quantity": "1",
+      "onboard_date_ms": 1580457600000,
+      "price_increment": "0.0001",
+      "price_increment_source": "exchangeInfo",
+      "price_precision": 4,
+      "size_increment": "1",
+      "size_precision": 0
+    },
+    "AVAXUSDT": {
+      "maintenance_margin": "0.015",
+      "max_quantity": "500000",
+      "min_notional": "5",
+      "min_quantity": "1",
+      "onboard_date_ms": 1600844400000,
+      "price_increment": "0.001",
+      "price_increment_source": "exchangeInfo",
+      "price_precision": 3,
+      "size_increment": "1",
+      "size_precision": 0
+    },
+    "BNBUSDT": {
+      "maintenance_margin": "0.0125",
+      "max_quantity": "100000",
+      "min_notional": "5",
+      "min_quantity": "0.01",
+      "onboard_date_ms": 1581321600000,
+      "price_increment": "0.01",
+      "price_increment_source": "exchangeInfo",
+      "price_precision": 2,
+      "size_increment": "0.01",
+      "size_precision": 2
+    },
+    "BTCUSDT": {
+      "maintenance_margin": "0.0125",
+      "max_quantity": "1000",
+      "min_notional": "50",
+      "min_quantity": "0.001",
+      "onboard_date_ms": 1567965300000,
+      "price_increment": "0.01",
+      "price_increment_source": "window_data_derived",
+      "price_precision": 2,
+      "size_increment": "0.001",
+      "size_precision": 3
+    },
+    "DOGEUSDT": {
+      "maintenance_margin": "0.015",
+      "max_quantity": "300000000",
+      "min_notional": "5",
+      "min_quantity": "1",
+      "onboard_date_ms": 1594371600000,
+      "price_increment": "0.00001",
+      "price_increment_source": "exchangeInfo",
+      "price_precision": 5,
+      "size_increment": "1",
+      "size_precision": 0
+    },
+    "DOTUSDT": {
+      "maintenance_margin": "0.0125",
+      "max_quantity": "3000000",
+      "min_notional": "5",
+      "min_quantity": "0.1",
+      "onboard_date_ms": 1598079600000,
+      "price_increment": "0.0001",
+      "price_increment_source": "exchangeInfo",
+      "price_precision": 4,
+      "size_increment": "0.1",
+      "size_precision": 1
+    },
+    "ETHUSDT": {
+      "maintenance_margin": "0.0125",
+      "max_quantity": "10000",
+      "min_notional": "20",
+      "min_quantity": "0.001",
+      "onboard_date_ms": 1574840700000,
+      "price_increment": "0.01",
+      "price_increment_source": "exchangeInfo",
+      "price_precision": 2,
+      "size_increment": "0.001",
+      "size_precision": 3
+    },
+    "LINKUSDT": {
+      "maintenance_margin": "0.0125",
+      "max_quantity": "700000",
+      "min_notional": "20",
+      "min_quantity": "0.01",
+      "onboard_date_ms": 1579248000000,
+      "price_increment": "0.001",
+      "price_increment_source": "exchangeInfo",
+      "price_precision": 3,
+      "size_increment": "0.01",
+      "size_precision": 2
+    },
+    "LTCUSDT": {
+      "maintenance_margin": "0.0125",
+      "max_quantity": "170000",
+      "min_notional": "20",
+      "min_quantity": "0.001",
+      "onboard_date_ms": 1578557100000,
+      "price_increment": "0.01",
+      "price_increment_source": "exchangeInfo",
+      "price_precision": 2,
+      "size_increment": "0.001",
+      "size_precision": 3
+    },
+    "SOLUSDT": {
+      "maintenance_margin": "0.015",
+      "max_quantity": "1000000",
+      "min_notional": "5",
+      "min_quantity": "0.01",
+      "onboard_date_ms": 1600066800000,
+      "price_increment": "0.0001",
+      "price_increment_source": "window_data_derived",
+      "price_precision": 4,
+      "size_increment": "0.01",
+      "size_precision": 2
+    },
+    "XRPUSDT": {
+      "maintenance_margin": "0.0125",
+      "max_quantity": "10000000",
+      "min_notional": "5",
+      "min_quantity": "0.1",
+      "onboard_date_ms": 1578298800000,
+      "price_increment": "0.0001",
+      "price_increment_source": "exchangeInfo",
+      "price_precision": 4,
+      "size_increment": "0.1",
+      "size_precision": 1
+    }
+  },
+  "validation_branch": "validation/cross-market",
+  "validation_head": "09908af840864a20e5bc4836ea4d21f4ceb93b35",
+  "verification_artifacts": [
+    "VERIFICATION_LOG.md",
+    "data/verification/archive_verification_independent.json",
+    "data/verification/archive_hashes_independent.txt",
+    "data/verification/LTCUSDT_independent.json"
+  ]
+}

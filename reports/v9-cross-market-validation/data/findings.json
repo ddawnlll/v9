@@ -1,0 +1,940 @@
+{
+ "ablations_present": [
+  "ADAUSDT",
+  "AVAXUSDT",
+  "BNBUSDT",
+  "DOGEUSDT",
+  "DOTUSDT",
+  "ETHUSDT",
+  "LINKUSDT",
+  "LTCUSDT",
+  "SOLUSDT",
+  "XRPUSDT"
+ ],
+ "arm_summary": {
+  "A": {
+   "net_pnl_by_symbol": {
+    "ADAUSDT": -163.4058,
+    "AVAXUSDT": 591.2836,
+    "BNBUSDT": -119.7095,
+    "DOGEUSDT": 179.5446,
+    "DOTUSDT": 229.5578,
+    "ETHUSDT": 44.3592,
+    "LINKUSDT": 44.2205,
+    "LTCUSDT": -390.5708,
+    "SOLUSDT": -92.431,
+    "XRPUSDT": -195.7832
+   },
+   "net_pnl_total_usdt": 127.065375,
+   "net_r_bootstrap_over_symbols": {
+    "ci_high": 9.286415216783789,
+    "ci_low": -6.9956902395996945,
+    "ci_method": "percentile bootstrap of the mean, clustering unit = symbol",
+    "mean": 0.6792363819195965,
+    "median": -1.193693531729925,
+    "n": 10,
+    "resamples": 5000
+   },
+   "net_r_total_by_symbol": {
+    "detail": {
+     "ADAUSDT": -8.175475,
+     "AVAXUSDT": 29.939457,
+     "BNBUSDT": -6.004518,
+     "DOGEUSDT": 9.013413,
+     "DOTUSDT": 11.482237,
+     "ETHUSDT": 2.226554,
+     "LINKUSDT": 2.245139,
+     "LTCUSDT": -19.529513,
+     "SOLUSDT": -4.613941,
+     "XRPUSDT": -9.790988
+    },
+    "flat": 0,
+    "negative": 5,
+    "p_two_sided": 1.0,
+    "positive": 5,
+    "symbols": 10
+   },
+   "protection_violations": 0,
+   "symbols_with_open_position_at_cutoff": 3,
+   "trades_total": 1308
+  },
+  "B": {
+   "net_pnl_by_symbol": {
+    "ADAUSDT": -100.3523,
+    "AVAXUSDT": 72.0002,
+    "BNBUSDT": -198.3138,
+    "DOGEUSDT": 55.2441,
+    "DOTUSDT": 62.9972,
+    "ETHUSDT": -196.7702,
+    "LINKUSDT": 37.8766,
+    "LTCUSDT": -217.3785,
+    "SOLUSDT": 80.8499,
+    "XRPUSDT": 10.1764
+   },
+   "net_pnl_total_usdt": -393.670493,
+   "net_r_bootstrap_over_symbols": {
+    "ci_high": 1.5475702780263547,
+    "ci_low": -5.76492378927494,
+    "ci_method": "percentile bootstrap of the mean, clustering unit = symbol",
+    "mean": -1.966732133314816,
+    "median": 1.2185385773295012,
+    "n": 10,
+    "resamples": 5000
+   },
+   "net_r_total_by_symbol": {
+    "detail": {
+     "ADAUSDT": -5.016998,
+     "AVAXUSDT": 3.59356,
+     "BNBUSDT": -9.908291,
+     "DOGEUSDT": 2.761835,
+     "DOTUSDT": 3.151342,
+     "ETHUSDT": -9.865866,
+     "LINKUSDT": 1.928324,
+     "LTCUSDT": -10.869165,
+     "SOLUSDT": 4.049185,
+     "XRPUSDT": 0.508753
+    },
+    "flat": 0,
+    "negative": 4,
+    "p_two_sided": 0.753906,
+    "positive": 6,
+    "symbols": 10
+   },
+   "protection_violations": 0,
+   "symbols_with_open_position_at_cutoff": 2,
+   "trades_total": 591
+  },
+  "C": {
+   "net_pnl_by_symbol": {
+    "ADAUSDT": -94.0306,
+    "AVAXUSDT": 276.8582,
+    "BNBUSDT": -10.5778,
+    "DOGEUSDT": 189.8651,
+    "DOTUSDT": 56.1645,
+    "ETHUSDT": -125.3943,
+    "LINKUSDT": 222.8571,
+    "LTCUSDT": -98.7621,
+    "SOLUSDT": -16.018,
+    "XRPUSDT": 95.9153
+   },
+   "net_pnl_total_usdt": 496.877373,
+   "net_r_bootstrap_over_symbols": {
+    "ci_high": 6.52116047925418,
+    "ci_low": -1.5250971492752932,
+    "ci_method": "percentile bootstrap of the mean, clustering unit = symbol",
+    "mean": 2.503730903168361,
+    "median": 1.156614465300439,
+    "n": 10,
+    "resamples": 5000
+   },
+   "net_r_total_by_symbol": {
+    "detail": {
+     "ADAUSDT": -4.706474,
+     "AVAXUSDT": 13.991987,
+     "BNBUSDT": -0.495291,
+     "DOGEUSDT": 9.494306,
+     "DOTUSDT": 2.808519,
+     "ETHUSDT": -6.294597,
+     "LINKUSDT": 11.178786,
+     "LTCUSDT": -4.938108,
+     "SOLUSDT": -0.798061,
+     "XRPUSDT": 4.796242
+    },
+    "flat": 0,
+    "negative": 5,
+    "p_two_sided": 1.0,
+    "positive": 5,
+    "symbols": 10
+   },
+   "protection_violations": 0,
+   "symbols_with_open_position_at_cutoff": 2,
+   "trades_total": 531
+  },
+  "D": {
+   "net_pnl_by_symbol": {
+    "ADAUSDT": -108.8645,
+    "AVAXUSDT": 60.977,
+    "BNBUSDT": 97.7893,
+    "DOGEUSDT": -56.387,
+    "DOTUSDT": -408.2035,
+    "ETHUSDT": 30.3989,
+    "LINKUSDT": 50.7072,
+    "LTCUSDT": -98.0737,
+    "SOLUSDT": 195.6131,
+    "XRPUSDT": 78.6717
+   },
+   "net_pnl_total_usdt": -157.371583,
+   "net_r_bootstrap_over_symbols": {
+    "ci_high": 3.59968284273275,
+    "ci_low": -6.15100504653719,
+    "ci_method": "percentile bootstrap of the mean, clustering unit = symbol",
+    "mean": -0.779389005962259,
+    "median": 2.020660196740507,
+    "n": 10,
+    "resamples": 5000
+   },
+   "net_r_total_by_symbol": {
+    "detail": {
+     "ADAUSDT": -5.447172,
+     "AVAXUSDT": 3.077842,
+     "BNBUSDT": 4.930928,
+     "DOGEUSDT": -2.820056,
+     "DOTUSDT": -20.415223,
+     "ETHUSDT": 1.506295,
+     "LINKUSDT": 2.535025,
+     "LTCUSDT": -4.903691,
+     "SOLUSDT": 9.807872,
+     "XRPUSDT": 3.93429
+    },
+    "flat": 0,
+    "negative": 4,
+    "p_two_sided": 0.753906,
+    "positive": 6,
+    "symbols": 10
+   },
+   "protection_violations": 1,
+   "symbols_with_open_position_at_cutoff": 2,
+   "trades_total": 581
+  }
+ },
+ "cross_runner_consistency": {
+  "ADAUSDT": {
+   "d_net_pnl": -108.864475,
+   "full_net_pnl": -108.864475,
+   "net_pnl_equal": true,
+   "trade_digest_equal": true
+  },
+  "AVAXUSDT": {
+   "d_net_pnl": 60.97703,
+   "full_net_pnl": 60.97703,
+   "net_pnl_equal": true,
+   "trade_digest_equal": true
+  },
+  "BNBUSDT": {
+   "d_net_pnl": 97.789251,
+   "full_net_pnl": 97.789251,
+   "net_pnl_equal": true,
+   "trade_digest_equal": true
+  },
+  "DOGEUSDT": {
+   "d_net_pnl": -56.386957,
+   "full_net_pnl": -56.386957,
+   "net_pnl_equal": true,
+   "trade_digest_equal": true
+  },
+  "DOTUSDT": {
+   "d_net_pnl": -408.20353,
+   "full_net_pnl": -408.20353,
+   "net_pnl_equal": true,
+   "trade_digest_equal": true
+  },
+  "ETHUSDT": {
+   "d_net_pnl": 30.398876,
+   "full_net_pnl": 30.398876,
+   "net_pnl_equal": true,
+   "trade_digest_equal": true
+  },
+  "LINKUSDT": {
+   "d_net_pnl": 50.707226,
+   "full_net_pnl": 50.707226,
+   "net_pnl_equal": true,
+   "trade_digest_equal": true
+  },
+  "LTCUSDT": {
+   "d_net_pnl": -98.073738,
+   "full_net_pnl": -98.073738,
+   "net_pnl_equal": true,
+   "trade_digest_equal": true
+  },
+  "SOLUSDT": {
+   "d_net_pnl": 195.61305,
+   "full_net_pnl": 195.61305,
+   "net_pnl_equal": true,
+   "trade_digest_equal": true
+  },
+  "XRPUSDT": {
+   "d_net_pnl": 78.671684,
+   "full_net_pnl": 78.671684,
+   "net_pnl_equal": true,
+   "trade_digest_equal": true
+  }
+ },
+ "entry_matched_D_vs_C": {
+  "detail": {
+   "ADAUSDT": {
+    "left_only": 4,
+    "matched_campaigns": 52,
+    "matched_delta": 56.7272,
+    "right_only": 13
+   },
+   "AVAXUSDT": {
+    "left_only": 10,
+    "matched_campaigns": 51,
+    "matched_delta": -112.3339,
+    "right_only": 13
+   },
+   "BNBUSDT": {
+    "left_only": 4,
+    "matched_campaigns": 31,
+    "matched_delta": 78.9494,
+    "right_only": 24
+   },
+   "DOGEUSDT": {
+    "left_only": 6,
+    "matched_campaigns": 48,
+    "matched_delta": -188.4826,
+    "right_only": 7
+   },
+   "DOTUSDT": {
+    "left_only": 4,
+    "matched_campaigns": 59,
+    "matched_delta": -427.5719,
+    "right_only": 8
+   },
+   "ETHUSDT": {
+    "left_only": 4,
+    "matched_campaigns": 42,
+    "matched_delta": 282.7603,
+    "right_only": 4
+   },
+   "LINKUSDT": {
+    "left_only": 7,
+    "matched_campaigns": 45,
+    "matched_delta": -15.7463,
+    "right_only": 16
+   },
+   "LTCUSDT": {
+    "left_only": 9,
+    "matched_campaigns": 50,
+    "matched_delta": 236.338,
+    "right_only": 10
+   },
+   "SOLUSDT": {
+    "left_only": 8,
+    "matched_campaigns": 50,
+    "matched_delta": 105.3052,
+    "right_only": 6
+   },
+   "XRPUSDT": {
+    "left_only": 3,
+    "matched_campaigns": 44,
+    "matched_delta": -49.0206,
+    "right_only": 8
+   }
+  },
+  "matched_campaigns": 472,
+  "matched_delta": -33.075211,
+  "symbols": 10
+ },
+ "generated_utc": "2026-11-05T13:26:33Z",
+ "paired_summary": {
+  "B-A": {
+   "delta_net_pnl_total": -520.735869,
+   "delta_net_r_bootstrap_over_symbols": {
+    "ci_high": 3.6985548,
+    "ci_low": -9.6344885,
+    "ci_method": "percentile bootstrap of the mean, clustering unit = symbol",
+    "mean": -2.6459685,
+    "median": -2.110294,
+    "n": 10,
+    "resamples": 5000
+   },
+   "sign": {
+    "detail": {
+     "ADAUSDT": 3.158477,
+     "AVAXUSDT": -26.345896,
+     "BNBUSDT": -3.903773,
+     "DOGEUSDT": -6.251578,
+     "DOTUSDT": -8.330895,
+     "ETHUSDT": -12.09242,
+     "LINKUSDT": -0.316815,
+     "LTCUSDT": 8.660348,
+     "SOLUSDT": 8.663126,
+     "XRPUSDT": 10.299741
+    },
+    "flat": 0,
+    "negative": 6,
+    "p_two_sided": 0.753906,
+    "positive": 4,
+    "symbols": 10
+   }
+  },
+  "C-B": {
+   "delta_net_pnl_total": 890.547864,
+   "delta_net_r_bootstrap_over_symbols": {
+    "ci_high": 7.132330400000001,
+    "ci_low": 1.4514348,
+    "ci_method": "percentile bootstrap of the mean, clustering unit = symbol",
+    "mean": 4.4704631,
+    "median": 5.1092735000000005,
+    "n": 10,
+    "resamples": 5000
+   },
+   "sign": {
+    "detail": {
+     "ADAUSDT": 0.310524,
+     "AVAXUSDT": 10.398427,
+     "BNBUSDT": 9.413,
+     "DOGEUSDT": 6.732471,
+     "DOTUSDT": -0.342822,
+     "ETHUSDT": 3.571269,
+     "LINKUSDT": 9.250461,
+     "LTCUSDT": 5.931057,
+     "SOLUSDT": -4.847246,
+     "XRPUSDT": 4.28749
+    },
+    "flat": 0,
+    "negative": 2,
+    "p_two_sided": 0.109375,
+    "positive": 8,
+    "symbols": 10
+   }
+  },
+  "D-A": {
+   "delta_net_pnl_total": -284.436957,
+   "delta_net_r_bootstrap_over_symbols": {
+    "ci_high": 7.9911552,
+    "ci_low": -11.9895873,
+    "ci_method": "percentile bootstrap of the mean, clustering unit = symbol",
+    "mean": -1.4586254999999997,
+    "median": 1.5090945,
+    "n": 10,
+    "resamples": 5000
+   },
+   "sign": {
+    "detail": {
+     "ADAUSDT": 2.728303,
+     "AVAXUSDT": -26.861615,
+     "BNBUSDT": 10.935446,
+     "DOGEUSDT": -11.833469,
+     "DOTUSDT": -31.89746,
+     "ETHUSDT": -0.720258,
+     "LINKUSDT": 0.289886,
+     "LTCUSDT": 14.625821,
+     "SOLUSDT": 14.421813,
+     "XRPUSDT": 13.725278
+    },
+    "flat": 0,
+    "negative": 4,
+    "p_two_sided": 0.753906,
+    "positive": 6,
+    "symbols": 10
+   }
+  },
+  "D-C": {
+   "delta_net_pnl_total": -654.248958,
+   "delta_net_r_bootstrap_over_symbols": {
+    "ci_high": 2.6536339,
+    "ci_low": -9.581468300000001,
+    "ci_method": "percentile bootstrap of the mean, clustering unit = symbol",
+    "mean": -3.2831201,
+    "median": -0.8013254999999999,
+    "n": 10,
+    "resamples": 5000
+   },
+   "sign": {
+    "detail": {
+     "ADAUSDT": -0.740698,
+     "AVAXUSDT": -10.914145,
+     "BNBUSDT": 5.426218,
+     "DOGEUSDT": -12.314362,
+     "DOTUSDT": -23.223742,
+     "ETHUSDT": 7.800892,
+     "LINKUSDT": -8.643761,
+     "LTCUSDT": 0.034417,
+     "SOLUSDT": 10.605933,
+     "XRPUSDT": -0.861953
+    },
+    "flat": 0,
+    "negative": 6,
+    "p_two_sided": 0.753906,
+    "positive": 4,
+    "symbols": 10
+   }
+  }
+ },
+ "random_entry_null": {
+  "ADAUSDT": {
+   "A": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 5,
+    "long_share": 0.4062,
+    "null_net_r_total_mean": -0.5687,
+    "null_net_r_total_p05": -17.2546,
+    "null_net_r_total_p95": 17.3942,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "ADAUSDT",
+    "trades_per_draw": 128,
+    "treatment_net_r_total": -8.1755,
+    "treatment_percentile": 23.45
+   },
+   "D": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 3,
+    "long_share": 0.6,
+    "null_net_r_total_mean": -0.4503,
+    "null_net_r_total_p05": -10.4166,
+    "null_net_r_total_p95": 9.6827,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "ADAUSDT",
+    "trades_per_draw": 65,
+    "treatment_net_r_total": -5.4472,
+    "treatment_percentile": 21.55
+   }
+  },
+  "AVAXUSDT": {
+   "A": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 6,
+    "long_share": 0.4384,
+    "null_net_r_total_mean": 0.1066,
+    "null_net_r_total_p05": -18.8198,
+    "null_net_r_total_p95": 19.5069,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "AVAXUSDT",
+    "trades_per_draw": 146,
+    "treatment_net_r_total": 29.9395,
+    "treatment_percentile": 99.4
+   },
+   "D": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 4,
+    "long_share": 0.6562,
+    "null_net_r_total_mean": -0.5041,
+    "null_net_r_total_p05": -11.2106,
+    "null_net_r_total_p95": 10.4547,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "AVAXUSDT",
+    "trades_per_draw": 64,
+    "treatment_net_r_total": 3.0778,
+    "treatment_percentile": 70.35
+   }
+  },
+  "BNBUSDT": {
+   "A": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 14,
+    "long_share": 0.4337,
+    "null_net_r_total_mean": 0.5691,
+    "null_net_r_total_p05": -11.7693,
+    "null_net_r_total_p95": 13.1442,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "BNBUSDT",
+    "trades_per_draw": 83,
+    "treatment_net_r_total": -6.0045,
+    "treatment_percentile": 18.3
+   },
+   "D": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 8,
+    "long_share": 0.7273,
+    "null_net_r_total_mean": 0.0996,
+    "null_net_r_total_p05": -8.0725,
+    "null_net_r_total_p95": 8.3518,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "BNBUSDT",
+    "trades_per_draw": 55,
+    "treatment_net_r_total": 4.9309,
+    "treatment_percentile": 84.15
+   }
+  },
+  "DOGEUSDT": {
+   "A": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 4,
+    "long_share": 0.4342,
+    "null_net_r_total_mean": -0.0479,
+    "null_net_r_total_p05": -16.5525,
+    "null_net_r_total_p95": 16.9946,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "DOGEUSDT",
+    "trades_per_draw": 152,
+    "treatment_net_r_total": 9.0134,
+    "treatment_percentile": 81.0
+   },
+   "D": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 3,
+    "long_share": 0.6182,
+    "null_net_r_total_mean": -0.0889,
+    "null_net_r_total_p05": -9.1033,
+    "null_net_r_total_p95": 9.1873,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "DOGEUSDT",
+    "trades_per_draw": 55,
+    "treatment_net_r_total": -2.8201,
+    "treatment_percentile": 31.75
+   }
+  },
+  "DOTUSDT": {
+   "A": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 7,
+    "long_share": 0.4296,
+    "null_net_r_total_mean": 0.7487,
+    "null_net_r_total_p05": -17.3058,
+    "null_net_r_total_p95": 18.7187,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "DOTUSDT",
+    "trades_per_draw": 135,
+    "treatment_net_r_total": 11.4822,
+    "treatment_percentile": 83.35
+   },
+   "D": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 4,
+    "long_share": 0.7164,
+    "null_net_r_total_mean": -0.6498,
+    "null_net_r_total_p05": -11.636,
+    "null_net_r_total_p95": 10.3046,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "DOTUSDT",
+    "trades_per_draw": 67,
+    "treatment_net_r_total": -20.4152,
+    "treatment_percentile": 0.05
+   }
+  },
+  "ETHUSDT": {
+   "A": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 7,
+    "long_share": 0.4597,
+    "null_net_r_total_mean": 0.5484,
+    "null_net_r_total_p05": -15.4032,
+    "null_net_r_total_p95": 17.3736,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "ETHUSDT",
+    "trades_per_draw": 124,
+    "treatment_net_r_total": 2.2266,
+    "treatment_percentile": 58.8
+   },
+   "D": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 7,
+    "long_share": 0.7609,
+    "null_net_r_total_mean": -0.0547,
+    "null_net_r_total_p05": -10.0663,
+    "null_net_r_total_p95": 10.1133,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "ETHUSDT",
+    "trades_per_draw": 46,
+    "treatment_net_r_total": 1.5063,
+    "treatment_percentile": 62.0
+   }
+  },
+  "LINKUSDT": {
+   "A": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 5,
+    "long_share": 0.4097,
+    "null_net_r_total_mean": 0.0377,
+    "null_net_r_total_p05": -17.9201,
+    "null_net_r_total_p95": 17.6001,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "LINKUSDT",
+    "trades_per_draw": 144,
+    "treatment_net_r_total": 2.2451,
+    "treatment_percentile": 59.0
+   },
+   "D": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 5,
+    "long_share": 0.6557,
+    "null_net_r_total_mean": -0.1914,
+    "null_net_r_total_p05": -12.1827,
+    "null_net_r_total_p95": 11.9762,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "LINKUSDT",
+    "trades_per_draw": 61,
+    "treatment_net_r_total": 2.535,
+    "treatment_percentile": 65.65
+   }
+  },
+  "LTCUSDT": {
+   "A": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 5,
+    "long_share": 0.4485,
+    "null_net_r_total_mean": -0.6062,
+    "null_net_r_total_p05": -16.3218,
+    "null_net_r_total_p95": 16.0445,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "LTCUSDT",
+    "trades_per_draw": 136,
+    "treatment_net_r_total": -19.5295,
+    "treatment_percentile": 2.5
+   },
+   "D": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 4,
+    "long_share": 0.7167,
+    "null_net_r_total_mean": -0.4523,
+    "null_net_r_total_p05": -10.4788,
+    "null_net_r_total_p95": 9.8171,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "LTCUSDT",
+    "trades_per_draw": 60,
+    "treatment_net_r_total": -4.9037,
+    "treatment_percentile": 24.35
+   }
+  },
+  "SOLUSDT": {
+   "A": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 7,
+    "long_share": 0.4748,
+    "null_net_r_total_mean": 0.6027,
+    "null_net_r_total_p05": -18.1143,
+    "null_net_r_total_p95": 20.4928,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "SOLUSDT",
+    "trades_per_draw": 139,
+    "treatment_net_r_total": -4.6139,
+    "treatment_percentile": 33.3
+   },
+   "D": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 4,
+    "long_share": 0.625,
+    "null_net_r_total_mean": 0.1297,
+    "null_net_r_total_p05": -9.3214,
+    "null_net_r_total_p95": 10.6674,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "SOLUSDT",
+    "trades_per_draw": 56,
+    "treatment_net_r_total": 9.8079,
+    "treatment_percentile": 93.6
+   }
+  },
+  "XRPUSDT": {
+   "A": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 5,
+    "long_share": 0.4298,
+    "null_net_r_total_mean": -1.0915,
+    "null_net_r_total_p05": -15.5738,
+    "null_net_r_total_p95": 14.0464,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "XRPUSDT",
+    "trades_per_draw": 121,
+    "treatment_net_r_total": -9.791,
+    "treatment_percentile": 15.95
+   },
+   "D": {
+    "basis": "bar-level bracket replay on verified H1 bars; stop evaluated before target inside a bar; not native execution",
+    "draws": 2000,
+    "hold_bars": 4,
+    "long_share": 0.6731,
+    "null_net_r_total_mean": -0.3678,
+    "null_net_r_total_p05": -9.1577,
+    "null_net_r_total_p95": 9.0545,
+    "seed": 20251105,
+    "status": "OK",
+    "symbol": "XRPUSDT",
+    "trades_per_draw": 52,
+    "treatment_net_r_total": 3.9343,
+    "treatment_percentile": 77.65
+   }
+  }
+ },
+ "regime_by_month": {
+  "A": {
+   "2025-01": {
+    "campaigns": 237,
+    "net_r_mean": 0.169068,
+    "net_r_total": 40.0692
+   },
+   "2025-02": {
+    "campaigns": 234,
+    "net_r_mean": 0.05706,
+    "net_r_total": 13.3521
+   },
+   "2025-03": {
+    "campaigns": 229,
+    "net_r_mean": 0.064752,
+    "net_r_total": 14.8281
+   },
+   "2025-04": {
+    "campaigns": 195,
+    "net_r_mean": -0.171113,
+    "net_r_total": -33.367
+   },
+   "2025-05": {
+    "campaigns": 227,
+    "net_r_mean": -0.124001,
+    "net_r_total": -28.1482
+   },
+   "2025-06": {
+    "campaigns": 185,
+    "net_r_mean": 0.005998,
+    "net_r_total": 1.1096
+   },
+   "2025-07": {
+    "campaigns": 1,
+    "net_r_mean": -1.051463,
+    "net_r_total": -1.0515
+   }
+  },
+  "B": {
+   "2025-01": {
+    "campaigns": 109,
+    "net_r_mean": 0.025481,
+    "net_r_total": 2.7775
+   },
+   "2025-02": {
+    "campaigns": 70,
+    "net_r_mean": -0.362358,
+    "net_r_total": -25.365
+   },
+   "2025-03": {
+    "campaigns": 107,
+    "net_r_mean": 0.157504,
+    "net_r_total": 16.8529
+   },
+   "2025-04": {
+    "campaigns": 83,
+    "net_r_mean": -0.180265,
+    "net_r_total": -14.962
+   },
+   "2025-05": {
+    "campaigns": 128,
+    "net_r_mean": 0.123523,
+    "net_r_total": 15.8109
+   },
+   "2025-06": {
+    "campaigns": 93,
+    "net_r_mean": -0.147636,
+    "net_r_total": -13.7302
+   },
+   "2025-07": {
+    "campaigns": 1,
+    "net_r_mean": -1.051463,
+    "net_r_total": -1.0515
+   }
+  },
+  "C": {
+   "2025-01": {
+    "campaigns": 92,
+    "net_r_mean": 0.154861,
+    "net_r_total": 14.2472
+   },
+   "2025-02": {
+    "campaigns": 65,
+    "net_r_mean": 0.154444,
+    "net_r_total": 10.0389
+   },
+   "2025-03": {
+    "campaigns": 87,
+    "net_r_mean": -0.188153,
+    "net_r_total": -16.3693
+   },
+   "2025-04": {
+    "campaigns": 71,
+    "net_r_mean": -0.245063,
+    "net_r_total": -17.3995
+   },
+   "2025-05": {
+    "campaigns": 122,
+    "net_r_mean": 0.229872,
+    "net_r_total": 28.0444
+   },
+   "2025-06": {
+    "campaigns": 93,
+    "net_r_mean": 0.080935,
+    "net_r_total": 7.527
+   },
+   "2025-07": {
+    "campaigns": 1,
+    "net_r_mean": -1.051463,
+    "net_r_total": -1.0515
+   }
+  },
+  "D": {
+   "2025-01": {
+    "campaigns": 95,
+    "net_r_mean": -0.072738,
+    "net_r_total": -6.9101
+   },
+   "2025-02": {
+    "campaigns": 66,
+    "net_r_mean": -0.012259,
+    "net_r_total": -0.8091
+   },
+   "2025-03": {
+    "campaigns": 92,
+    "net_r_mean": -0.006581,
+    "net_r_total": -0.6054
+   },
+   "2025-04": {
+    "campaigns": 80,
+    "net_r_mean": -0.13932,
+    "net_r_total": -11.1456
+   },
+   "2025-05": {
+    "campaigns": 137,
+    "net_r_mean": 0.14508,
+    "net_r_total": 19.876
+   },
+   "2025-06": {
+    "campaigns": 109,
+    "net_r_mean": -0.061012,
+    "net_r_total": -6.6503
+   },
+   "2025-07": {
+    "campaigns": 2,
+    "net_r_mean": -0.774687,
+    "net_r_total": -1.5494
+   }
+  }
+ },
+ "symbols": [
+  "ADAUSDT",
+  "AVAXUSDT",
+  "BNBUSDT",
+  "DOGEUSDT",
+  "DOTUSDT",
+  "ETHUSDT",
+  "LINKUSDT",
+  "LTCUSDT",
+  "SOLUSDT",
+  "XRPUSDT"
+ ]
+}

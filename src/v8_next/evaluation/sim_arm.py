@@ -87,6 +87,7 @@ from v8_next.evaluation.ablations import (
     bootstrap_mean_ci,
 )
 from v8_next.evaluation.economic_benchmark import pair_positions, parse_money
+from v8_next.evaluation.instrument_metadata import InstrumentFilters
 from v8_next.evaluation.multitape import FundingRow, MultiTape, load_multitape
 from v8_next.evaluation.tape_identity import sha256_file
 
@@ -324,6 +325,10 @@ class SimArmMeasurement:
     unsupported: tuple[str, ...] = ()
     #: Runtime evidence that each expert read its declared primary horizon.
     horizon_evidence: dict[str, Any] = field(default_factory=dict)
+    #: Per-campaign native records (entry/exit price, timestamps, realized PnL).
+    #: Additive measurement detail for cross-market reporting; it never feeds a
+    #: decision, and the digests that pin reproducibility do not include it.
+    campaign_detail: tuple[dict[str, Any], ...] = ()
 
     def to_arm_result(self, *, intervention: Intervention | None = None) -> ArmResult:
         """The ablation-contract projection of this measurement."""
@@ -457,6 +462,37 @@ def _campaign_metrics(
     }
 
 
+def _campaign_detail(
+    opened: list[dict[str, Any]], closed: list[dict[str, Any]]
+) -> tuple[dict[str, Any], ...]:
+    """Native open/close pairs, one row per campaign, in time order."""
+    rows: list[dict[str, Any]] = []
+    for open_record, close_record in pair_positions(list(opened), list(closed)):
+        rows.append(
+            {
+                "position_id": str(open_record.get("position_id", "")),
+                "side": str(open_record.get("side", "")),
+                "quantity": str(open_record.get("quantity", "")),
+                "entry_px": str(open_record.get("avg_px_open", "")),
+                "open_ns": int(open_record.get("event_ns", 0) or 0),
+                "close_px": None
+                if close_record is None
+                else str(close_record.get("avg_px_close", "")),
+                "close_ns": None
+                if close_record is None
+                else int(close_record.get("event_ns", 0) or 0),
+                "realized_pnl": None
+                if close_record is None
+                else str(close_record.get("realized_pnl", "")),
+                "realized_return": None
+                if close_record is None
+                else str(close_record.get("realized_return", "")),
+                "open": close_record is None,
+            }
+        )
+    return tuple(rows)
+
+
 def _trade_digest(opened: list[dict[str, Any]]) -> str:
     """Identity of the executed trades, in time order: equal digests == equal trades."""
     rows = sorted(
@@ -517,6 +553,7 @@ def _drive(
     maker_fee: Decimal,
     taker_fee: Decimal,
     execution_profile: str,
+    instrument_filters: InstrumentFilters | None = None,
     currency: str = "USDT",
     venue: str = "BINANCE",
 ) -> dict[str, Any]:
@@ -548,9 +585,10 @@ def _drive(
                 curr,
                 maker_fee,
                 taker_fee,
+                instrument_filters,
             )
         )
-        engine.add_data(_bars(window.candles, window.bar_type))
+        engine.add_data(_bars(window.candles, window.bar_type, instrument_filters))
 
         window_start = window.candles[0].end_ns
         window_end = window.candles[-1].end_ns
@@ -561,8 +599,13 @@ def _drive(
             window_end,
         )
         for effective, boundary, row, fund_iid, mark in prepared:
+            mark_precision = 2 if instrument_filters is None else instrument_filters.price_precision
             engine.add_data(
-                [MarkPriceUpdate(fund_iid, Price(float(mark), 2), boundary, boundary)]
+                [
+                    MarkPriceUpdate(
+                        fund_iid, Price(float(mark), mark_precision), boundary, boundary
+                    )
+                ]
             )
             engine.add_data(
                 [
@@ -786,6 +829,9 @@ def _measure(
         orders=tuple(orders),
         decisions=tuple(decisions),
         trade_digest=_trade_digest(list(strategy.opened_positions)),
+        campaign_detail=_campaign_detail(
+            list(strategy.opened_positions), list(strategy.closed_positions)
+        ),
         orders_digest=orders_digest,
         decisions_digest=decisions_digest,
         protection=protection,
@@ -833,6 +879,8 @@ def _config_sha(config: SimArmConfig) -> str:
             "adaptive_management_enabled": config.adaptive_management_enabled,
             "stop_amendments_enabled": config.stop_amendments_enabled,
             "target_amendments_enabled": config.target_amendments_enabled,
+            "structural_stop_enabled": config.structural_stop_enabled,
+            "structural_target_enabled": config.structural_target_enabled,
             "fee_bps": str(config.fee_bps),
         }
     )
@@ -851,6 +899,7 @@ def run_sim_arm(
     maker_fee: Decimal = Decimal("0.0002"),
     taker_fee: Decimal = Decimal("0.0005"),
     execution_profile: str = "baseline",
+    instrument_filters: InstrumentFilters | None = None,
 ) -> SimArmMeasurement:
     """Measure the V9 adaptive arm on the authorized development slice.
 
@@ -886,6 +935,7 @@ def run_sim_arm(
         maker_fee=maker_fee,
         taker_fee=taker_fee,
         execution_profile=execution_profile,
+        instrument_filters=instrument_filters,
     )
     return _measure(
         arm_id=ADAPTIVE_ARM_ID,
@@ -914,6 +964,7 @@ def run_baseline_arm(
     taker_fee: Decimal = Decimal("0.0005"),
     execution_profile: str = "baseline",
     baseline_config: ExpertStrategyConfig | None = None,
+    instrument_filters: InstrumentFilters | None = None,
 ) -> SimArmMeasurement:
     """Measure the V8 expert ensemble on the identical window and parameters.
 
@@ -945,6 +996,7 @@ def run_baseline_arm(
         maker_fee=maker_fee,
         taker_fee=taker_fee,
         execution_profile=execution_profile,
+        instrument_filters=instrument_filters,
     )
     return _measure(
         arm_id=BASELINE_ARM_ID,

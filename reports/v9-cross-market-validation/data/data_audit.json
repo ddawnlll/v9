@@ -1,0 +1,1472 @@
+{
+ "ADAUSDT": {
+  "bar_durations_exact": true,
+  "funding": {
+   "complete": true,
+   "coverage_pct": 100.0,
+   "expected_8h_settlements": 543,
+   "first": "2025-01-01T00:00:00Z",
+   "interval_histogram_hours": {
+    "8.0": 542
+   },
+   "last": "2025-06-30T16:00:00Z",
+   "receipt_time_unknown": 543,
+   "rows_in_window": 543,
+   "rows_total": 543
+  },
+  "h1": {
+   "abs_gap_over_10pct": 0,
+   "bars": 4344,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-10T07:00:00Z",
+     "bps": 2.1101,
+     "next_open": "0.94760",
+     "prev_close": "0.94780",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-12T09:00:00Z",
+     "bps": 2.006,
+     "next_open": "0.99720",
+     "prev_close": "0.99700",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-14T14:00:00Z",
+     "bps": 2.0589,
+     "next_open": "0.97160",
+     "prev_close": "0.97140",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 3.2462,
+   "boundary_diff_mean_bps": 1.368,
+   "boundary_diffs": 2101,
+   "boundary_diffs_beyond_one_tick": 11,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 4344,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "h1_manifest": {
+   "archives": {
+    "ADAUSDT-1h-2025-01.zip": "27fb80bcc9c164ae67ce8bf2084c748d4c28d956083e1cfe61c0d9f803ce0ee7",
+    "ADAUSDT-1h-2025-02.zip": "f79607b33b72502f72d13676a1d30609bb42ab0ad865a55d725ff87b0efa8f36",
+    "ADAUSDT-1h-2025-03.zip": "6ed5c1f5b931720d693f9ade3de8c03a825a53d97fc1f6d8f0a964b0fe295639",
+    "ADAUSDT-1h-2025-04.zip": "e328a24f922020dd2de0481ee828e3ea9e003a6524c5ba381a8ec5b8644bff43",
+    "ADAUSDT-1h-2025-05.zip": "fd2dc99c786632bd85279aa1fb8bb7f8c9ef16b17cc1d9b5cde68552ab5abbcf",
+    "ADAUSDT-1h-2025-06.zip": "6db0555c0976c8795430b788ab0e811714f784bb177dd523750fd9cf053dbb39",
+    "ADAUSDT-fundingRate-2025-01.zip": "ef6a5a286fc3d91fcdb479226500693ce9bc16ee39399ef09076a40349d2e399",
+    "ADAUSDT-fundingRate-2025-02.zip": "4bc50dceb5108bef8e51c417b13108595c64460d738080a619b60ce341718ed0",
+    "ADAUSDT-fundingRate-2025-03.zip": "3d0e98df673dad946ea8a6318d7b3f7189323127362f3aa80734a78d42aa5594",
+    "ADAUSDT-fundingRate-2025-04.zip": "0db8f973876decb78f7ef39c4114216c769c92e10ed5bbdae1ca148178b2104d",
+    "ADAUSDT-fundingRate-2025-05.zip": "2c2596eb60963e0970ccd887e4e7da52d6eed2ea2c33523407803fb7a28ff951",
+    "ADAUSDT-fundingRate-2025-06.zip": "c5cc8021595af02e572658ebbc6ee76210d0226e0d474bb354106b55b12edea9"
+   },
+   "channel_counts": {
+    "funding": 543,
+    "kline": 4344
+   },
+   "hash_manifest_required": true,
+   "instruments": {
+    "ADAUSDT": {
+     "first_open_ms": 1735689600000,
+     "funding_rows": 543,
+     "kline_rows": 4344,
+     "last_open_ms": 1751324400000
+    }
+   },
+   "rows": 4887,
+   "schema_version": "v9.tape.1",
+   "tape_sha256": "180c0ecab579fc912d62034bf9af36c414986378fa0f604f1b78fdf3472f4085"
+  },
+  "h4": {
+   "aligned_blocks_with_gaps": 0,
+   "completed_h4_bars": 1086,
+   "expected_h4_bars": 1086,
+   "rule": "H4 published only when four contiguous complete H1 bars exist and the 4h window starts on a 00:00/04:00/... boundary"
+  },
+  "m15": {
+   "abs_gap_over_10pct": 0,
+   "bars": 17376,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-03T19:30:00Z",
+     "bps": 1.8243,
+     "next_open": "1.09650",
+     "prev_close": "1.09630",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-05T01:30:00Z",
+     "bps": 1.8845,
+     "next_open": "1.06110",
+     "prev_close": "1.06130",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-09T03:30:00Z",
+     "bps": 2.1409,
+     "next_open": "0.93440",
+     "prev_close": "0.93420",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 14.0708,
+   "boundary_diff_mean_bps": 1.3731,
+   "boundary_diffs": 8516,
+   "boundary_diffs_beyond_one_tick": 56,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 17376,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "m15_manifest_sha": "485b06a8de257e3809b1517cedfb74e5fe6e1ab884cef30556556438e30f53f5",
+  "status": "OK",
+  "symbol": "ADAUSDT"
+ },
+ "AVAXUSDT": {
+  "bar_durations_exact": true,
+  "funding": {
+   "complete": true,
+   "coverage_pct": 100.0,
+   "expected_8h_settlements": 543,
+   "first": "2025-01-01T00:00:00Z",
+   "interval_histogram_hours": {
+    "8.0": 542
+   },
+   "last": "2025-06-30T16:00:00Z",
+   "receipt_time_unknown": 543,
+   "rows_in_window": 543,
+   "rows_total": 543
+  },
+  "h1": {
+   "abs_gap_over_10pct": 0,
+   "bars": 4344,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T05:00:00Z",
+     "bps": 0.5657,
+     "next_open": "35.3520",
+     "prev_close": "35.3540",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-01T11:00:00Z",
+     "bps": 1.1357,
+     "next_open": "35.2260",
+     "prev_close": "35.2220",
+     "ticks": 4.0
+    },
+    {
+     "at": "2025-01-01T17:00:00Z",
+     "bps": 0.5491,
+     "next_open": "36.4240",
+     "prev_close": "36.4220",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 3.7775,
+   "boundary_diff_mean_bps": 0.5687,
+   "boundary_diffs": 2692,
+   "boundary_diffs_beyond_one_tick": 572,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 4344,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "h1_manifest": {
+   "archives": {
+    "AVAXUSDT-1h-2025-01.zip": "53a311b0c7aa0cf0e5f5d4728b386a4ed81dca86dfc20f78dc507b3edc6e6761",
+    "AVAXUSDT-1h-2025-02.zip": "04c24f476d0bcdb121daff8dac9ea979d657a2433a5b6c5c315744ca17af670f",
+    "AVAXUSDT-1h-2025-03.zip": "23d01b3ff0e243d8daef911dfd392ffb905e221741afd7bb2159ef440e237cc5",
+    "AVAXUSDT-1h-2025-04.zip": "058e73f16ca89b66a39c2fea121d228d36414358ffe23636165663c1c2fa4626",
+    "AVAXUSDT-1h-2025-05.zip": "5a1cec74bf5966540cb917cba7261e9ee09129b2875c6e89d91cf2fa7a5b4a94",
+    "AVAXUSDT-1h-2025-06.zip": "704b2961a9bc86f1e817962ba8cf63f3a6b0a55559595c6b51a020bdedf7771f",
+    "AVAXUSDT-fundingRate-2025-01.zip": "141b34b255a63e4a8c398df4d5a020e7a27b6ba1eba49b54c783cae27e308b8c",
+    "AVAXUSDT-fundingRate-2025-02.zip": "86f4c9d7d39f199e55718ac2bbb388401851c989e8dc000450e6586dd245a3f8",
+    "AVAXUSDT-fundingRate-2025-03.zip": "cb0107d6ec4a78fbf5e70501a3089ecfe2fea1eb8284fed7d32d3b4ef8e6a719",
+    "AVAXUSDT-fundingRate-2025-04.zip": "116af3098e0221ae14893cf2ab26a7845aa8e4ceb5e4ba390d169b5e75907928",
+    "AVAXUSDT-fundingRate-2025-05.zip": "ca460af4a1a1fb71ccb2a0236f2221be914294f9940113434bdbf3967cf0a454",
+    "AVAXUSDT-fundingRate-2025-06.zip": "dd24aae0ead63e998dcd4d5f2e84431c4792074d87e95d8f7449c4a13af05394"
+   },
+   "channel_counts": {
+    "funding": 543,
+    "kline": 4344
+   },
+   "hash_manifest_required": true,
+   "instruments": {
+    "AVAXUSDT": {
+     "first_open_ms": 1735689600000,
+     "funding_rows": 543,
+     "kline_rows": 4344,
+     "last_open_ms": 1751324400000
+    }
+   },
+   "rows": 4887,
+   "schema_version": "v9.tape.1",
+   "tape_sha256": "b70736a99dd359af19fb1ccd6db9b000d94fc3d1fc8d461a46dea6467cce30a2"
+  },
+  "h4": {
+   "aligned_blocks_with_gaps": 0,
+   "completed_h4_bars": 1086,
+   "expected_h4_bars": 1086,
+   "rule": "H4 published only when four contiguous complete H1 bars exist and the 4h window starts on a 00:00/04:00/... boundary"
+  },
+  "m15": {
+   "abs_gap_over_10pct": 0,
+   "bars": 17376,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T00:45:00Z",
+     "bps": 0.5563,
+     "next_open": "35.9490",
+     "prev_close": "35.9510",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-01T04:30:00Z",
+     "bps": 1.127,
+     "next_open": "35.4880",
+     "prev_close": "35.4920",
+     "ticks": 4.0
+    },
+    {
+     "at": "2025-01-01T05:00:00Z",
+     "bps": 0.5657,
+     "next_open": "35.3520",
+     "prev_close": "35.3540",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 24.2281,
+   "boundary_diff_mean_bps": 0.5755,
+   "boundary_diffs": 10759,
+   "boundary_diffs_beyond_one_tick": 2358,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 17376,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "m15_manifest_sha": "117dc3a1dd0c66af5cdd68c4b4f05a7159894d1d9a6dade08de92174fdca7330",
+  "status": "OK",
+  "symbol": "AVAXUSDT"
+ },
+ "BNBUSDT": {
+  "bar_durations_exact": true,
+  "funding": {
+   "complete": true,
+   "coverage_pct": 100.0,
+   "expected_8h_settlements": 543,
+   "first": "2025-01-01T00:00:00Z",
+   "interval_histogram_hours": {
+    "8.0": 542
+   },
+   "last": "2025-06-30T16:00:00Z",
+   "receipt_time_unknown": 543,
+   "rows_in_window": 543,
+   "rows_total": 543
+  },
+  "h1": {
+   "abs_gap_over_10pct": 0,
+   "bars": 4344,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T20:00:00Z",
+     "bps": 0.2828,
+     "next_open": "707.180",
+     "prev_close": "707.200",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-02T15:00:00Z",
+     "bps": 0.9833,
+     "next_open": "711.820",
+     "prev_close": "711.890",
+     "ticks": 7.0
+    },
+    {
+     "at": "2025-01-04T01:00:00Z",
+     "bps": 0.4181,
+     "next_open": "717.460",
+     "prev_close": "717.490",
+     "ticks": 3.0
+    }
+   ],
+   "boundary_diff_max_bps": 2.5576,
+   "boundary_diff_mean_bps": 0.1847,
+   "boundary_diffs": 2206,
+   "boundary_diffs_beyond_one_tick": 154,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 4344,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "h1_manifest": {
+   "archives": {
+    "BNBUSDT-1h-2025-01.zip": "d7a3c3240f2214756249042ec7d914008d13457d2fdba41571607e5243a2513d",
+    "BNBUSDT-1h-2025-02.zip": "3cc05e52175fbee8638a83472b29cae87ed409d3ff95391fe260f94f2a991bf1",
+    "BNBUSDT-1h-2025-03.zip": "eab50e62bc9d8c8c65b9da0e34af0f80bce41624a6b385148a5c1bea05216999",
+    "BNBUSDT-1h-2025-04.zip": "0c2472f4288c96f99b3e0ad4ff705658c7d62b922a52fa1ac9d3abadcc25d9b4",
+    "BNBUSDT-1h-2025-05.zip": "e9efa6d5f3980d3c5be1a9b3f45d96a1b6bc116b53149d311e506ae1280ffde8",
+    "BNBUSDT-1h-2025-06.zip": "b828c5ecd697ea470abb5745a41589987198213d08a2c205ffa128258d071f84",
+    "BNBUSDT-fundingRate-2025-01.zip": "74544eee335ba817f34c28bad187eabc9c19b730a84e875eb636499944198479",
+    "BNBUSDT-fundingRate-2025-02.zip": "b5094d4dfe17e0b07b4a4cfeca6baef32a96711b824ea45e1c9bcf80db0d2b06",
+    "BNBUSDT-fundingRate-2025-03.zip": "8bd05f64e15a3f1731d75ad21dea232b6ae9e93cff351a0699a4c1ab0dc0d2ea",
+    "BNBUSDT-fundingRate-2025-04.zip": "d5b35805679bb3a410fce7ddb370ce4b6f69bc37233e4ffde4eec40f524e3ff2",
+    "BNBUSDT-fundingRate-2025-05.zip": "fc9a418d195865c4a61e0c858c56dfa62dab80c4d5f0df37cd71aed1173fd37b",
+    "BNBUSDT-fundingRate-2025-06.zip": "2ea8b6a079ab89270eeeecee1bd47128cbf585ada1bc65a1b657b76061e12c04"
+   },
+   "channel_counts": {
+    "funding": 543,
+    "kline": 4344
+   },
+   "hash_manifest_required": true,
+   "instruments": {
+    "BNBUSDT": {
+     "first_open_ms": 1735689600000,
+     "funding_rows": 543,
+     "kline_rows": 4344,
+     "last_open_ms": 1751324400000
+    }
+   },
+   "rows": 4887,
+   "schema_version": "v9.tape.1",
+   "tape_sha256": "90f88ac162cc0fffd52f994ad80dadab72db930d2cc4501e2b7a177f95a218a6"
+  },
+  "h4": {
+   "aligned_blocks_with_gaps": 0,
+   "completed_h4_bars": 1086,
+   "expected_h4_bars": 1086,
+   "rule": "H4 published only when four contiguous complete H1 bars exist and the 4h window starts on a 00:00/04:00/... boundary"
+  },
+  "m15": {
+   "abs_gap_over_10pct": 0,
+   "bars": 17376,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T16:15:00Z",
+     "bps": 0.2832,
+     "next_open": "706.230",
+     "prev_close": "706.250",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-01T20:00:00Z",
+     "bps": 0.2828,
+     "next_open": "707.180",
+     "prev_close": "707.200",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-01T22:30:00Z",
+     "bps": 0.2829,
+     "next_open": "706.880",
+     "prev_close": "706.900",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 2.6938,
+   "boundary_diff_mean_bps": 0.1867,
+   "boundary_diffs": 8876,
+   "boundary_diffs_beyond_one_tick": 651,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 17376,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "m15_manifest_sha": "5de370c74330a235e649a059dd0235d57831e14d08bab60a5be8725e7cee82a5",
+  "status": "OK",
+  "symbol": "BNBUSDT"
+ },
+ "DOGEUSDT": {
+  "bar_durations_exact": true,
+  "funding": {
+   "complete": true,
+   "coverage_pct": 100.0,
+   "expected_8h_settlements": 543,
+   "first": "2025-01-01T00:00:00Z",
+   "interval_histogram_hours": {
+    "8.0": 542
+   },
+   "last": "2025-06-30T16:00:00Z",
+   "receipt_time_unknown": 543,
+   "rows_in_window": 543,
+   "rows_total": 543
+  },
+  "h1": {
+   "abs_gap_over_10pct": 0,
+   "bars": 4344,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-02T10:00:00Z",
+     "bps": 0.5886,
+     "next_open": "0.339780",
+     "prev_close": "0.339800",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-03T10:00:00Z",
+     "bps": 0.5884,
+     "next_open": "0.339870",
+     "prev_close": "0.339890",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-03T15:00:00Z",
+     "bps": 0.5515,
+     "next_open": "0.362680",
+     "prev_close": "0.362660",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 2.4552,
+   "boundary_diff_mean_bps": 0.4982,
+   "boundary_diffs": 2251,
+   "boundary_diffs_beyond_one_tick": 59,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 4344,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "h1_manifest": {
+   "archives": {
+    "DOGEUSDT-1h-2025-01.zip": "427a82105e4175baad3486e4b47e1cc604aef880865fe30236a7b6b431703481",
+    "DOGEUSDT-1h-2025-02.zip": "617fe97855251983542f1bfb8badf2a30f908d4c88ad87d89d6ac205944fc056",
+    "DOGEUSDT-1h-2025-03.zip": "adbf47f194daaee202e2de6d4d607b393705d17d3c84bafa84fa79480419d187",
+    "DOGEUSDT-1h-2025-04.zip": "54ac07724ed6db19c0600627b318f1efa36bcacdb727538f9aa0c2085c01be0d",
+    "DOGEUSDT-1h-2025-05.zip": "5efb8967b310b24a583a3ee67ee1777519cd4ebb2d6e11cf5521ffe03e899d1d",
+    "DOGEUSDT-1h-2025-06.zip": "9a15a61f50ede3a051bcd04f31f5989f01bc4d07c4421fa84d53e65bb75eee04",
+    "DOGEUSDT-fundingRate-2025-01.zip": "be2ccf953a2fa5e84f49be601917340ba1b220b7ca42566f4066173633c80107",
+    "DOGEUSDT-fundingRate-2025-02.zip": "fa3a34848d0a10af64b9e534bf9209ac317fe0da05378d622dc9d406ca88f69d",
+    "DOGEUSDT-fundingRate-2025-03.zip": "3d9ac62d34961c5bd7b2e2b9f33abef0bcb295fdfae421bd38abab67598b2482",
+    "DOGEUSDT-fundingRate-2025-04.zip": "ef81cc81573c727ba251f68e73593322ccf16db7055de77856b4dd5cd1e7cfc8",
+    "DOGEUSDT-fundingRate-2025-05.zip": "408322bd25a392d3fb10b66ebf214e2d7c0426456bfa1d3dab79da804a511188",
+    "DOGEUSDT-fundingRate-2025-06.zip": "5a18b464cd2d6a6e106c497a5e265327762cff0ee86ebcf8fd20e0150d5a67a5"
+   },
+   "channel_counts": {
+    "funding": 543,
+    "kline": 4344
+   },
+   "hash_manifest_required": true,
+   "instruments": {
+    "DOGEUSDT": {
+     "first_open_ms": 1735689600000,
+     "funding_rows": 543,
+     "kline_rows": 4344,
+     "last_open_ms": 1751324400000
+    }
+   },
+   "rows": 4887,
+   "schema_version": "v9.tape.1",
+   "tape_sha256": "9e34ea110845829fd4fa41ad59f24c4706049942bf09308833b88c2dbebc04dc"
+  },
+  "h4": {
+   "aligned_blocks_with_gaps": 0,
+   "completed_h4_bars": 1086,
+   "expected_h4_bars": 1086,
+   "rule": "H4 published only when four contiguous complete H1 bars exist and the 4h window starts on a 00:00/04:00/... boundary"
+  },
+  "m15": {
+   "abs_gap_over_10pct": 0,
+   "bars": 17376,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T09:15:00Z",
+     "bps": 0.6373,
+     "next_open": "0.313790",
+     "prev_close": "0.313810",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-02T08:30:00Z",
+     "bps": 0.597,
+     "next_open": "0.335040",
+     "prev_close": "0.335020",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-02T10:00:00Z",
+     "bps": 0.5886,
+     "next_open": "0.339780",
+     "prev_close": "0.339800",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 9.3901,
+   "boundary_diff_mean_bps": 0.5013,
+   "boundary_diffs": 8899,
+   "boundary_diffs_beyond_one_tick": 270,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 17376,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "m15_manifest_sha": "c9af8596550d2c928e0f15066337da481af72c80c76acbc919de728f15fdcd98",
+  "status": "OK",
+  "symbol": "DOGEUSDT"
+ },
+ "DOTUSDT": {
+  "bar_durations_exact": true,
+  "funding": {
+   "complete": true,
+   "coverage_pct": 100.0,
+   "expected_8h_settlements": 543,
+   "first": "2025-01-01T00:00:00Z",
+   "interval_histogram_hours": {
+    "8.0": 542
+   },
+   "last": "2025-06-30T16:00:00Z",
+   "receipt_time_unknown": 543,
+   "rows_in_window": 543,
+   "rows_total": 543
+  },
+  "h1": {
+   "abs_gap_over_10pct": 0,
+   "bars": 4344,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T03:00:00Z",
+     "bps": 1.4975,
+     "next_open": "6.679",
+     "prev_close": "6.678",
+     "ticks": 10.0
+    },
+    {
+     "at": "2025-01-01T06:00:00Z",
+     "bps": 1.4997,
+     "next_open": "6.669",
+     "prev_close": "6.668",
+     "ticks": 10.0
+    },
+    {
+     "at": "2025-01-01T07:00:00Z",
+     "bps": 1.4997,
+     "next_open": "6.669",
+     "prev_close": "6.668",
+     "ticks": 10.0
+    }
+   ],
+   "boundary_diff_max_bps": 6.2448,
+   "boundary_diff_mean_bps": 2.2361,
+   "boundary_diffs": 2078,
+   "boundary_diffs_beyond_one_tick": 2078,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 4344,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "h1_manifest": {
+   "archives": {
+    "DOTUSDT-1h-2025-01.zip": "210f92b2b3e705272085061161447bda7840374c6599395c82ea518147f9a700",
+    "DOTUSDT-1h-2025-02.zip": "e2040ee79a9619d38656b37c354bab84618aeeee259c0d57b5efdf00e5d7b259",
+    "DOTUSDT-1h-2025-03.zip": "d82b05b8a6adf12131fcb2fa4215cb573ebbf6fc3cf99806557030554baccfc7",
+    "DOTUSDT-1h-2025-04.zip": "9671cf800f16b795eafad8ab6db79cf7a73fe0fb277115452481167b0678e9f7",
+    "DOTUSDT-1h-2025-05.zip": "168b775035dcafcca3c35a2cc51e62bdf01e53bd2123d182bc5c6be0ace17613",
+    "DOTUSDT-1h-2025-06.zip": "9ab765c4d91da288a8537681a6d55c9c275f37b82b6a66546b1b538042ccbade",
+    "DOTUSDT-fundingRate-2025-01.zip": "b226f044688e19eb612fdef1ebd176cc0b53a74b59b5038ea1518c9ee6ada1bb",
+    "DOTUSDT-fundingRate-2025-02.zip": "549b7c16c6144d2e38a190abd66a04d683ad306e1c210237242d20de709e0165",
+    "DOTUSDT-fundingRate-2025-03.zip": "d483c0852c51f4ca6ec92fd28d1152a0c4dd57e9aa8184583e245218866fa692",
+    "DOTUSDT-fundingRate-2025-04.zip": "5b40f75448bacec8a9ae7eb22d083f8c6d3c7900ea31e5a441daa8d5e29072ce",
+    "DOTUSDT-fundingRate-2025-05.zip": "1d7a8909d74169ce338195da7f1a56da5417ac6f08df24e3690a87a15cdbcaf7",
+    "DOTUSDT-fundingRate-2025-06.zip": "e5f8e1fcbddf08273ccf9e35de972049183f0cb4ae07fedfec91b626abfcd95b"
+   },
+   "channel_counts": {
+    "funding": 543,
+    "kline": 4344
+   },
+   "hash_manifest_required": true,
+   "instruments": {
+    "DOTUSDT": {
+     "first_open_ms": 1735689600000,
+     "funding_rows": 543,
+     "kline_rows": 4344,
+     "last_open_ms": 1751324400000
+    }
+   },
+   "rows": 4887,
+   "schema_version": "v9.tape.1",
+   "tape_sha256": "77ac1cb55de434011ceaaa3e8bb8cc41279e02e820be537d52c7587bba48a2b0"
+  },
+  "h4": {
+   "aligned_blocks_with_gaps": 0,
+   "completed_h4_bars": 1086,
+   "expected_h4_bars": 1086,
+   "rule": "H4 published only when four contiguous complete H1 bars exist and the 4h window starts on a 00:00/04:00/... boundary"
+  },
+  "m15": {
+   "abs_gap_over_10pct": 0,
+   "bars": 17376,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T00:15:00Z",
+     "bps": 1.4988,
+     "next_open": "6.671",
+     "prev_close": "6.672",
+     "ticks": 10.0
+    },
+    {
+     "at": "2025-01-01T00:30:00Z",
+     "bps": 1.4984,
+     "next_open": "6.673",
+     "prev_close": "6.674",
+     "ticks": 10.0
+    },
+    {
+     "at": "2025-01-01T00:45:00Z",
+     "bps": 1.4961,
+     "next_open": "6.683",
+     "prev_close": "6.684",
+     "ticks": 10.0
+    }
+   ],
+   "boundary_diff_max_bps": 10.4293,
+   "boundary_diff_mean_bps": 2.2282,
+   "boundary_diffs": 8407,
+   "boundary_diffs_beyond_one_tick": 8407,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 17376,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "m15_manifest_sha": "1a1923d55648fdaf73ce0c62bd4987fb02fa9eda87f2d1226cf9d7d15472b2f0",
+  "status": "OK",
+  "symbol": "DOTUSDT"
+ },
+ "ETHUSDT": {
+  "bar_durations_exact": true,
+  "funding": {
+   "complete": true,
+   "coverage_pct": 100.0,
+   "expected_8h_settlements": 543,
+   "first": "2025-01-01T00:00:00Z",
+   "interval_histogram_hours": {
+    "8.0": 542
+   },
+   "last": "2025-06-30T16:00:00Z",
+   "receipt_time_unknown": 543,
+   "rows_in_window": 543,
+   "rows_total": 543
+  },
+  "h1": {
+   "abs_gap_over_10pct": 0,
+   "bars": 4344,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T20:00:00Z",
+     "bps": 0.0596,
+     "next_open": "3356.21",
+     "prev_close": "3356.23",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-02T10:00:00Z",
+     "bps": 0.0865,
+     "next_open": "3467.84",
+     "prev_close": "3467.87",
+     "ticks": 3.0
+    },
+    {
+     "at": "2025-01-02T15:00:00Z",
+     "bps": 0.2862,
+     "next_open": "3494.43",
+     "prev_close": "3494.53",
+     "ticks": 10.0
+    }
+   ],
+   "boundary_diff_max_bps": 1.1121,
+   "boundary_diff_mean_bps": 0.0563,
+   "boundary_diffs": 2190,
+   "boundary_diffs_beyond_one_tick": 169,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 4344,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "h1_manifest": {
+   "archives": {
+    "ETHUSDT-1h-2025-01.zip": "99928eb8fdc5d565d317b0e9685e07fc5f9487510a39b8675d7374cfdfcbec82",
+    "ETHUSDT-1h-2025-02.zip": "d7466620f50bb4048080ece1deab8eb0298274413a3eb2a9f4c728536ab3c647",
+    "ETHUSDT-1h-2025-03.zip": "9dbad1e542ff8344fe8610450cf71d5cb98e1af2e8f2d7a31dbe8679ef263535",
+    "ETHUSDT-1h-2025-04.zip": "238c691129962d9fe08aaca46ea367f911e62c58a820a8e5ded371bff7f4eec4",
+    "ETHUSDT-1h-2025-05.zip": "201829c864a26677ad0b53df5b0491e9eab00e6f48e1a8bf5204dc7d794dd7ea",
+    "ETHUSDT-1h-2025-06.zip": "45763ee27ad110703c6f71d9ec80711de151b8211b14ad98cc978c4d5ede82ce",
+    "ETHUSDT-fundingRate-2025-01.zip": "88c95b99d2784a7baac529fe578563d7e05038a1b8a498b2f59bf81b216fee20",
+    "ETHUSDT-fundingRate-2025-02.zip": "9e116dd6754484a19ecc41ced40b8dfa7f62c33d41cdc3317336b1e1f043767f",
+    "ETHUSDT-fundingRate-2025-03.zip": "62464a8bfb7ba515628acb76d3e2172d33b88805faa2e701a22537c51a17d139",
+    "ETHUSDT-fundingRate-2025-04.zip": "7db62cb5e9f32397dacabb3d571b96397024bda3810bde0799c90f61cb773679",
+    "ETHUSDT-fundingRate-2025-05.zip": "996aff38f046b50510301532ac5cbdca115afca971c49cb548f50e5d70e18d99",
+    "ETHUSDT-fundingRate-2025-06.zip": "ae7ca242249ca3df06d1222a0c264fe83b18c4b2c19fe656e864f7d081d5e198"
+   },
+   "channel_counts": {
+    "funding": 543,
+    "kline": 4344
+   },
+   "hash_manifest_required": true,
+   "instruments": {
+    "ETHUSDT": {
+     "first_open_ms": 1735689600000,
+     "funding_rows": 543,
+     "kline_rows": 4344,
+     "last_open_ms": 1751324400000
+    }
+   },
+   "rows": 4887,
+   "schema_version": "v9.tape.1",
+   "tape_sha256": "be7aa5e90b028bbda4984474f4f3d730bfc361d63a5e8e423843980377489096"
+  },
+  "h4": {
+   "aligned_blocks_with_gaps": 0,
+   "completed_h4_bars": 1086,
+   "expected_h4_bars": 1086,
+   "rule": "H4 published only when four contiguous complete H1 bars exist and the 4h window starts on a 00:00/04:00/... boundary"
+  },
+  "m15": {
+   "abs_gap_over_10pct": 0,
+   "bars": 17376,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T10:30:00Z",
+     "bps": 0.06,
+     "next_open": "3331.73",
+     "prev_close": "3331.71",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-01T20:00:00Z",
+     "bps": 0.0596,
+     "next_open": "3356.21",
+     "prev_close": "3356.23",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-01T21:45:00Z",
+     "bps": 0.5058,
+     "next_open": "3361.34",
+     "prev_close": "3361.17",
+     "ticks": 17.0
+    }
+   ],
+   "boundary_diff_max_bps": 20.6752,
+   "boundary_diff_mean_bps": 0.0592,
+   "boundary_diffs": 8848,
+   "boundary_diffs_beyond_one_tick": 670,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 17376,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "m15_manifest_sha": "a526df6ecf172746ae4e12e9a0fef5f354ec280732037ed9d799be258f67771f",
+  "status": "OK",
+  "symbol": "ETHUSDT"
+ },
+ "LINKUSDT": {
+  "bar_durations_exact": true,
+  "funding": {
+   "complete": true,
+   "coverage_pct": 100.0,
+   "expected_8h_settlements": 543,
+   "first": "2025-01-01T00:00:00Z",
+   "interval_histogram_hours": {
+    "8.0": 542
+   },
+   "last": "2025-06-30T16:00:00Z",
+   "receipt_time_unknown": 543,
+   "rows_in_window": 543,
+   "rows_total": 543
+  },
+  "h1": {
+   "abs_gap_over_10pct": 0,
+   "bars": 4344,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-02T15:00:00Z",
+     "bps": 0.8893,
+     "next_open": "22.487",
+     "prev_close": "22.489",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-03T00:00:00Z",
+     "bps": 0.9065,
+     "next_open": "22.066",
+     "prev_close": "22.064",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-03T01:00:00Z",
+     "bps": 0.9094,
+     "next_open": "21.995",
+     "prev_close": "21.993",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 3.1451,
+   "boundary_diff_mean_bps": 0.708,
+   "boundary_diffs": 2395,
+   "boundary_diffs_beyond_one_tick": 231,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 4344,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "h1_manifest": {
+   "archives": {
+    "LINKUSDT-1h-2025-01.zip": "04edde44f5fe5aa72bb935e4ce110b570e22dfd7e49832efb5755c4db5750601",
+    "LINKUSDT-1h-2025-02.zip": "6888afba85650ae4a9f8a64ba1d975cfbafd7f3bcf8ebcbbc534118afb493ed8",
+    "LINKUSDT-1h-2025-03.zip": "1cbe649d0f91846bbcc1f3563f8179bf875e01b8b6b2bb074c3594234b13fc8a",
+    "LINKUSDT-1h-2025-04.zip": "2998afdca7b4d9d2c328ea1261b478d011af0469b9cc00246825c44940d1ef61",
+    "LINKUSDT-1h-2025-05.zip": "ba574e76e7e394db368df3dae93028f6c1e7039c0513b3cc50d0ab82ec8c18a0",
+    "LINKUSDT-1h-2025-06.zip": "e5db5f3c3586190e79f3a07d2de9128ae8f8a8b57e2fd7cf0fdd275954c89f24",
+    "LINKUSDT-fundingRate-2025-01.zip": "13713b66ca784964b080a68c8a944d758202e8ab454fba9bd8b42fc1c8fdb804",
+    "LINKUSDT-fundingRate-2025-02.zip": "92d748c5583035811fa307d7f0f039d2fdcaabf59c78095ba61f24426328e77c",
+    "LINKUSDT-fundingRate-2025-03.zip": "bb73dc71a95ee0127f66248f1912b605f8bccaaa52b318be42397b4263c42be7",
+    "LINKUSDT-fundingRate-2025-04.zip": "17f6f5f71e62fb2478167db581286c36f298d266b5b73a18d954bfca1a61c874",
+    "LINKUSDT-fundingRate-2025-05.zip": "7d3b60afb85860117409e2137884e2a01e45a22eb2e4d1353514244f83796002",
+    "LINKUSDT-fundingRate-2025-06.zip": "cbdf6273e84d457b4915139e41a278629cbdfc02855e290b6d9ff34218eb36a5"
+   },
+   "channel_counts": {
+    "funding": 543,
+    "kline": 4344
+   },
+   "hash_manifest_required": true,
+   "instruments": {
+    "LINKUSDT": {
+     "first_open_ms": 1735689600000,
+     "funding_rows": 543,
+     "kline_rows": 4344,
+     "last_open_ms": 1751324400000
+    }
+   },
+   "rows": 4887,
+   "schema_version": "v9.tape.1",
+   "tape_sha256": "f4e1e17261c513e2c60d1977d7e9632f6ea42c74e25b6a05dc1c44706e526b80"
+  },
+  "h4": {
+   "aligned_blocks_with_gaps": 0,
+   "completed_h4_bars": 1086,
+   "expected_h4_bars": 1086,
+   "rule": "H4 published only when four contiguous complete H1 bars exist and the 4h window starts on a 00:00/04:00/... boundary"
+  },
+  "m15": {
+   "abs_gap_over_10pct": 0,
+   "bars": 17376,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T00:15:00Z",
+     "bps": 1.4943,
+     "next_open": "20.079",
+     "prev_close": "20.076",
+     "ticks": 3.0
+    },
+    {
+     "at": "2025-01-01T05:45:00Z",
+     "bps": 1.9933,
+     "next_open": "20.071",
+     "prev_close": "20.067",
+     "ticks": 4.0
+    },
+    {
+     "at": "2025-01-01T07:30:00Z",
+     "bps": 1.4996,
+     "next_open": "20.002",
+     "prev_close": "20.005",
+     "ticks": 3.0
+    }
+   ],
+   "boundary_diff_max_bps": 24.3394,
+   "boundary_diff_mean_bps": 0.7119,
+   "boundary_diffs": 9499,
+   "boundary_diffs_beyond_one_tick": 950,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 17376,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "m15_manifest_sha": "4a7a11ca525e8235b596e0d5d27178dd6816e2a9174af95d98575eff625882f3",
+  "status": "OK",
+  "symbol": "LINKUSDT"
+ },
+ "LTCUSDT": {
+  "bar_durations_exact": true,
+  "funding": {
+   "complete": true,
+   "coverage_pct": 100.0,
+   "expected_8h_settlements": 543,
+   "first": "2025-01-01T00:00:00Z",
+   "interval_histogram_hours": {
+    "8.0": 542
+   },
+   "last": "2025-06-30T16:00:00Z",
+   "receipt_time_unknown": 543,
+   "rows_in_window": 543,
+   "rows_total": 543
+  },
+  "h1": {
+   "abs_gap_over_10pct": 0,
+   "bars": 4344,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-06T03:00:00Z",
+     "bps": 1.7247,
+     "next_open": "115.94",
+     "prev_close": "115.96",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-07T14:00:00Z",
+     "bps": 1.8002,
+     "next_open": "111.12",
+     "prev_close": "111.10",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-08T02:00:00Z",
+     "bps": 1.9207,
+     "next_open": "104.15",
+     "prev_close": "104.13",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 4.0005,
+   "boundary_diff_mean_bps": 1.074,
+   "boundary_diffs": 2174,
+   "boundary_diffs_beyond_one_tick": 72,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 4344,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "h1_manifest": {
+   "archives": {
+    "LTCUSDT-1h-2025-01.zip": "fdd79bce6411c1794602db19dbe125080b9d0c50338b2c238d0ab80f6a0f6339",
+    "LTCUSDT-1h-2025-02.zip": "110d0051392451d211c6f2534fccbd730d3a08d2c9bbfc4fe180c59df3a38616",
+    "LTCUSDT-1h-2025-03.zip": "05602d2109bb9bf7778179e429cb5ac75f0e69a2828d9c1926d07af0eef64c03",
+    "LTCUSDT-1h-2025-04.zip": "e810bdd996786aeabb89c9794bad75af8c2752c1eb3ff4fa489b6c6998a0d718",
+    "LTCUSDT-1h-2025-05.zip": "a53d95be3620ca6406f23830d2af04ff4f02c939e53d924aa364fd25234d9d2f",
+    "LTCUSDT-1h-2025-06.zip": "73368142c29a402d9d265ba0aabf1869c1a8cce06a0e2bfc8bd9a56011d47f69",
+    "LTCUSDT-fundingRate-2025-01.zip": "0ba4ae7a317bf2d4d708cdcfabfca13332c9e87ca2875b89e968ab6368234cfb",
+    "LTCUSDT-fundingRate-2025-02.zip": "8c30729e7412ed01cb0dc5237432f47e6316fbe50465d4a6d95360db04e6c8f6",
+    "LTCUSDT-fundingRate-2025-03.zip": "d4b7be682d103815845bd1e6d8d3f7b420577ed55b91a0471ae70581cd7317b6",
+    "LTCUSDT-fundingRate-2025-04.zip": "e84071807012cee4af78727a72862e87bfa8afe7993c478a531674358fe15aec",
+    "LTCUSDT-fundingRate-2025-05.zip": "ade502ee0d0be2a666ec94f8361525808b7b911fa9e576a27bce326e06b4edf6",
+    "LTCUSDT-fundingRate-2025-06.zip": "9159d2d6e16e41b82f77f51f0005038d6d718a3b6222604a5209a2ce92e0ad1c"
+   },
+   "channel_counts": {
+    "funding": 543,
+    "kline": 4344
+   },
+   "hash_manifest_required": true,
+   "instruments": {
+    "LTCUSDT": {
+     "first_open_ms": 1735689600000,
+     "funding_rows": 543,
+     "kline_rows": 4344,
+     "last_open_ms": 1751324400000
+    }
+   },
+   "rows": 4887,
+   "schema_version": "v9.tape.1",
+   "tape_sha256": "4a455a83d0251cc7eb339ea38b23ca9068334db3936ecaa08141518af6501ebd"
+  },
+  "h4": {
+   "aligned_blocks_with_gaps": 0,
+   "completed_h4_bars": 1086,
+   "expected_h4_bars": 1086,
+   "rule": "H4 published only when four contiguous complete H1 bars exist and the 4h window starts on a 00:00/04:00/... boundary"
+  },
+  "m15": {
+   "abs_gap_over_10pct": 0,
+   "bars": 17376,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T12:15:00Z",
+     "bps": 1.9299,
+     "next_open": "103.61",
+     "prev_close": "103.63",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-03T05:30:00Z",
+     "bps": 1.9082,
+     "next_open": "104.79",
+     "prev_close": "104.81",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-03T05:45:00Z",
+     "bps": 1.9049,
+     "next_open": "105.01",
+     "prev_close": "104.99",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 17.0358,
+   "boundary_diff_mean_bps": 1.0798,
+   "boundary_diffs": 8684,
+   "boundary_diffs_beyond_one_tick": 305,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 17376,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "m15_manifest_sha": "49afec82928cbaa9e22be1ed0d999a8beab5ed121abb38b49065918b495c9589",
+  "status": "OK",
+  "symbol": "LTCUSDT"
+ },
+ "SOLUSDT": {
+  "bar_durations_exact": true,
+  "funding": {
+   "complete": true,
+   "coverage_pct": 100.0,
+   "expected_8h_settlements": 543,
+   "first": "2025-01-01T00:00:00Z",
+   "interval_histogram_hours": {
+    "8.0": 542
+   },
+   "last": "2025-06-30T16:00:00Z",
+   "receipt_time_unknown": 543,
+   "rows_in_window": 543,
+   "rows_total": 543
+  },
+  "h1": {
+   "abs_gap_over_10pct": 0,
+   "bars": 4344,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T02:00:00Z",
+     "bps": 0.5246,
+     "next_open": "190.6300",
+     "prev_close": "190.6200",
+     "ticks": 100.0
+    },
+    {
+     "at": "2025-01-01T03:00:00Z",
+     "bps": 0.5222,
+     "next_open": "191.5200",
+     "prev_close": "191.5100",
+     "ticks": 100.0
+    },
+    {
+     "at": "2025-01-01T08:00:00Z",
+     "bps": 0.5264,
+     "next_open": "189.9700",
+     "prev_close": "189.9600",
+     "ticks": 100.0
+    }
+   ],
+   "boundary_diff_max_bps": 2.7064,
+   "boundary_diff_mean_bps": 0.652,
+   "boundary_diffs": 2191,
+   "boundary_diffs_beyond_one_tick": 2191,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 4344,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "h1_manifest": {
+   "archives": {
+    "SOLUSDT-1h-2025-01.zip": "372c98abd2da7bbf5e3cbe39e77296efe8ef4e94790c3566da3e7313049be7b8",
+    "SOLUSDT-1h-2025-02.zip": "863aeb10c3a31a5a9da82bfbcd120740c0dfad5078a579366caf166f58aa9b34",
+    "SOLUSDT-1h-2025-03.zip": "04b504d8b18dd7e1dce1783add7bf40df0132e6aeb9932a46aa950abb36534c8",
+    "SOLUSDT-1h-2025-04.zip": "6d8784d0f2a936547897208aada8b57d65104bd3307cfad32fb39070fdec061c",
+    "SOLUSDT-1h-2025-05.zip": "b20e5bf7b4b3b3d5c0720ab2d845e03933ef08f15d3f06570b009463ba12bad9",
+    "SOLUSDT-1h-2025-06.zip": "72d6fb9cab913d98220a06a08eab70a361b5d3fe84ea9701420e5f2cc6600c7c",
+    "SOLUSDT-fundingRate-2025-01.zip": "314888152c16bc2d846f9aaa9ea3ebeec7c67d235ef2671f1a5e6fe0a8b4dbf2",
+    "SOLUSDT-fundingRate-2025-02.zip": "eeade74c1ca2a6dc9d78ba0d7a1ff145c323be72cfa2c09fcef9edab88baef9f",
+    "SOLUSDT-fundingRate-2025-03.zip": "3f77a33779c946da6f3082d14fb9a5497e7e4a4e3fff4d68967e6ddf96cf99ea",
+    "SOLUSDT-fundingRate-2025-04.zip": "6cd3fb27bae9313e15734d7214f4a83dc37a7a199cfc12c23f7777a5e27f7fd7",
+    "SOLUSDT-fundingRate-2025-05.zip": "eb03fd0d0b31eef9ee05544ea8dcce097a807d3475f67d0a5f0859c487c5f5c3",
+    "SOLUSDT-fundingRate-2025-06.zip": "4ccee0a6fd67cb775be49d124b9eb038f26acd09426fcb9aaf9d3de74cf3a24e"
+   },
+   "channel_counts": {
+    "funding": 543,
+    "kline": 4344
+   },
+   "hash_manifest_required": true,
+   "instruments": {
+    "SOLUSDT": {
+     "first_open_ms": 1735689600000,
+     "funding_rows": 543,
+     "kline_rows": 4344,
+     "last_open_ms": 1751324400000
+    }
+   },
+   "rows": 4887,
+   "schema_version": "v9.tape.1",
+   "tape_sha256": "8587eb5cc2de93ae11410fed3903438cc0428b7351dfa93595109f02d9b2cbf8"
+  },
+  "h4": {
+   "aligned_blocks_with_gaps": 0,
+   "completed_h4_bars": 1086,
+   "expected_h4_bars": 1086,
+   "rule": "H4 published only when four contiguous complete H1 bars exist and the 4h window starts on a 00:00/04:00/... boundary"
+  },
+  "m15": {
+   "abs_gap_over_10pct": 0,
+   "bars": 17376,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-01T00:15:00Z",
+     "bps": 0.5253,
+     "next_open": "190.3900",
+     "prev_close": "190.3800",
+     "ticks": 100.0
+    },
+    {
+     "at": "2025-01-01T00:30:00Z",
+     "bps": 0.5246,
+     "next_open": "190.6000",
+     "prev_close": "190.6100",
+     "ticks": 100.0
+    },
+    {
+     "at": "2025-01-01T00:45:00Z",
+     "bps": 0.5231,
+     "next_open": "191.1600",
+     "prev_close": "191.1500",
+     "ticks": 100.0
+    }
+   ],
+   "boundary_diff_max_bps": 4.7747,
+   "boundary_diff_mean_bps": 0.6506,
+   "boundary_diffs": 8746,
+   "boundary_diffs_beyond_one_tick": 8746,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 17376,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "m15_manifest_sha": "f55603d982f0a6140900795acf6cdc419d5a0ae9e103d857318055676358da1e",
+  "status": "OK",
+  "symbol": "SOLUSDT"
+ },
+ "XRPUSDT": {
+  "bar_durations_exact": true,
+  "funding": {
+   "complete": true,
+   "coverage_pct": 100.0,
+   "expected_8h_settlements": 543,
+   "first": "2025-01-01T00:00:00Z",
+   "interval_histogram_hours": {
+    "8.0": 542
+   },
+   "last": "2025-06-30T16:00:00Z",
+   "receipt_time_unknown": 543,
+   "rows_in_window": 543,
+   "rows_total": 543
+  },
+  "h1": {
+   "abs_gap_over_10pct": 0,
+   "bars": 4344,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-14T16:00:00Z",
+     "bps": 0.7757,
+     "next_open": "2.5780",
+     "prev_close": "2.5782",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-20T00:00:00Z",
+     "bps": 1.0151,
+     "next_open": "2.9552",
+     "prev_close": "2.9555",
+     "ticks": 3.0
+    },
+    {
+     "at": "2025-01-20T06:00:00Z",
+     "bps": 0.6439,
+     "next_open": "3.1059",
+     "prev_close": "3.1061",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 2.4019,
+   "boundary_diff_mean_bps": 0.4452,
+   "boundary_diffs": 2230,
+   "boundary_diffs_beyond_one_tick": 64,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 4344,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "h1_manifest": {
+   "archives": {
+    "XRPUSDT-1h-2025-01.zip": "480e6a9873f8186a2f4d3b2d6e4fd85a91b951f3cec01a3775c272cd76630781",
+    "XRPUSDT-1h-2025-02.zip": "924fde9c32553b6d2dc05259a6e963555a0cca9e8fe522d04a0adc71729c0d27",
+    "XRPUSDT-1h-2025-03.zip": "5efb970f41e93decca8a1a63565a96e7e254f005629f2c0eb0658a195441cd9f",
+    "XRPUSDT-1h-2025-04.zip": "332087b75ad18a7d26831c6d7f330b8b56ec4a48994ff4f2f631d841a021e91f",
+    "XRPUSDT-1h-2025-05.zip": "f915ca779e9a4374fdbf67e4c6fad61d658a1ba88ad6c87ab1c30e4a0e49ed81",
+    "XRPUSDT-1h-2025-06.zip": "fdc070996205a34c55c14eeed845d0bd1fe61df6fe88f4425de239e450410895",
+    "XRPUSDT-fundingRate-2025-01.zip": "b14759b7a99d6111f819790de938b2b0f3eeeaac57402c2e1ef71fd38302d26d",
+    "XRPUSDT-fundingRate-2025-02.zip": "927da57e3d0a92fa6e024c00397abac93ab5722ca7a353e92e493cfd28de2f3c",
+    "XRPUSDT-fundingRate-2025-03.zip": "690fb0f227c2b8b1467428b2e3340ea9928d8ef81ac461bd6f641f100dd21d66",
+    "XRPUSDT-fundingRate-2025-04.zip": "d47ea402f11ad727be1c1b4adfa8483698151509d90e9cb53b84b0a43ca67de8",
+    "XRPUSDT-fundingRate-2025-05.zip": "7c664b87b0ae630b033f67ab334a46d433374927e74445c56f4b3be7b9b23092",
+    "XRPUSDT-fundingRate-2025-06.zip": "5bfb1683c2b8c738a0059ee02078706585b62c1e430685af76e3796a0ee58613"
+   },
+   "channel_counts": {
+    "funding": 543,
+    "kline": 4344
+   },
+   "hash_manifest_required": true,
+   "instruments": {
+    "XRPUSDT": {
+     "first_open_ms": 1735689600000,
+     "funding_rows": 543,
+     "kline_rows": 4344,
+     "last_open_ms": 1751324400000
+    }
+   },
+   "rows": 4887,
+   "schema_version": "v9.tape.1",
+   "tape_sha256": "35c14b4eab9c01565884da92232860f9b9a60d1a2478d1833263716421158ca6"
+  },
+  "h4": {
+   "aligned_blocks_with_gaps": 0,
+   "completed_h4_bars": 1086,
+   "expected_h4_bars": 1086,
+   "rule": "H4 published only when four contiguous complete H1 bars exist and the 4h window starts on a 00:00/04:00/... boundary"
+  },
+  "m15": {
+   "abs_gap_over_10pct": 0,
+   "bars": 17376,
+   "boundary_diff_examples": [
+    {
+     "at": "2025-01-03T12:30:00Z",
+     "bps": 0.8284,
+     "next_open": "2.4142",
+     "prev_close": "2.4144",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-08T09:45:00Z",
+     "bps": 0.8624,
+     "next_open": "2.3192",
+     "prev_close": "2.3190",
+     "ticks": 2.0
+    },
+    {
+     "at": "2025-01-11T21:45:00Z",
+     "bps": 0.7806,
+     "next_open": "2.5618",
+     "prev_close": "2.5620",
+     "ticks": 2.0
+    }
+   ],
+   "boundary_diff_max_bps": 7.9872,
+   "boundary_diff_mean_bps": 0.4442,
+   "boundary_diffs": 8815,
+   "boundary_diffs_beyond_one_tick": 237,
+   "complete": true,
+   "coverage_pct": 100.0,
+   "duplicate_slots": 0,
+   "event_time_rule": "event_time = bar close + 1 ms (a bar is knowable only when closed)",
+   "expected_bars": 17376,
+   "first_event": "2025-01-01T00:00:00Z",
+   "gap_examples": [],
+   "last_event_end": "2025-07-01T00:00:00Z",
+   "missing_examples": [],
+   "missing_slots": 0,
+   "monotonic": true,
+   "non_positive_or_inverted_bars": 0,
+   "ohlc_ordering_violations": 0,
+   "out_of_order": 0
+  },
+  "m15_manifest_sha": "505e5c2c21c2f0bea78fa4f34cfc2aad058e649932b1763c9bda5a949043fc53",
+  "status": "OK",
+  "symbol": "XRPUSDT"
+ }
+}

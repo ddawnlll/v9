@@ -13,6 +13,7 @@ from typing import Any
 import polars as pl
 
 from v8_next.domain.market import CausalFrame
+from v8_next.evaluation.instrument_metadata import VENUE_FILTERS
 
 
 def numeric(value: object) -> float:
@@ -86,11 +87,26 @@ def opportunity_record(opportunity: Opportunity) -> dict[str, Any]:
 
 
 def linear_exposure_id(instrument_id: str) -> str | None:
-    """Explicit initial USD-M universe; native metadata must still qualify contracts."""
-    return {
-        "BTCUSDT-PERP.BINANCE": "BTC/USD:linear-perpetual",
-        "ETHUSDT-PERP.BINANCE": "ETH/USD:linear-perpetual",
-    }.get(instrument_id)
+    """Explicit USD-M universe; native metadata must still qualify contracts.
+
+    The universe is the verified venue-filter table
+    (:mod:`v8_next.evaluation.instrument_metadata`) rather than a second,
+    hand-maintained list. An instrument absent from it has **no** exposure id, so
+    :func:`opportunity_at` returns ``None`` and the bar cannot become an
+    opportunity: an unmapped symbol is refused, never silently treated as BTC.
+    ``BTCUSDT-PERP.BINANCE`` and ``ETHUSDT-PERP.BINANCE`` map exactly as before,
+    so existing measurements and identities are unchanged.
+    """
+    return _LINEAR_EXPOSURES.get(instrument_id)
+
+
+#: ``<SYMBOL>-PERP.BINANCE`` -> ``<BASE>/USD:linear-perpetual`` for every
+#: instrument with a verified filter entry. Settlement is USDT, so the exposure
+#: quotes in USD, matching the existing BTC/ETH entries.
+_LINEAR_EXPOSURES: dict[str, str] = {
+    f"{filters.symbol}-PERP.BINANCE": f"{filters.base_currency}/USD:linear-perpetual"
+    for filters in VENUE_FILTERS.values()
+}
 
 
 def opportunity_at(frame: CausalFrame) -> Opportunity | None:

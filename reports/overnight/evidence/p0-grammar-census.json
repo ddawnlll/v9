@@ -1,0 +1,163 @@
+{
+  "authority": "OFFLINE_PIT_CENSUS",
+  "bars": 2160,
+  "bracket_stop_pct": "0.02",
+  "bracket_target_pct": "0.04",
+  "claim_status": "NO_ECONOMIC_CLAIM",
+  "costs_applied": "NONE",
+  "distributions": [
+    {
+      "against_open_episodes": 8,
+      "ambiguous_bars": 0,
+      "bars_evaluated": 2112,
+      "censored": 0,
+      "directional_bars": 123,
+      "episodes": 10,
+      "fragments": 113,
+      "hit_rate": 0.4,
+      "horizon_bars": 336,
+      "mean_mae_pct": 1.683128948777642,
+      "mean_market_move_pct": 0.29055159062978675,
+      "mean_mfe_pct": 2.60388377041614,
+      "neutral_bars": 0,
+      "policy": "range-breakout-48-v1",
+      "stop_hits": 6,
+      "target_hits": 4,
+      "timeouts": 0,
+      "warmup_bars": 49
+    },
+    {
+      "against_open_episodes": 36,
+      "ambiguous_bars": 157,
+      "bars_evaluated": 2140,
+      "censored": 1,
+      "directional_bars": 389,
+      "episodes": 56,
+      "fragments": 333,
+      "hit_rate": 0.23636363636363636,
+      "horizon_bars": 48,
+      "mean_mae_pct": 1.7092999886450528,
+      "mean_market_move_pct": 0.1473668109012657,
+      "mean_mfe_pct": 1.9941961159710535,
+      "neutral_bars": 273,
+      "policy": "volatility-extreme-v2",
+      "stop_hits": 32,
+      "target_hits": 13,
+      "timeouts": 10,
+      "warmup_bars": 21
+    },
+    {
+      "against_open_episodes": 74,
+      "ambiguous_bars": 0,
+      "bars_evaluated": 2136,
+      "censored": 1,
+      "directional_bars": 818,
+      "episodes": 118,
+      "fragments": 700,
+      "hit_rate": 0.1111111111111111,
+      "horizon_bars": 24,
+      "mean_mae_pct": 1.4985675150927844,
+      "mean_market_move_pct": -0.025964778989106284,
+      "mean_mfe_pct": 1.7648002154703202,
+      "neutral_bars": 0,
+      "policy": "trend-continuation-v2",
+      "stop_hits": 42,
+      "target_hits": 13,
+      "timeouts": 62,
+      "warmup_bars": 25
+    },
+    {
+      "against_open_episodes": 0,
+      "ambiguous_bars": 0,
+      "bars_evaluated": 2140,
+      "censored": 0,
+      "directional_bars": 62,
+      "episodes": 33,
+      "fragments": 29,
+      "hit_rate": 0.06060606060606061,
+      "horizon_bars": 12,
+      "mean_mae_pct": 1.5364803529874314,
+      "mean_market_move_pct": 0.0483233972287388,
+      "mean_mfe_pct": 1.5683856236247737,
+      "neutral_bars": 0,
+      "policy": "mean-reversion-v2",
+      "stop_hits": 11,
+      "target_hits": 2,
+      "timeouts": 20,
+      "warmup_bars": 21
+    },
+    {
+      "against_open_episodes": 5,
+      "ambiguous_bars": 0,
+      "bars_evaluated": 2099,
+      "censored": 0,
+      "directional_bars": 32,
+      "episodes": 22,
+      "fragments": 10,
+      "hit_rate": 0.22727272727272727,
+      "horizon_bars": 24,
+      "mean_mae_pct": 1.7319556336618123,
+      "mean_market_move_pct": 0.27207778671210775,
+      "mean_mfe_pct": 2.201707666493697,
+      "neutral_bars": 0,
+      "policy": "compression-expansion-v2",
+      "stop_hits": 12,
+      "target_hits": 5,
+      "timeouts": 5,
+      "warmup_bars": 62
+    }
+  ],
+  "evidence_digest": "sha256:6aa93f797e761061dd4e8cc129df8521f7256b48ddf500c17c0b43e5cd4a607f",
+  "instrument_id": "BTCUSDT-PERP.BINANCE",
+  "overlap": {
+    "bars_with_multiple_grammars": 354,
+    "bars_with_opposing_directions": 26,
+    "pairwise_co_detections": [
+      {
+        "a": "trend-continuation-v2",
+        "b": "volatility-extreme-v2",
+        "bars": 309
+      },
+      {
+        "a": "range-breakout-48-v1",
+        "b": "trend-continuation-v2",
+        "bars": 122
+      },
+      {
+        "a": "range-breakout-48-v1",
+        "b": "volatility-extreme-v2",
+        "bars": 111
+      },
+      {
+        "a": "mean-reversion-v2",
+        "b": "volatility-extreme-v2",
+        "bars": 26
+      },
+      {
+        "a": "compression-expansion-v2",
+        "b": "volatility-extreme-v2",
+        "bars": 17
+      },
+      {
+        "a": "compression-expansion-v2",
+        "b": "trend-continuation-v2",
+        "bars": 15
+      },
+      {
+        "a": "compression-expansion-v2",
+        "b": "range-breakout-48-v1",
+        "bars": 8
+      }
+    ]
+  },
+  "panel_gate": {
+    "contradiction_can_block": false,
+    "expert_count": 28,
+    "max_contradiction_tolerance": 28,
+    "min_support_can_pass_with": "a single support vote",
+    "min_support_quorum": 1,
+    "note": "contradiction can never block: 28 experts exist and 28 contradictions are tolerated, so the gate reduces to the support quorum alone"
+  },
+  "tape_sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7",
+  "version": "p0-grammar-census-v1"
+}
