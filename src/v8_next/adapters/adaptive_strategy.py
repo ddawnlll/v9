@@ -387,11 +387,6 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self._reduce_decision: dict[str, str] = {}
         self._live_protection: dict[str, str] = {}
         self._pending_flat: dict[str, ProtectionEvent] = {}
-        #: Opened-position snapshots are published on the next bar, after the
-        #: bracket children's ACK callbacks for the opening batch, so the
-        #: invariant checker does not report a transient missing ACK that the
-        #: venue answers later in the same event batch.
-        self._pending_snapshots: dict[str, tuple[int, Decimal, Direction | None]] = {}
         #: Positions this session has seen open and not yet seen close. Used as a
         #: fail-closed overlap guard: a cache miss must never permit a second
         #: entry that would leave the first bracket under-sized.
@@ -408,7 +403,6 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         cut = candle.end_ns
 
         self._flush_pending_flat(unconditional=True)
-        self._flush_pending_snapshots()
         self._flush_pending_pairs()
         self._reprotect_remaining(candle)
         for transitioned in self.opportunity_book.on_candle(candle):
@@ -1155,6 +1149,8 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 submission = self._pending_protective.pop(client_id, None)
                 if submission is not None:
                     position_id = event.position_id or submission.position_id
+                    if not position_id and facts is not None:
+                        position_id = self._position_for_decision(facts.decision_id)
                     if position_id:
                         self._publish_protective(
                             replace(submission, position_id=position_id),
@@ -1175,12 +1171,19 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 ProtectionEventKind.FILL,
             ):
                 submission = self._pending_protective.pop(client_id, None)
+                acknowledgement = self._pending_protective_ack.pop(client_id, None)
                 if submission is not None:
-                    position_id = event.position_id or submission.position_id
-                    if position_id:
-                        submission = replace(submission, position_id=position_id)
-                        event = replace(event, position_id=position_id)
+                    # An unresolved ACK cannot be assigned to a position merely
+                    # because a later fill carries one. Keep the missing binding
+                    # visible to the checker and retain the callback in order.
+                    if acknowledgement is None:
+                        position_id = event.position_id or submission.position_id
+                        if position_id:
+                            submission = replace(submission, position_id=position_id)
+                            event = replace(event, position_id=position_id)
                     self.protection_events.append(submission)
+                if acknowledgement is not None:
+                    self.protection_events.append(acknowledgement)
                 self.protection_events.append(event)
                 if event.kind in (
                     ProtectionEventKind.CANCELED,
@@ -1220,23 +1223,32 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         if not position_id:
             return
         self._seen_open_positions.add(position_id)
-        position = self.cache.position(event.position_id)
-        quantity = position.quantity.as_decimal() if position is not None else Decimal(0)
+        quantity = getattr(event, "quantity", None)
+        side = str(getattr(event, "side", "")).split(".")[-1].upper()
         direction = (
-            Direction.LONG
-            if position_direction(position) is ExposureDirection.LONG
-            else Direction.SHORT
+            Direction.LONG if side == "LONG" else Direction.SHORT if side == "SHORT" else None
         )
-        self._pending_snapshots[position_id] = (
-            int(getattr(event, "ts_event", 0) or 0),
-            quantity,
-            direction,
-        )
+        if quantity is not None:
+            self._append_snapshot(
+                int(getattr(event, "ts_event", 0) or 0),
+                position_id,
+                _as_decimal(quantity),
+                direction,
+            )
         self._flush_pending_children(position_id)
 
     def _flush_pending_children(self, position_id: str) -> None:
         """Append buffered protective submission/ACK events for ``position_id``."""
         self._flush_pending_pairs(position_id)
+
+    def _position_for_decision(self, decision_id: str) -> str:
+        if not decision_id:
+            return ""
+        matches = [
+            pid for pid, recorded in self._position_decision.items()
+            if recorded == decision_id and pid in self._seen_open_positions
+        ]
+        return matches[0] if len(matches) == 1 else ""
 
     def _flush_pending_pairs(self, position_id: str | None = None) -> None:
         """Publish any submission/ACK pair whose position id is now known."""
@@ -1245,11 +1257,10 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             submission = self._pending_protective.pop(client_id, None)
             if submission is None:
                 continue
-            resolved = acknowledgement.position_id or submission.position_id or position_id
-            if not resolved and len(self._seen_open_positions) == 1:
-                # Netting mode reuses one position id; while exactly one position
-                # is open, a protective ACK with no explicit id belongs to it.
-                resolved = next(iter(self._seen_open_positions))
+            resolved = acknowledgement.position_id or submission.position_id
+            facts = self._order_facts.get(client_id)
+            if not resolved and facts is not None:
+                resolved = self._position_for_decision(facts.decision_id)
             if not resolved:
                 # Keep the pair until a position callback supplies the id.
                 self._pending_protective_ack[client_id] = acknowledgement
@@ -1295,11 +1306,6 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 quantity=quantity,
             )
         )
-
-    def _flush_pending_snapshots(self) -> None:
-        for position_id in sorted(self._pending_snapshots):
-            ts_ns, quantity, direction = self._pending_snapshots.pop(position_id)
-            self._append_snapshot(ts_ns, position_id, quantity, direction)
 
     def _flush_pending_flat(
         self, *, position_id: str | None = None, unconditional: bool = False
