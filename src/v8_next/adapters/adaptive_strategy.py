@@ -417,6 +417,11 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 or self._source_quality.get(source.end_ns) is not QualityState.OK):
                 raise SimArmRefused("SHADOW_AVAILABILITY_UNPROVEN",
                                     "M15 source must be explicitly available at the native callback")
+            if (source.open != bar.open.as_decimal() or source.high != bar.high.as_decimal()
+                or source.low != bar.low.as_decimal() or source.close != bar.close.as_decimal()
+                or source.volume != bar.volume.as_decimal()):
+                raise SimArmRefused("SHADOW_SOURCE_BAR_MISMATCH",
+                                    "native event values differ from verified source candle")
         candle = self._candle_from(bar)
         self.candles.append(candle)
         self._observations.append(_observation_of(candle, len(self._observations)))

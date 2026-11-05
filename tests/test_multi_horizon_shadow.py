@@ -99,3 +99,20 @@ def test_native_shadow_rejects_missing_quality_and_late_source_before_any_bookke
     with pytest.raises(SimArmRefused, match="SHADOW_AVAILABILITY_UNPROVEN"):
         strategy.on_bar(native)
     assert not strategy.candles
+
+
+def test_native_shadow_rejects_different_native_prices_before_processing():
+    from types import SimpleNamespace
+
+    source = candle(0)
+    config = SimArmConfig(enabled=True, multi_horizon_shadow=True, bar_type_str=TYPE)
+    strategy = AdaptiveSimStrategy(config, source_candles={source.end_ns: source},
+                                   source_quality={source.end_ns: QualityState.OK})
+    price = lambda value: SimpleNamespace(as_decimal=lambda: value)  # noqa: E731
+    native = SimpleNamespace(ts_event=source.end_ns, ts_init=source.end_ns,
+                             open=price(source.open), high=price(source.high),
+                             low=price(source.low), close=price(source.close + 1),
+                             volume=price(source.volume))
+    with pytest.raises(SimArmRefused, match="SHADOW_SOURCE_BAR_MISMATCH"):
+        strategy.on_bar(native)
+    assert not strategy.candles
