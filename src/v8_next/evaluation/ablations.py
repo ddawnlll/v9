@@ -37,6 +37,11 @@ Honesty rules
 * Missing microstructure is tagged ``UNSUPPORTED`` and never filled with zero.
 * The baseline replay command is recorded by the CLI so the numbers can be
   reproduced.
+* :func:`publish_costed_result` is the only producer of
+  ``reports/evaluation/costed_result.json``. It refuses unless the arm is the
+  preregistered costed ``V9_INTERVENTION`` (never the V8 baseline or the
+  random-entry control), digest-bound to the preregistration on disk, and its
+  costs equal the registered fee/funding/slippage vector.
 """
 
 from __future__ import annotations
@@ -48,13 +53,19 @@ import json
 import random
 import sys
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 SCHEMA_VERSION = "v9.ablation.1"
 BASELINE_ARM_ID = "baseline_v8_no_intervention"
+#: The preregistered intervention kind a costed result may be bound to.
+V9_INTERVENTION_KIND = "V9_INTERVENTION"
+#: The shared-contract location the economic verdict reads.
+PREREGISTRATION_PATH = Path("reports/evaluation/preregistration.json")
+COSTED_RESULT_PATH = Path("reports/evaluation/costed_result.json")
+COSTED_RESULT_VERDICTS = frozenset({"PASS", "NO_EDGE", "INCONCLUSIVE", "STOP", "INVALID"})
 BOOTSTRAP_SEED = 20251105
 BOOTSTRAP_RESAMPLES = 2000
 CI_LEVEL = 0.95
@@ -273,6 +284,10 @@ class ArmResult:
     risk_basis: str | None = None
     open_campaigns: int | None = None
     unsupported: tuple[str, ...] = ()
+    #: ``V9_INTERVENTION`` for the preregistered adaptive arm; ``None`` when unstated.
+    arm_kind: str | None = None
+    #: sha256 of the preregistration this arm was measured under, when it declares one.
+    preregistration_digest: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -294,6 +309,8 @@ class ArmResult:
             "risk_basis": self.risk_basis,
             "open_campaigns": self.open_campaigns,
             "unsupported": list(self.unsupported),
+            "arm_kind": self.arm_kind,
+            "preregistration_digest": self.preregistration_digest,
         }
 
     @classmethod
@@ -331,6 +348,12 @@ class ArmResult:
                 None if payload.get("open_campaigns") is None else int(payload["open_campaigns"])
             ),
             unsupported=tuple(str(value) for value in payload.get("unsupported", ())),
+            arm_kind=None if payload.get("arm_kind") is None else str(payload["arm_kind"]),
+            preregistration_digest=(
+                None
+                if payload.get("preregistration_digest") is None
+                else str(payload["preregistration_digest"])
+            ),
         )
 
 
@@ -370,6 +393,35 @@ def _difference(treatment: float | None, baseline: float | None) -> float | None
     return treatment - baseline
 
 
+def _require_comparable_provenance(baseline: ArmResult, treatment: ArmResult) -> None:
+    """Refuse a delta whose two arms were not measured on one measurement basis.
+
+    A difference between numbers produced on different tapes, engines or execution
+    profiles is not an intervention effect; it conflates the treatment with the
+    measurement. Each mismatch is named so the caller can see which fact differs.
+    """
+    left = baseline.provenance
+    right = treatment.provenance
+    if left is None or right is None:
+        raise ValueError(
+            "a delta requires provenance on both arms; an arm without a declared "
+            "measurement basis cannot be compared"
+        )
+    checks = (
+        ("tape", left.tape_sha256, right.tape_sha256),
+        ("engine", left.engine, right.engine),
+        ("engine_version", left.engine_version, right.engine_version),
+        ("execution_profile", left.execution_profile, right.execution_profile),
+        ("execution_profile_digest", left.execution_profile_digest, right.execution_profile_digest),
+    )
+    mismatched = [name for name, base, cand in checks if base != cand]
+    if mismatched:
+        raise ValueError(
+            "a delta requires both arms measured on the same tape, engine and execution "
+            f"profile; mismatched: {', '.join(mismatched)}"
+        )
+
+
 def compute_delta(
     baseline: ArmResult,
     treatment: ArmResult,
@@ -380,12 +432,15 @@ def compute_delta(
     """Increment of a costed treatment over a costed baseline.
 
     Refuses uncosted arms: a delta computed from an unrun arm would be a
-    fabricated economic claim.
+    fabricated economic claim. Also refuses arms whose provenance names a different
+    tape, engine or execution profile: such a difference is not an intervention
+    effect, no matter what the numbers say.
     """
     if not baseline.costed or not treatment.costed:
         raise ValueError("a delta requires both arms costed")
     if treatment.intervention is None:
         raise ValueError("a treatment arm must declare its intervention")
+    _require_comparable_provenance(baseline, treatment)
     low, high = bootstrap_mean_difference_ci(
         baseline.net_r_samples,
         treatment.net_r_samples,
@@ -429,6 +484,173 @@ def compute_delta(
         delta_ci_high=high,
         ci_method=method if low is not None and high is not None else None,
     )
+
+
+class CostedResultError(ValueError):
+    """A costed result was refused; nothing was written."""
+
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(f"{code}: {detail}")
+        self.code = code
+
+
+def _decimal_term(value: object) -> Decimal | None:
+    """A finite Decimal parsed from a string/number, or ``None`` when unusable."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    return parsed if parsed.is_finite() else None
+
+
+def _declared_costs(costs: object, *, source: str) -> dict[str, Any]:
+    """The four shared-contract cost terms, validated; absence is never zero."""
+    if not isinstance(costs, Mapping):
+        raise CostedResultError(
+            f"{source}_COSTS_MISSING", "the cost vector is not a mapping"
+        )
+    if costs.get("funding_included") is not True:
+        raise CostedResultError(
+            f"{source}_COSTS_INVALID",
+            "costs must declare funding_included=true",
+        )
+    resolved: dict[str, Any] = {"funding_included": True}
+    for field in ("fee_bps_per_side", "funding_bps_per_day", "slippage_bps_per_side"):
+        parsed = _decimal_term(costs.get(field))
+        if parsed is None or parsed < 0:
+            raise CostedResultError(
+                f"{source}_COSTS_INVALID",
+                f"{field} is not a non-negative number: {costs.get(field)!r}",
+            )
+        resolved[field] = parsed
+    return resolved
+
+
+def publish_costed_result(
+    arm: ArmResult | None,
+    *,
+    costs: Mapping[str, Any],
+    net_return: str | Decimal | int | float | None,
+    verdict: str,
+    preregistration_path: Path | str = PREREGISTRATION_PATH,
+    output_path: Path | str = COSTED_RESULT_PATH,
+    uncertainty: Mapping[str, Any] | None = None,
+) -> Path:
+    """Publish the shared-contract costed result for the preregistered V9 arm.
+
+    The file is written only after every binding fact has been checked: a
+    preregistration must exist on disk, the arm must be the preregistered
+    ``V9_INTERVENTION`` (not the V8 baseline and not the random-entry control), it
+    must record the sha256 of the preregistration it was measured under, and the
+    declared costs must equal the registered costs exactly. Every refusal raises
+    :class:`CostedResultError` before any write, so a failed publish cannot leave a
+    partially-bound artifact behind.
+    """
+    prereg_path = Path(preregistration_path)
+    if not prereg_path.is_file():
+        raise CostedResultError(
+            "PREREGISTRATION_MISSING", f"no preregistration at {prereg_path}"
+        )
+    try:
+        preregistration: object = json.loads(prereg_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise CostedResultError("PREREGISTRATION_UNREADABLE", str(exc)) from exc
+    if not isinstance(preregistration, Mapping):
+        raise CostedResultError(
+            "PREREGISTRATION_UNREADABLE", "preregistration is not a JSON object"
+        )
+    if arm is None:
+        raise CostedResultError(
+            "COSTED_RESULT_ARM_MISSING",
+            "no arm was supplied; a costed result cannot be published",
+        )
+    if not arm.costed:
+        raise CostedResultError(
+            "COSTED_RESULT_ARM_NOT_COSTED",
+            f"arm {arm.arm_id!r} is not costed; nothing measured nothing to publish",
+        )
+    intervention = preregistration.get("intervention")
+    intervention = intervention if isinstance(intervention, Mapping) else {}
+    if intervention.get("kind") != V9_INTERVENTION_KIND:
+        raise CostedResultError(
+            "PREREGISTRATION_NOT_V9_INTERVENTION",
+            f"preregistration intervention kind is {intervention.get('kind')!r}",
+        )
+    if arm.arm_kind != V9_INTERVENTION_KIND:
+        raise CostedResultError(
+            "COSTED_RESULT_ARM_NOT_V9_INTERVENTION",
+            f"arm {arm.arm_id!r} declares kind {arm.arm_kind!r}; only the "
+            "preregistered V9 intervention may be published",
+        )
+    registered_arm_id = intervention.get("arm_id")
+    if not isinstance(registered_arm_id, str) or arm.arm_id != registered_arm_id:
+        raise CostedResultError(
+            "COSTED_RESULT_ARM_NOT_PREREGISTERED",
+            f"arm {arm.arm_id!r} is not the preregistered arm {registered_arm_id!r}",
+        )
+    digest = hashlib.sha256(prereg_path.read_bytes()).hexdigest()
+    if arm.preregistration_digest != digest:
+        raise CostedResultError(
+            "PREREGISTRATION_DIGEST_MISMATCH",
+            f"arm records {arm.preregistration_digest!r}; preregistration on disk is {digest!r}",
+        )
+    registered = _declared_costs(preregistration.get("costs"), source="PREREGISTRATION")
+    declared = _declared_costs(costs, source="COSTED_RESULT")
+    mismatched = [
+        field
+        for field in ("fee_bps_per_side", "funding_bps_per_day", "slippage_bps_per_side")
+        if declared[field] != registered[field]
+    ]
+    if mismatched:
+        raise CostedResultError(
+            "COSTS_DIFFER_FROM_REGISTRATION",
+            f"declared {', '.join(mismatched)} differ from the registered costs",
+        )
+    dataset_role = preregistration.get("dataset_role")
+    if not isinstance(dataset_role, str) or not dataset_role:
+        raise CostedResultError(
+            "PREREGISTRATION_DATASET_ROLE_MISSING",
+            "the preregistration does not declare a dataset_role",
+        )
+    net = _decimal_term(net_return)
+    if net is None:
+        raise CostedResultError(
+            "NET_RETURN_INVALID", f"net_return is not a finite decimal: {net_return!r}"
+        )
+    declared_verdict = str(verdict).strip().upper()
+    if declared_verdict not in COSTED_RESULT_VERDICTS:
+        raise CostedResultError(
+            "VERDICT_INVALID",
+            f"verdict {verdict!r} is not one of {sorted(COSTED_RESULT_VERDICTS)}",
+        )
+    payload: dict[str, Any] = {
+        "preregistration_digest": digest,
+        "dataset_role": dataset_role,
+        "costs": {
+            "fee_bps_per_side": str(registered["fee_bps_per_side"]),
+            "funding_bps_per_day": str(registered["funding_bps_per_day"]),
+            "slippage_bps_per_side": str(registered["slippage_bps_per_side"]),
+            "funding_included": True,
+        },
+        "net_return": str(net),
+        "verdict": declared_verdict,
+    }
+    if uncertainty is not None:
+        if not isinstance(uncertainty, Mapping):
+            raise CostedResultError(
+                "UNCERTAINTY_NOT_JSON", "uncertainty must be a mapping"
+            )
+        payload["uncertainty"] = dict(uncertainty)
+    try:
+        encoded = json.dumps(payload, sort_keys=True, indent=2, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise CostedResultError("COSTED_RESULT_NOT_JSON", str(exc)) from exc
+    target = Path(output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(encoded + "\n", encoding="utf-8")
+    return target
 
 
 def _not_run_arm(intervention: Intervention, reason: str) -> ArmResult:

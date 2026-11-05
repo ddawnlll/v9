@@ -38,8 +38,11 @@ verdict, not just trust it.
 Status honesty
 --------------
 :class:`SoakReport` refuses to exist with a dishonest ``soak_status``: ``COMPLETE`` requires a
-positive target and ``duration_actual_s >= duration_target_s``. A shorter run is
-``SHORT_RUN``; a run that never executed is ``NOT_RUN``. A real 24-48 h shadow soak cannot be
+target of at least :data:`MIN_SOAK_TARGET_S` (24 h) *and*
+``duration_actual_s >= duration_target_s``. A caller-chosen target below that floor is
+``SHORT_RUN`` with a named ``status_reason`` no matter how long the loop ran, so a 1 ms
+target cannot qualify as a soak. A shorter run is ``SHORT_RUN``; a run that never executed is
+``NOT_RUN``. A real 24-48 h shadow soak cannot be
 produced in this environment (no production shadow loop, no multi-hour wall clock budget), so
 it is reported as ``NOT_RUN`` in ``reports/overnight/evidence/M4-05.md``. The CLI exercises the
 harness only and will normally emit ``SHORT_RUN``.
@@ -71,6 +74,7 @@ __all__ = [
     "DEFAULT_RSS_GROWTH_LIMIT_BYTES_PER_SAMPLE",
     "DEFAULT_SAMPLE_EVERY",
     "MIN_GROWTH_SAMPLES",
+    "MIN_SOAK_TARGET_S",
     "DecisionJournal",
     "DecisionObservation",
     "DuplicateDecision",
@@ -103,6 +107,13 @@ MIN_GROWTH_SAMPLES = 5
 
 #: Default sampling cadence, in loop iterations.
 DEFAULT_SAMPLE_EVERY = 100
+
+#: The shortest target a run may declare and still be eligible for ``COMPLETE``.
+#: The soak exists to qualify a long-lived shadow loop; a caller-chosen target of a
+#: few milliseconds would make ``duration_actual_s >= duration_target_s`` true for
+#: any run at all. Below this floor the run is reported as ``SHORT_RUN`` with a
+#: reason, never promoted to ``COMPLETE`` by editing the target.
+MIN_SOAK_TARGET_S = 24 * 3600.0
 
 #: The product target; the host this runs on is recorded separately when known.
 DEFAULT_HARDWARE_PROFILE = (
@@ -349,9 +360,27 @@ class SoakStatus(StrEnum):
     NOT_RUN = "NOT_RUN"
 
 
+def _status_reason(iterations: int, target_s: float, actual_s: float) -> str | None:
+    """The named reason the declared target could not earn ``COMPLETE``, if any."""
+    target_s = float(target_s)
+    actual_s = float(actual_s)
+    if iterations <= 0 or target_s <= 0:
+        return "NO_EXECUTED_ITERATION_OR_POSITIVE_TARGET"
+    if target_s < MIN_SOAK_TARGET_S:
+        return (
+            f"TARGET_BELOW_QUALIFICATION_FLOOR:{target_s}<{MIN_SOAK_TARGET_S}"
+            " — a soak target shorter than 24 h cannot qualify"
+        )
+    if actual_s < target_s:
+        return f"ACTUAL_BELOW_TARGET:{actual_s}<{target_s}"
+    return None
+
+
 def _status_for(iterations: int, target_s: float, actual_s: float) -> SoakStatus:
     if iterations <= 0 or target_s <= 0:
         return SoakStatus.NOT_RUN
+    if target_s < MIN_SOAK_TARGET_S:
+        return SoakStatus.SHORT_RUN
     if actual_s >= target_s:
         return SoakStatus.COMPLETE
     return SoakStatus.SHORT_RUN
@@ -386,6 +415,8 @@ class SoakReport(BaseModel):
     declared_hardware_profile: str
     rss_source: str
     soak_status: SoakStatus
+    #: Why the target did not qualify, derived (not supplied) from the measurements.
+    status_reason: str | None = None
     fail_closed: bool = True
 
     @model_validator(mode="after")
@@ -396,6 +427,14 @@ class SoakReport(BaseModel):
             raise ValueError(
                 "SOAK_REPORT: soak_status does not match the declared target and measured "
                 "duration; a short run cannot claim COMPLETE"
+            )
+        expected_reason = _status_reason(
+            self.iterations, self.duration_target_s, self.duration_actual_s
+        )
+        if self.status_reason != expected_reason:
+            raise ValueError(
+                "SOAK_REPORT: status_reason must follow from the declared target, the "
+                "measured duration and the qualification floor"
             )
         if self.duplicate_decision_ids != len(self.duplicates):
             raise ValueError("SOAK_REPORT: duplicate_decision_ids must match the duplicate rows")
@@ -634,6 +673,7 @@ class SoakRunner:
             declared_hardware_profile=self._hardware_profile,
             rss_source=self._rss_source,
             soak_status=_status_for(executed, duration_target_s, duration_actual),
+            status_reason=_status_reason(executed, duration_target_s, duration_actual),
             fail_closed=not self._violations and not self._duplicates and not growth,
         )
 

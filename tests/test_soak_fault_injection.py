@@ -17,6 +17,7 @@ from pydantic import ValidationError
 from v8_next.domain.decision import DecisionAction
 from v8_next.factory.soak import (
     DEFAULT_RSS_GROWTH_LIMIT_BYTES_PER_SAMPLE,
+    MIN_SOAK_TARGET_S,
     DecisionObservation,
     ExpectedInvariant,
     FaultKind,
@@ -367,6 +368,59 @@ def test_short_run_is_never_complete() -> None:
     empty = _run(FaultPlan(), _wait, iterations=0, target_s=24 * 3600)
     assert empty.soak_status is SoakStatus.NOT_RUN
     assert empty.iterations == 0
+
+
+def test_one_millisecond_target_cannot_qualify_as_a_soak() -> None:
+    report = _run(FaultPlan(), _wait, iterations=10, target_s=0.001)
+
+    assert report.soak_status is SoakStatus.SHORT_RUN
+    assert "BELOW_QUALIFICATION_FLOOR" in (report.status_reason or "")
+
+    payload = report.model_dump(mode="json")
+    payload["soak_status"] = SoakStatus.COMPLETE.value
+    with pytest.raises(ValidationError, match="short run cannot claim COMPLETE"):
+        SoakReport.model_validate(payload)
+
+
+def test_floor_survives_a_caller_editing_only_the_target() -> None:
+    """Even a run that outlasted its target cannot qualify below the 24 h floor."""
+    report = _run(FaultPlan(), _wait, iterations=10, target_s=24 * 3600)
+    payload = report.model_dump(mode="json")
+    payload.update(
+        {
+            "duration_target_s": 0.001,
+            "duration_actual_s": 100.0,
+            "soak_status": SoakStatus.COMPLETE.value,
+            "status_reason": None,
+        }
+    )
+    with pytest.raises(ValidationError, match="short run cannot claim COMPLETE"):
+        SoakReport.model_validate(payload)
+
+    payload["soak_status"] = SoakStatus.SHORT_RUN.value
+    payload["status_reason"] = (
+        f"TARGET_BELOW_QUALIFICATION_FLOOR:0.001<{MIN_SOAK_TARGET_S} — "
+        "a soak target shorter than 24 h cannot qualify"
+    )
+    accepted = SoakReport.model_validate(payload)
+    assert accepted.soak_status is SoakStatus.SHORT_RUN
+    assert "BELOW_QUALIFICATION_FLOOR" in (accepted.status_reason or "")
+
+
+def test_full_floor_target_with_two_seconds_elapsed_is_short_run() -> None:
+    report = _run(FaultPlan(), _wait, iterations=10, target_s=MIN_SOAK_TARGET_S)
+    payload = report.model_dump(mode="json")
+    payload.update(
+        {
+            "duration_actual_s": 2.0,
+            "soak_status": SoakStatus.SHORT_RUN.value,
+            "status_reason": f"ACTUAL_BELOW_TARGET:2.0<{MIN_SOAK_TARGET_S}",
+        }
+    )
+    accepted = SoakReport.model_validate(payload)
+
+    assert accepted.soak_status is SoakStatus.SHORT_RUN
+    assert "ACTUAL_BELOW_TARGET" in (accepted.status_reason or "")
 
 
 def test_report_refuses_a_fabricated_growth_verdict() -> None:

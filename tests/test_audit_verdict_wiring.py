@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from v8_next.audit.lineage import certify
+from v8_next.audit.lineage import LineageChain, certify
 from v8_next.audit.pipeline import derive_audit_inputs
 from v8_next.audit.reporting import write_reports
 from v8_next.audit.verdicts import VerdictState, audit_label
@@ -346,6 +346,52 @@ def test_run_without_lineage_rows_supplies_no_chain(tmp_path: Path) -> None:
     inputs = derive_audit_inputs(run_dir)
     assert inputs.lineage is None
     assert inputs.as_of_ns is None
+
+
+def test_open_only_run_cannot_earn_an_economic_pass(tmp_path: Path) -> None:
+    """A run that closed nothing has no realized outcome to reconcile."""
+    run_dir = _seed_run(
+        tmp_path,
+        # The campaign is still open: the reconciling ledger balanced, and the row
+        # even carries PnL columns, but no campaign was ever closed.
+        lifecycles=[
+            _lifecycle(
+                position_status="OPEN",
+                closed_ns=None,
+                exit_price=None,
+                exit_kind=None,
+            )
+        ],
+        lineage=False,
+    )
+    inputs = derive_audit_inputs(run_dir)
+
+    assert inputs.verdict.economic is VerdictState.INCOMPLETE
+    assert "ECONOMIC_NO_CLOSED_CAMPAIGN" in inputs.verdict.reasons
+    assert audit_label(inputs.verdict) != COMPLETE
+    assert _status_text(_render(run_dir)) == "AUDIT_INCOMPLETE"
+
+
+def test_fills_without_any_identity_declare_a_broken_chain(tmp_path: Path) -> None:
+    """Persisted fills that cannot be joined must block, never read as "no claim"."""
+    run_dir = _seed_run(
+        tmp_path,
+        lineage=False,
+        # No trade id and no order: every fill row is dropped by the join.
+        fills=[{"ts_last": 2000, "instrument_id": INSTRUMENT}],
+    )
+    inputs = derive_audit_inputs(run_dir)
+
+    assert inputs.lineage == LineageChain()
+    assert inputs.as_of_ns == 0
+    certification = certify(inputs.lineage, as_of_ns=0)
+    assert not certification.complete
+    # The run's own dimensions may pass; the declared-but-uncertifiable chain is
+    # what blocks the label.
+    assert inputs.verdict.completeness is VerdictState.PASS
+    label = _status_text(_render(run_dir))
+    assert label == "AUDIT_BLOCKED"
+    assert label != COMPLETE
 
 
 def test_unjoined_fill_participates_and_downgrades_the_report(tmp_path: Path) -> None:
