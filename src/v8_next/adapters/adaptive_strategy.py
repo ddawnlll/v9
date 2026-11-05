@@ -52,6 +52,7 @@ from v8_next.adapters.expert_strategy import (
     ExpertStrategyConfig,
     _bar_duration_ns,
 )
+from v8_next.adapters.horizon_shadow import MultiHorizonShadowPipeline
 from v8_next.adapters.native_callback_trace import capture_native_callback
 from v8_next.adapters.protection_invariants import (
     Direction,
@@ -69,6 +70,7 @@ from v8_next.domain.decision import (
     VenueOrderStatus,
     lifecycle_of,
 )
+from v8_next.domain.horizon_aggregation import M15_NS
 from v8_next.domain.horizons import Timeframe, assemble_context
 from v8_next.domain.market import Candle, CausalFrame, frame_at_incremental
 from v8_next.domain.observation import (
@@ -175,6 +177,7 @@ class SimArmConfig:
     enabled: bool = False
     instrument_id: str = "BTCUSDT-PERP.BINANCE"
     bar_type_str: str = "BTCUSDT-PERP.BINANCE-1-HOUR-LAST-EXTERNAL"
+    multi_horizon_shadow: bool = False
     grammar_policy: str = "range-breakout-48-v1"
     min_support_quorum: int = 1
     #: Matches the V8 audit/portfolio baseline gate (`audit.pipeline._config`:
@@ -192,6 +195,10 @@ class SimArmConfig:
     max_concurrent_positions: int = 1
 
     def __post_init__(self) -> None:
+        if not isinstance(self.multi_horizon_shadow, bool):
+            raise TypeError("multi_horizon_shadow must be a bool")
+        if self.multi_horizon_shadow and self.bar_type_str != f"{self.instrument_id}-15-MINUTE-LAST-EXTERNAL":
+            raise ValueError("multi-horizon shadow requires an explicit M15 source bar type")
         if not isinstance(self.enabled, bool):
             raise TypeError("enabled must be a bool")
         if not self.instrument_id.strip():
@@ -343,6 +350,7 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         config: SimArmConfig,
         *,
         source_candles: dict[int, Candle] | None = None,
+        source_quality: dict[int, QualityState] | None = None,
         readings: tuple[PositioningReading, ...] = (),
         audit_recorder: Any | None = None,
     ) -> None:
@@ -360,9 +368,11 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             audit_recorder=audit_recorder,
         )
         self.sim_config = config
+        self._source_quality = dict(source_quality or {})
         # ---- V9 chain state -------------------------------------------------
         self._policy = TraderDecisionPolicy()
         self._feature_cache = FeatureCache()
+        self._horizon_shadow = MultiHorizonShadowPipeline(config.instrument_id) if config.multi_horizon_shadow else None
         self._belief: MarketBeliefV1 | None = None
         self._observations: list[Observation] = []
         self._frame: CausalFrame | None = None
@@ -397,6 +407,16 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
     # ------------------------------------------------------------------ entry
     def on_bar(self, bar: Bar) -> None:
         """One closed bar: advance the V9 chain, then act on its decision."""
+        if self._horizon_shadow is not None:
+            source = self.source_candles.get(int(bar.ts_event))
+            if (source is None or source.end_ns != int(bar.ts_event)
+                or source.available_ns != source.end_ns or int(bar.ts_init) != source.end_ns
+                or source.instrument_id != str(self.instrument_id)
+                or source.end_ns - source.start_ns != M15_NS or source.start_ns % M15_NS
+                or source.received_ns > source.end_ns
+                or self._source_quality.get(source.end_ns) is not QualityState.OK):
+                raise SimArmRefused("SHADOW_AVAILABILITY_UNPROVEN",
+                                    "M15 source must be explicitly available at the native callback")
         candle = self._candle_from(bar)
         self.candles.append(candle)
         self._observations.append(_observation_of(candle, len(self._observations)))
@@ -404,7 +424,8 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
 
         self._flush_pending_flat(unconditional=True)
         self._flush_pending_pairs()
-        self._reprotect_remaining(candle)
+        if self._horizon_shadow is None:
+            self._reprotect_remaining(candle)
         for transitioned in self.opportunity_book.on_candle(candle):
             self.book_transitions.append(
                 {
@@ -428,20 +449,23 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         context = assemble_context(
             {Timeframe.H1: view}, instrument_id=str(self.instrument_id), decision_time_ns=cut
         )
-        belief = advance(self._belief, view, context, now_ns=cut)
-        self._belief = belief
-
         opportunity = self._detect(frame)
         record = self._remember_opportunity(opportunity, candle)
-        bundle = produce_evidence(
-            view=view,
-            context=context,
-            frame=frame,
-            cache=self._feature_cache,
-            belief=belief,
-            opportunity=opportunity,
-            readings=self.readings,
-        )
+        if self._horizon_shadow is not None:
+            belief, bundle = self._horizon_shadow.advance(candle, cut=cut, opportunity=opportunity,
+                                                          quality=self._source_quality[cut], readings=self.readings)
+        else:
+            belief = advance(self._belief, view, context, now_ns=cut)
+            bundle = produce_evidence(
+                view=view,
+                context=context,
+                frame=frame,
+                cache=self._feature_cache,
+                belief=belief,
+                opportunity=opportunity,
+                readings=self.readings,
+            )
+        self._belief = belief
         supported = record is not None and self._supported(bundle)
         if supported and record is not None:
             self.opportunity_book.update_status(
@@ -468,7 +492,8 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             # Bind the actual entry decision before native submission callbacks
             # can fire. A later opportunity must never replace the entry thesis.
             self._entry_opportunities[decision.decision_id] = opportunity_view.opportunity_id
-        outcome = self._apply(decision.action, decision.decision_id, candle, position, direction)
+        outcome = ("SHADOW_NO_EXECUTION" if self._horizon_shadow is not None else
+                   self._apply(decision.action, decision.decision_id, candle, position, direction))
         if decision.action is DecisionAction.ENTER and not outcome.startswith("SUBMITTED_BRACKET_"):
             self._entry_opportunities.pop(decision.decision_id, None)
 
@@ -501,7 +526,14 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 "evidence_quorum_met": supported,
                 "executed": outcome,
                 "sim_arm": True,
-                "advisory_only": False,
+                "advisory_only": self._horizon_shadow is not None,
+                **({"shadow_inputs": [
+                    {"expert_id": w.stance.observer_id, "primary": w.context.profile.primary.value,
+                     "provenance": w.context.input_provenance, "stance": row.stance.value,
+                     "reason": row.reason, "warmup_ok": row.warmup_ok}
+                    for w, row in zip(self._horizon_shadow.last_witnesses, bundle.evidence, strict=True)
+                ], "shadow_alignments": [a.model_dump(mode="json") for a in belief.horizons.alignments]}
+                if self._horizon_shadow is not None else {}),
             }
         )
 

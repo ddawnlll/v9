@@ -759,6 +759,9 @@ def run_sim_arm(
         raise TypeError(f"expected SimArmConfig, got {type(config).__name__}")
     if config.enabled is not True:
         raise SimArmDisabled()
+    if config.multi_horizon_shadow:
+        raise SimArmRefused("SHADOW_TAPE_AVAILABILITY_UNPROVEN",
+                            "load_multitape assumes close-time availability; use a verified shadow feed")
     jsonl, tape_sha = _authorize_tape(tape)
     loaded = load_multitape(jsonl, limit=limit)
     window = _window(loaded, config, limit)
