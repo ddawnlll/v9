@@ -1,0 +1,69 @@
+{
+  "schema": "v9.sim-arm-comparison.v1",
+  "status": "MEASURED_DESCRIPTIVE_ONLY",
+  "claim": "NONE",
+  "tape": "btcusdt-1h-2025Q1",
+  "note": "Simulation-only Nautilus BacktestEngine. No venue adapter, credential, dry-run or live path. V9 underperformed V8 on this single slice; this is not a generalisation.",
+  "v9": {
+    "arm_id": "v9_adaptive_sim_arm",
+    "arm_kind": "V9_INTERVENTION",
+    "costed": true,
+    "bars": 2160,
+    "trades": 24,
+    "open_campaigns": 1,
+    "net_pnl": -33.92107028,
+    "net_r": -0.0492515593469931,
+    "max_drawdown": 0.0184747221620001,
+    "hit_rate": 0.3333333333333333,
+    "fee_total": 20.57124326,
+    "funding_total": 0.3338058,
+    "unsupported": [],
+    "protection_state": "UNKNOWN",
+    "protection_violations": {
+      "MISSING_ACK": 50,
+      "PROTECTION_QUANTITY_MISMATCH": 2,
+      "POSITION_QUANTITY_CONFLICT": 2,
+      "PROTECTIVE_SIDE_INCONSISTENT": 2,
+      "BRACKET_GEOMETRY_INCONSISTENT": 1
+    },
+    "seconds": 95.827013969,
+    "provenance": {
+      "tape_sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7",
+      "engine_version": "2.0.0rc4",
+      "execution_profile": "baseline",
+      "config_sha": "304ad9f02c3cca25ff86a483489c0144732970439ac9279c6cd1ed00678fb525"
+    }
+  },
+  "v8": {
+    "arm_id": "baseline_v8_no_intervention",
+    "arm_kind": null,
+    "costed": true,
+    "bars": 2160,
+    "trades": 44,
+    "open_campaigns": 1,
+    "net_pnl": -8.57430674,
+    "net_r": -0.021638104034911513,
+    "max_drawdown": 0.018041058663057406,
+    "hit_rate": 0.3409090909090909,
+    "fee_total": 36.76607636,
+    "funding_total": 0.3338058,
+    "unsupported": [],
+    "protection_state": "NOT_APPLICABLE",
+    "protection_violations": {},
+    "seconds": 0.477841854,
+    "provenance": {
+      "tape_sha256": "84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3be6773514673d7",
+      "engine_version": "2.0.0rc4",
+      "execution_profile": "baseline",
+      "config_sha": "304ad9f02c3cca25ff86a483489c0144732970439ac9279c6cd1ed00678fb525"
+    }
+  },
+  "delta_v9_minus_v8": {
+    "net_pnl": -25.34676354,
+    "net_r": -0.02761345531208159,
+    "max_drawdown": 0.0004336634989426935,
+    "fees": -16.1948331
+  },
+  "control_arms": "NOT_RUN (no matched random-entry costed pool in this run)",
+  "economic_claim": "NONE"
+}
