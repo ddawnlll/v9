@@ -134,3 +134,37 @@ def test_unknown_rank_mode_is_refused() -> None:
     panel = _panel({"AAA": [-0.05], "BBB": [0.05]})
     with pytest.raises(ValueError, match="unknown rank mode"):
         xs.selection_events(panel, symbols=("AAA", "BBB"), lookback=4, legs=1, mode="carry")
+
+
+def test_flow_ranking_buys_the_strongest_aggressive_flow() -> None:
+    panel = _panel({"AAA": [0.0], "BBB": [0.0], "CCC": [0.0]}, bars=20)
+    shares = {"AAA": 0.70, "BBB": 0.50, "CCC": 0.30}
+    flow = {
+        symbol: {bar.end_ns: {"buy_share": shares[symbol], "trades": 1.0, "quote_volume": 1.0}
+                 for bar in series}
+        for symbol, series in panel.items()
+    }
+    events = xs.selection_events(
+        panel, symbols=("AAA", "BBB", "CCC"), lookback=1, legs=1, mode="flow", flow=flow
+    )
+    assert events
+    assert {(e["symbol"], e["direction"]) for e in events} == {("AAA", 1), ("CCC", -1)}
+
+
+def test_load_flow_skips_bars_without_a_quote_denominator(tmp_path) -> None:
+    tape = tmp_path / "tape.jsonl"
+
+    def row(open_ms: int, quote: float, buy: float) -> str:
+        return (
+            '{"channel":"kline","instrument":"BTCUSDT","event_time":%d,'
+            '"payload":{"open":100,"high":101,"low":99,"close":100,"volume":1,'
+            '"quote_asset_volume":%f,"taker_buy_quote_asset_volume":%f,'
+            '"open_time_ms":%d,"closed":true}}' % (open_ms + 3_600_000, quote, buy, open_ms)
+        )
+
+    tape.write_text(
+        "\n".join([row(0, 1000.0, 600.0), row(3_600_000, 0.0, 0.0)]), encoding="utf-8"
+    )
+    flow = screen.load_flow(tape, instrument="BTCUSDT")
+    assert list(flow) == [3_600_000 * 1_000_000]
+    assert flow[3_600_000 * 1_000_000]["buy_share"] == pytest.approx(0.6)

@@ -94,13 +94,19 @@ def _code_sha() -> str:
 
 def load_panel(
     symbols: tuple[str, ...], *, start_ms: int, end_ms: int
-) -> tuple[dict[str, list[screen.Bar]], dict[str, tuple[tuple[int, float], ...]]]:
+) -> tuple[
+    dict[str, list[screen.Bar]],
+    dict[str, tuple[tuple[int, float], ...]],
+    dict[str, dict[int, dict[str, float]]],
+]:
     bars: dict[str, list[screen.Bar]] = {}
     funding: dict[str, tuple[tuple[int, float], ...]] = {}
+    flow: dict[str, dict[int, dict[str, float]]] = {}
     for symbol in symbols:
         tape = TAPE_DIR / f"{symbol.lower()}-1h-2025H1" / "tape.jsonl"
         bars[symbol] = screen.load_bars(tape, instrument=symbol, start_ms=start_ms, end_ms=end_ms)
         funding[symbol] = screen.load_funding(tape, instrument=symbol, start_ms=start_ms, end_ms=end_ms)
+        flow[symbol] = screen.load_flow(tape, instrument=symbol, start_ms=start_ms, end_ms=end_ms)
     lengths = {len(v) for v in bars.values()}
     grids = {tuple(bar.end_ns for bar in v) for v in bars.values()}
     if len(lengths) != 1 or len(grids) != 1:
@@ -108,7 +114,7 @@ def load_panel(
             "symbols do not share one bar grid; a cross-sectional rank would be "
             f"computed on misaligned bars (lengths={sorted(lengths)})"
         )
-    return bars, funding
+    return bars, funding, flow
 
 
 def price_leg(
@@ -176,6 +182,7 @@ def selection_events(
     lookback: int,
     legs: int,
     mode: str = "reversal",
+    flow: dict[str, dict[int, dict[str, float]]] | None = None,
 ) -> list[dict[str, Any]]:
     """Bars on which a symbol newly enters an extreme rank.
 
@@ -183,19 +190,43 @@ def selection_events(
     there: re-entering the same state is the same information, and repeating it
     would inflate the sample with overlapping copies of one observation.
     """
-    if mode not in ("reversal", "momentum"):
+    if mode not in ("reversal", "momentum", "flow"):
         raise ValueError(f"unknown rank mode {mode!r}")
+    if mode == "flow" and flow is None:
+        raise ValueError("flow ranking needs the aggressive-flow series")
     # reversal buys the weakest and sells the strongest; momentum is the exact
-    # opposite ranking rule with everything else held fixed.
+    # opposite ranking rule with everything else held fixed; flow buys the
+    # strongest aggressive-buy share.
     long_rank = "bottom" if mode == "reversal" else "top"
     size = len(symbols)
+
+    def values_at(index: int, returns: dict[str, float] | None) -> dict[str, float] | None:
+        if mode != "flow":
+            return returns
+        assert flow is not None
+        ns = bars[symbols[0]][index].end_ns
+        values: dict[str, float] = {}
+        for symbol in symbols:
+            record = flow[symbol].get(ns)
+            if record is None:
+                return None
+            values[symbol] = record["buy_share"]
+        return values
     # The first bar on which a ranking exists is itself a transition: every
     # selected symbol moves from "not held" to "held".
     previous: dict[str, int] = {}
     events: list[dict[str, Any]] = []
     for index in range(lookback, len(bars[symbols[0]]) - 1):
-        returns = trailing_returns(bars, symbols=symbols, index=index, lookback=lookback)
-        ranked = sorted(symbols, key=lambda symbol: returns[symbol])
+        returns = (
+            None
+            if mode == "flow"
+            else trailing_returns(bars, symbols=symbols, index=index, lookback=lookback)
+        )
+        values = values_at(index, returns)
+        if values is None:
+            previous = {}
+            continue
+        ranked = sorted(symbols, key=lambda symbol: values[symbol])
         state = {}
         for rank, symbol in enumerate(ranked):
             in_bottom = rank < legs
@@ -213,7 +244,7 @@ def selection_events(
                         "bar_index": index,
                         "symbol": symbol,
                         "direction": direction,
-                        "trailing_return": returns[symbol],
+                        "feature_value": values[symbol],
                     }
                 )
         previous = state
@@ -236,7 +267,7 @@ def event_legs(
         )
         if row["realized_net_r"] is None:
             continue
-        row["trailing_return"] = event["trailing_return"]
+        row["feature_value"] = event["feature_value"]
         rows.append(row)
     return rows
 
@@ -282,10 +313,20 @@ def event_means(rows: list[dict[str, Any]]) -> list[float]:
     return [statistics.fmean(values) for values in grouped.values()]
 
 
-def run(*, start_ms: int, end_ms: int, lookback: int, legs: int, mode: str = "reversal") -> dict[str, Any]:
+def run(
+    *,
+    start_ms: int,
+    end_ms: int,
+    lookback: int,
+    legs: int,
+    mode: str = "reversal",
+    control_draws: int = 200,
+) -> dict[str, Any]:
     symbols = UNIVERSE
-    bars, funding = load_panel(symbols, start_ms=start_ms, end_ms=end_ms)
-    events = selection_events(bars, symbols=symbols, lookback=lookback, legs=legs, mode=mode)
+    bars, funding, flow = load_panel(symbols, start_ms=start_ms, end_ms=end_ms)
+    events = selection_events(
+        bars, symbols=symbols, lookback=lookback, legs=legs, mode=mode, flow=flow
+    )
     rows = event_legs(bars, funding, events)
     summary = metrics.summarize(rows, net_key="realized_net_r")
     per_symbol: dict[str, Any] = {}
@@ -304,7 +345,7 @@ def run(*, start_ms: int, end_ms: int, lookback: int, legs: int, mode: str = "re
         symbols=symbols,
         legs=legs,
         seed=CONFIG["control_seed"],
-        draws=CONFIG["control_draws"],
+        draws=control_draws,
     )
     null_means = [draw["mean_net_r"] for draw in null if draw["mean_net_r"] is not None]
     treatment_event_means = event_means(rows)
@@ -346,7 +387,7 @@ def run(*, start_ms: int, end_ms: int, lookback: int, legs: int, mode: str = "re
             "treatment_event_mean_r": statistics.fmean(treatment_event_means) if treatment_event_means else None,
         },
         "symbols": per_symbol,
-        "control": {"draws": CONFIG["control_draws"], "distribution_head": null_means[:5]},
+        "control": {"draws": control_draws, "distribution_head": null_means[:5]},
         "code_sha": _code_sha(),
         "claim_status": "MODEL_DERIVED_DEV_SCREEN",
     }
@@ -381,19 +422,22 @@ def main() -> int:
     parser.add_argument("--start-ms", type=int, default=DEV_START_MS)
     parser.add_argument("--end-ms", type=int, default=DEV_END_MS)
     parser.add_argument("--sensitivity", action="store_true")
-    parser.add_argument("--mode", choices=("reversal", "momentum"), default="reversal")
+    parser.add_argument("--mode", choices=("reversal", "momentum", "flow"), default="reversal")
+    parser.add_argument("--control-draws", type=int, default=200)
     args = parser.parse_args()
 
     if args.start_ms >= HOLDOUT_START_MS and __import__("os").environ.get("V9_HOLDOUT_AUTHORIZED") != "1":
         raise SealedWindowRefusal("holdout sealed; see reports/research/LEDGER.md")
 
     args.out.mkdir(parents=True, exist_ok=True)
+    lookback = 1 if args.mode == "flow" else int(CONFIG["lookback_bars"])
     primary = run(
         start_ms=args.start_ms,
         end_ms=args.end_ms,
-        lookback=int(CONFIG["lookback_bars"]),
+        lookback=lookback,
         legs=int(CONFIG["legs_per_side"]),
         mode=args.mode,
+        control_draws=args.control_draws,
     )
     primary["assessment"] = assess(primary)
     (args.out / "primary.json").write_text(json.dumps(primary, indent=2, sort_keys=True), encoding="utf-8")
@@ -410,13 +454,19 @@ def main() -> int:
     }
     if args.sensitivity:
         payload["sensitivity"] = {}
-        for lookback, legs in ((4, 2), (72, 2), (24, 1), (24, 3)):
+        variants = (
+            ((1, 1), (1, 3))
+            if args.mode == "flow"
+            else ((4, 2), (72, 2), (24, 1), (24, 3))
+        )
+        for lookback, legs in variants:
             variant = run(
                 start_ms=args.start_ms,
                 end_ms=args.end_ms,
                 lookback=lookback,
                 legs=legs,
                 mode=args.mode,
+                control_draws=args.control_draws,
             )
             payload["sensitivity"][f"L{lookback}_k{legs}"] = {
                 "trades": variant["pooled"]["trades"],

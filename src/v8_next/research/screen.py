@@ -153,6 +153,50 @@ def load_funding(
     return tuple(rows)
 
 
+def load_flow(
+    tape_path: Path | str,
+    *,
+    instrument: str = "BTCUSDT",
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+) -> dict[int, dict[str, float]]:
+    """Per closed bar: aggressive taker-buy share of quote volume.
+
+    Returns ``{end_ns: {"buy_share": s, "trades": n, "quote_volume": q}}``. Only
+    bars whose payload carries a positive quote volume are included: a share of
+    an empty denominator is not a measurement, so it is absent rather than 0.5.
+    """
+    flow: dict[int, dict[str, float]] = {}
+    with open(tape_path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if row.get("channel") != "kline":
+                continue
+            if str(row.get("instrument")) != instrument:
+                continue
+            payload = row.get("payload") or {}
+            if not payload.get("closed", True):
+                continue
+            open_ms = int(payload.get("open_time_ms") or 0)
+            if start_ms is not None and open_ms < start_ms:
+                continue
+            if end_ms is not None and open_ms >= end_ms:
+                continue
+            quote = float(payload.get("quote_asset_volume") or 0.0)
+            taker_buy = float(payload.get("taker_buy_quote_asset_volume") or 0.0)
+            if quote <= 0.0 or taker_buy < 0.0:
+                continue
+            flow[int(row["event_time"]) * NS_PER_MS] = {
+                "buy_share": taker_buy / quote,
+                "trades": float(payload.get("trades") or 0.0),
+                "quote_volume": quote,
+            }
+    return flow
+
+
 def bar_index_at(bars: Sequence[Bar], ts_ns: int) -> int:
     """Index of the first bar whose close is strictly after ``ts_ns``."""
     ends = [bar.end_ns for bar in bars]
