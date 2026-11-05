@@ -1,6 +1,6 @@
 # Experimental expert horizon contracts
 
-Profiles are uncalibrated hypotheses from `src/v8_next/experts/horizon_profiles.py`; confirmation horizons are provenance only and are not consumed by the legacy observers. No profile is connected to the native simulation; runtime evidence for every row is NOT_RUN. Warmup is inherited from the registry. Synthetic tests are mechanics, not economic evidence.
+Profiles are uncalibrated hypotheses from `src/v8_next/experts/horizon_profiles.py`; confirmation horizons are provenance only and are not consumed by legacy observers. No profile is connected to native simulation; runtime evidence for every row is NOT_RUN. Warmup is inherited from the registry. Synthetic tests are mechanics, not economic evidence.
 
 | Expert | Required | Primary | Optional confirmation | Warmup bars | Runtime |
 | --- | --- | --- | --- | ---: | --- |

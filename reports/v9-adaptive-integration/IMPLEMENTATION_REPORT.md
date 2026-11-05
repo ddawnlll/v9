@@ -15,3 +15,7 @@ Base: `d0430a64ebdeb44545115826e06a2e00caa36bea` (fetched `origin/integration/wa
 The checked-in `reports/overnight/evidence/sim-arm-comparison.json` reports a prior 2,160-bar H1 development replay, 24 closed V9 campaigns and 44 V8 campaigns. This is historical evidence, not a newly executed result. It reports 13.036 s for V9 and 0.746 s for V8, and a funding attribution disagreement. The 24-trade sample fails the 30-trade floor. Existing tape inventory contains H1; a genuine M15/H4 replay is not established. The checker grouped submissions through later ACK events, so its recorded zero violations cannot alone establish uninterrupted protection. Native REDUCE/EXIT cancelled protection before execution and could leave exposure unprotected; these order side effects are now explicitly blocked pending a verified handoff.
 
 `uv sync --locked --extra dev` completed in this worktree. Further command outcomes and artifacts will be recorded as work progresses. All simulation results remain distinct from live authorization and economic edge.
+
+## Verification checkpoint
+
+`uv run --locked --extra dev pytest -q tests`: 2817 passed, 72 skipped, 512 deselected, 1 failed (`test_protection_audit_is_clean_over_500_bars`). `uv run --locked --extra dev ruff check src tests` passed; `uv run --locked --extra dev mypy src` passed (256 source files). The failing assertion is preserved and qualification remains blocked.
