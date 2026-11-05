@@ -1,0 +1,98 @@
+{
+  "schema_version": "v9.raw-signal-preregistration.1",
+  "experiment_id": "E-004",
+  "created_ns": 1793836800000000000,
+  "created_utc": "2026-11-05T00:00:00Z",
+  "code_sha": "c6ce480",
+  "supersedes": null,
+  "predecessor_evidence": "reports/research/LEDGER.md E-001..E-003 (all NO_EDGE)",
+  "authority": "OFFLINE_MODEL_DERIVED",
+  "claim_status": "NO_ECONOMIC_CLAIM_DEV_SCREEN_ONLY",
+  "dataset": {
+    "role": "DEVELOPMENT",
+    "window_utc": ["2025-01-01T00:00:00Z", "2025-05-01T00:00:00Z"],
+    "bar_interval": "1h",
+    "funding_source": "venue fundingRate archives inside the same verified tape, settlement instant = funding_time_ms",
+    "universe": [
+      "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT",
+      "ADAUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT", "LTCUSDT"
+    ],
+    "holdout": {
+      "window_utc": ["2025-05-01T00:00:00Z", "2025-07-01T00:00:00Z"],
+      "state": "SEALED",
+      "reason": "already sealed before E-001; nothing in this registration opens it"
+    }
+  },
+  "execution_model": {
+    "entry": "MARKET at the next bar open after the first bar closing at or after the funding settlement",
+    "exit": "static bracket, stop 2% / target 4% of entry, stop-first intrabar, 48-bar time exit",
+    "target_fill": "MAKER_LIMIT",
+    "market_fill_slippage_bps_per_side": 2.0,
+    "fee_bps_per_side": {"taker": 5.0, "maker": 2.0},
+    "funding": "actual venue settlements inside the holding window",
+    "sizing": "risk 100 USDT per campaign; R = net PnL / 100",
+    "evidence_class": "MODEL_DERIVED"
+  },
+  "candidates": [
+    {
+      "hypothesis_id": "H-FUND-001",
+      "candidate_id": "funding_extreme_reversion",
+      "statement": "An extreme settlement funding rate marks leveraged crowding, and the crowded side reverses over the following holding window by more than the round-trip cost and more than a matched random entry.",
+      "parameters": {"window": 30, "quantile": 0.10},
+      "direction_rule": "rate strictly below the trailing 10th percentile -> LONG; strictly above the trailing 90th percentile -> SHORT",
+      "tie_rule": "strict comparisons only, so the modal constant rate never triggers",
+      "falsified_by": "net expectancy <= 0, or not above the matched random-entry control, or concentration in fewer than 6 of 10 symbols"
+    }
+  ],
+  "controls": {
+    "random_entry_matched_exits": {
+      "pool": "every bar from warmup to the penultimate bar, both directions, identical bracket, costs, funding and time exit",
+      "draw_rule": "per symbol, sample without replacement exactly the candidate's trade count; pooled statistic is the mean of per-symbol draw means",
+      "draws": 200,
+      "seed": 20260101
+    }
+  },
+  "unit_of_comparison": "per-campaign net R; cross-market clustering unit is the per-symbol mean net R",
+  "primary_metric": "pooled net expectancy in R",
+  "secondary_metrics": [
+    "control percentile and one-sided control p-value",
+    "symbol mean bootstrap 95% CI",
+    "trade-level bootstrap 95% CI",
+    "positive symbol count",
+    "net profit factor",
+    "maximum drawdown",
+    "funding cost per campaign",
+    "declared sensitivity grid (not selectable)"
+  ],
+  "gates": {
+    "minimum_trades": 120,
+    "net_expectancy_must_exceed_zero": true,
+    "net_expectancy_must_exceed_matched_control_mean": true,
+    "minimum_positive_symbols": 6,
+    "alpha": 0.05,
+    "multiple_testing": "Holm over the hypotheses in this family (one primary)",
+    "max_drawdown_gate": 1.0
+  },
+  "accepted_outcomes": ["NO_EDGE", "STOP", "INCONCLUSIVE"],
+  "decision_rule": "DEV_CANDIDATE only when every gate passes; otherwise NO_EDGE, or INCONCLUSIVE below the trade minimum. DEV_CANDIDATE nominates a native validation and is not an economic edge claim. PASS can never be awarded by this screen.",
+  "hypothesis_budget": {
+    "family": "v9-funding-crowding-2025H1",
+    "max_hypotheses": 1,
+    "max_trials": 5,
+    "trials_declared": "1 primary + 4 sensitivity variants (quantile 0.05/0.20, window 15/60)",
+    "alpha": 0.05,
+    "correction": "HOLM"
+  },
+  "cumulative_dev_budget": {
+    "families": 2,
+    "primary_hypotheses_tested": 4,
+    "declared_variants_tested": 14,
+    "note": "The development window is exploratory by design: it can nominate, never confirm. Only a frozen candidate evaluated on the sealed holdout can support a claim."
+  },
+  "known_limitations": [
+    "funding is a crowding proxy; open interest and positioning are absent from the archives",
+    "the funding series is settlement-frequency (8h) while entries are hourly, so at most three entry opportunities per day per symbol",
+    "the bar path does not model queue position or partial fills",
+    "dev and holdout share one six-month regime"
+  ]
+}

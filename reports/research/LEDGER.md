@@ -100,3 +100,14 @@ funding rate is the price of leveraged crowding, so an extreme settlement rate
 should predict a reversal against the crowded side. Funding data is present in
 every verified tape and was unused by all three failed candidates.
 
+
+---
+
+## 2026-11-05 — E-004: funding-crowding reversal
+
+* Preregistration: `reports/research/PREREGISTRATION_funding.json` (code `c6ce480`).
+* Same dev window, costs, exits and control design as E-001..E-003.
+* Hypothesis: an extreme settlement funding rate marks leveraged crowding and
+  the crowded side reverses; strict quartile comparisons mean the modal constant
+  rate never triggers.
+* Status: `PREREGISTERED` (results pending).
