@@ -246,6 +246,14 @@ class SimArmConfig:
     stop_amendments_enabled: bool = True
     #: Native target extensions. Simulation-only.
     target_amendments_enabled: bool = True
+    #: Research-only ablation: when ``False`` the initial stop is the fixed
+    #: ``bracket_stop_pct`` distance instead of the structural lookback stop.
+    #: Default ``True`` preserves the frozen adaptive entry geometry exactly.
+    structural_stop_enabled: bool = True
+    #: Research-only ablation: when ``False`` the initial target is the fixed
+    #: ``bracket_target_pct`` distance instead of the structural objective.
+    #: Default ``True`` preserves the frozen adaptive entry geometry exactly.
+    structural_target_enabled: bool = True
     #: Round-trip fee used by the break-even policy, in basis points.
     fee_bps: Decimal = Decimal("5")
 
@@ -280,6 +288,8 @@ class SimArmConfig:
             "adaptive_management_enabled",
             "stop_amendments_enabled",
             "target_amendments_enabled",
+            "structural_stop_enabled",
+            "structural_target_enabled",
         ):
             if not isinstance(getattr(self, name), bool):
                 raise TypeError(f"{name} must be a bool")
@@ -1784,22 +1794,51 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             return sizing_note
         side_text = "LONG" if side is OrderSide.BUY else "SHORT"
         if self.sim_config.adaptive_management_enabled:
-            initial_stop = self._stop_policy.initial_stop(
-                side=side_text,
-                entry_price=entry_px,
-                bars=tuple(self._horizon_candles[Timeframe.H1][:-1]),
-            )
-            objective = structural_objective(
-                side_text, self._horizon_candles[Timeframe.H4] or self._horizon_candles[Timeframe.H1]
-            )
-            target_plan = self._target_policy.initial_target(
-                side=side_text,
-                entry_price=entry_px,
-                stop_price=initial_stop.price,
-                objective=objective,
-            )
-            stop_px = initial_stop.price
-            target_px = target_plan.target_price
+            stop_dist = entry_px * self.sim_config.bracket_stop_pct
+            target_dist = entry_px * self.sim_config.bracket_target_pct
+            if self.sim_config.structural_stop_enabled:
+                initial_stop = self._stop_policy.initial_stop(
+                    side=side_text,
+                    entry_price=entry_px,
+                    bars=tuple(self._horizon_candles[Timeframe.H1][:-1]),
+                )
+                stop_px = initial_stop.price
+            else:
+                stop_px = (
+                    entry_px - stop_dist
+                    if side is OrderSide.BUY
+                    else entry_px + stop_dist
+                )
+                initial_stop = InitialStop(
+                    price=stop_px,
+                    kind=StopKind.NATIVE_PROTECTIVE,
+                    distance=stop_dist,
+                    basis="FIXED_BRACKET_PCT_ABLATION",
+                )
+            if self.sim_config.structural_target_enabled:
+                objective = structural_objective(
+                    side_text,
+                    self._horizon_candles[Timeframe.H4]
+                    or self._horizon_candles[Timeframe.H1],
+                )
+                target_plan = self._target_policy.initial_target(
+                    side=side_text,
+                    entry_price=entry_px,
+                    stop_price=initial_stop.price,
+                    objective=objective,
+                )
+                target_px = target_plan.target_price
+            else:
+                target_px = (
+                    entry_px + target_dist
+                    if side is OrderSide.BUY
+                    else entry_px - target_dist
+                )
+                target_plan = TargetPlan(
+                    target_price=target_px,
+                    expected_bars=self._target_policy.expected_bars,
+                    max_bars=self._target_policy.max_bars,
+                )
         else:
             stop_dist = entry_px * self.sim_config.bracket_stop_pct
             target_dist = entry_px * self.sim_config.bracket_target_pct

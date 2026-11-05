@@ -1,0 +1,138 @@
+{
+  "assessment": {
+    "reasons": [
+      "NON_POSITIVE_EXPECTANCY",
+      "NOT_ABOVE_MATCHED_CONTROL",
+      "CONCENTRATED:1<6",
+      "CONTROL_P_VALUE_NOT_SIGNIFICANT"
+    ],
+    "status": "NO_EDGE"
+  },
+  "claim_status": "MODEL_DERIVED_DEV_SCREEN",
+  "code_sha": "382adcb487158e26038f83a2cfc76e79ee46bc28",
+  "control": {
+    "distribution_head": [
+      -0.04494004723437879,
+      -0.04758759947276761,
+      -0.03873024887806747,
+      -0.03782055717455077,
+      -0.04286484397016316
+    ],
+    "draws": 50
+  },
+  "design": {
+    "config": {
+      "alpha": 0.05,
+      "bootstrap_resamples": 2000,
+      "bootstrap_seed": 20260101,
+      "control_draws": 200,
+      "control_seed": 20260101,
+      "legs_per_side": 2,
+      "lookback_bars": 24,
+      "maker_fee_bps": 2.0,
+      "max_bars": 48,
+      "minimum_positive_symbols": 6,
+      "minimum_trades": 120,
+      "risk_budget_usdt": 100.0,
+      "slippage_bps": 2.0,
+      "stop_pct": 0.02,
+      "taker_fee_bps": 5.0,
+      "target_pct": 0.04
+    },
+    "events": 2878,
+    "legs": 9071,
+    "legs_per_side": 2,
+    "lookback_bars": 1,
+    "mode": "flow",
+    "window": {
+      "end_ms": 1746057600000,
+      "start_ms": 1735689600000
+    }
+  },
+  "pooled": {
+    "control_mean_r": -0.04483708287584489,
+    "control_p_value": 1.0,
+    "gross_expectancy_r": -0.014769545631242434,
+    "leg_mean_ci": {
+      "alpha": 0.05,
+      "ci_high": -0.031522625616856634,
+      "ci_low": -0.08888386146739627,
+      "contains_zero": false,
+      "estimate": -0.06028357232169551,
+      "n": 9071,
+      "resamples": 2000,
+      "seed": 20260102
+    },
+    "maximum_drawdown_usdt": 59430.03159213462,
+    "net_expectancy_r": -0.06028357232169551,
+    "net_profit_factor": 0.9114423088225762,
+    "positive_symbols": 1,
+    "symbol_mean_ci": {
+      "alpha": 0.05,
+      "ci_high": -0.030505468671080838,
+      "ci_low": -0.09331821277482491,
+      "contains_zero": false,
+      "estimate": -0.06081582715837667,
+      "n": 10,
+      "resamples": 2000,
+      "seed": 20260101
+    },
+    "symbols_with_trades": 10,
+    "total_net_pnl_usdt": -54683.228452979994,
+    "trades": 9071,
+    "treatment_event_mean_r": -0.06496504802751042,
+    "win_rate": 0.3483629147833756
+  },
+  "symbols": {
+    "ADAUSDT": {
+      "gross_expectancy_r": -0.1187220214666271,
+      "net_expectancy_r": -0.1648665310554632,
+      "trades": 842
+    },
+    "AVAXUSDT": {
+      "gross_expectancy_r": 0.05424672861697699,
+      "net_expectancy_r": 0.008828007066265062,
+      "trades": 913
+    },
+    "BNBUSDT": {
+      "gross_expectancy_r": -0.023223496256736947,
+      "net_expectancy_r": -0.0681649346402383,
+      "trades": 1091
+    },
+    "DOGEUSDT": {
+      "gross_expectancy_r": 0.040870568105684436,
+      "net_expectancy_r": -0.004534281560092805,
+      "trades": 862
+    },
+    "DOTUSDT": {
+      "gross_expectancy_r": -0.019396979246906202,
+      "net_expectancy_r": -0.06484582639311377,
+      "trades": 1002
+    },
+    "ETHUSDT": {
+      "gross_expectancy_r": -0.048630705028443466,
+      "net_expectancy_r": -0.09531393393460247,
+      "trades": 893
+    },
+    "LINKUSDT": {
+      "gross_expectancy_r": 0.006747017198853196,
+      "net_expectancy_r": -0.038560915152981656,
+      "trades": 872
+    },
+    "LTCUSDT": {
+      "gross_expectancy_r": -0.02061849641372932,
+      "net_expectancy_r": -0.06550881040925025,
+      "trades": 1027
+    },
+    "SOLUSDT": {
+      "gross_expectancy_r": 0.03070649909200967,
+      "net_expectancy_r": -0.014670690032687653,
+      "trades": 826
+    },
+    "XRPUSDT": {
+      "gross_expectancy_r": -0.05469750134468373,
+      "net_expectancy_r": -0.10052035547160161,
+      "trades": 743
+    }
+  }
+}

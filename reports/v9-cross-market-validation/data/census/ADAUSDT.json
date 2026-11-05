@@ -1,0 +1,168 @@
+{
+  "authority": "OFFLINE_PIT_CENSUS",
+  "bars": 4344,
+  "bracket_stop_pct": "0.02",
+  "bracket_target_pct": "0.04",
+  "claim_status": "NO_ECONOMIC_CLAIM",
+  "costs_applied": "NONE",
+  "distributions": [
+    {
+      "against_open_episodes": 18,
+      "ambiguous_bars": 0,
+      "bars_evaluated": 4296,
+      "censored": 0,
+      "directional_bars": 233,
+      "episodes": 22,
+      "fragments": 211,
+      "hit_rate": 0.36363636363636365,
+      "horizon_bars": 336,
+      "mean_mae_pct": 2.0931361055915314,
+      "mean_market_move_pct": 0.4672095382579403,
+      "mean_mfe_pct": 2.917726822618809,
+      "neutral_bars": 0,
+      "policy": "range-breakout-48-v1",
+      "stop_hits": 14,
+      "target_hits": 8,
+      "timeouts": 0,
+      "warmup_bars": 49
+    },
+    {
+      "against_open_episodes": 80,
+      "ambiguous_bars": 331,
+      "bars_evaluated": 4324,
+      "censored": 0,
+      "directional_bars": 746,
+      "episodes": 120,
+      "fragments": 626,
+      "hit_rate": 0.2833333333333333,
+      "horizon_bars": 48,
+      "mean_mae_pct": 2.3888496169526054,
+      "mean_market_move_pct": -0.47029167135825445,
+      "mean_mfe_pct": 2.306041966043714,
+      "neutral_bars": 534,
+      "policy": "volatility-extreme-v2",
+      "stop_hits": 81,
+      "target_hits": 34,
+      "timeouts": 5,
+      "warmup_bars": 21
+    },
+    {
+      "against_open_episodes": 142,
+      "ambiguous_bars": 0,
+      "bars_evaluated": 4320,
+      "censored": 0,
+      "directional_bars": 1664,
+      "episodes": 232,
+      "fragments": 1432,
+      "hit_rate": 0.22413793103448276,
+      "horizon_bars": 24,
+      "mean_mae_pct": 2.008636960270603,
+      "mean_market_move_pct": -0.16701013001600254,
+      "mean_mfe_pct": 2.27197336115916,
+      "neutral_bars": 0,
+      "policy": "trend-continuation-v2",
+      "stop_hits": 145,
+      "target_hits": 52,
+      "timeouts": 35,
+      "warmup_bars": 25
+    },
+    {
+      "against_open_episodes": 0,
+      "ambiguous_bars": 0,
+      "bars_evaluated": 4324,
+      "censored": 1,
+      "directional_bars": 124,
+      "episodes": 62,
+      "fragments": 62,
+      "hit_rate": 0.09836065573770492,
+      "horizon_bars": 12,
+      "mean_mae_pct": 1.9986853092992085,
+      "mean_market_move_pct": -0.23718856772210828,
+      "mean_mfe_pct": 1.9001792844762062,
+      "neutral_bars": 0,
+      "policy": "mean-reversion-v2",
+      "stop_hits": 29,
+      "target_hits": 6,
+      "timeouts": 26,
+      "warmup_bars": 21
+    },
+    {
+      "against_open_episodes": 78,
+      "ambiguous_bars": 0,
+      "bars_evaluated": 4283,
+      "censored": 0,
+      "directional_bars": 409,
+      "episodes": 154,
+      "fragments": 255,
+      "hit_rate": 0.2532467532467532,
+      "horizon_bars": 24,
+      "mean_mae_pct": 2.415868732293749,
+      "mean_market_move_pct": -0.349505824422582,
+      "mean_mfe_pct": 2.274027868420089,
+      "neutral_bars": 0,
+      "policy": "compression-expansion-v2",
+      "stop_hits": 94,
+      "target_hits": 39,
+      "timeouts": 21,
+      "warmup_bars": 62
+    }
+  ],
+  "evidence_digest": "sha256:cc8f03c6432f289a53d1dbd66cb53827b28a17109eee54a5befb287f28dba6fa",
+  "instrument_id": "ADAUSDT-PERP.BINANCE",
+  "overlap": {
+    "bars_with_multiple_grammars": 768,
+    "bars_with_opposing_directions": 52,
+    "pairwise_co_detections": [
+      {
+        "a": "trend-continuation-v2",
+        "b": "volatility-extreme-v2",
+        "bars": 578
+      },
+      {
+        "a": "range-breakout-48-v1",
+        "b": "trend-continuation-v2",
+        "bars": 220
+      },
+      {
+        "a": "range-breakout-48-v1",
+        "b": "volatility-extreme-v2",
+        "bars": 203
+      },
+      {
+        "a": "compression-expansion-v2",
+        "b": "trend-continuation-v2",
+        "bars": 193
+      },
+      {
+        "a": "compression-expansion-v2",
+        "b": "volatility-extreme-v2",
+        "bars": 113
+      },
+      {
+        "a": "mean-reversion-v2",
+        "b": "volatility-extreme-v2",
+        "bars": 52
+      },
+      {
+        "a": "compression-expansion-v2",
+        "b": "range-breakout-48-v1",
+        "bars": 32
+      },
+      {
+        "a": "compression-expansion-v2",
+        "b": "mean-reversion-v2",
+        "bars": 2
+      }
+    ]
+  },
+  "panel_gate": {
+    "contradiction_can_block": false,
+    "expert_count": 28,
+    "max_contradiction_tolerance": 28,
+    "min_support_can_pass_with": "a single support vote",
+    "min_support_quorum": 1,
+    "note": "contradiction can never block: 28 experts exist and 28 contradictions are tolerated, so the gate reduces to the support quorum alone"
+  },
+  "tape_sha256": "180c0ecab579fc912d62034bf9af36c414986378fa0f604f1b78fdf3472f4085",
+  "version": "p0-grammar-census-v1"
+}

@@ -1,0 +1,59 @@
+{
+  "alpha_after_holm": 0.05,
+  "candidates": {
+    "funding_extreme_reversion": {
+      "control_mean_r": -0.04329073098847111,
+      "holm_p": 0.645,
+      "net_expectancy_r": -0.13811352850852573,
+      "p_value": 0.645,
+      "reasons": [
+        "NON_POSITIVE_EXPECTANCY",
+        "NOT_ABOVE_RANDOM_ENTRY",
+        "CONCENTRATED:3<6",
+        "CONTROL_P_VALUE_NOT_SIGNIFICANT"
+      ],
+      "sensitivity": {
+        "{\"quantile\": 0.05}": {
+          "net_profit_factor": 0.8340856602740073,
+          "pooled_net_expectancy_r": -0.11626198231852941,
+          "trades": 340
+        },
+        "{\"quantile\": 0.2}": {
+          "net_profit_factor": 0.7405606748395845,
+          "pooled_net_expectancy_r": -0.1898507021230281,
+          "trades": 1103
+        },
+        "{\"window\": 15}": {
+          "net_profit_factor": 0.7746679096089266,
+          "pooled_net_expectancy_r": -0.16294438403712871,
+          "trades": 808
+        },
+        "{\"window\": 60}": {
+          "net_profit_factor": 0.7746585624792041,
+          "pooled_net_expectancy_r": -0.16258724370754715,
+          "trades": 477
+        }
+      },
+      "status": "NO_EDGE",
+      "symbols_positive": 3,
+      "trades": 563
+    }
+  },
+  "code_sha": "e7ab5171bd427efc5e3df881073dbe1c754c5ec7",
+  "config": {
+    "alpha": 0.05,
+    "bootstrap_resamples": 2000,
+    "bootstrap_seed": 20260101,
+    "control_seed": 20260101,
+    "draws": 200,
+    "maker_fee_bps": 2.0,
+    "max_bars": 48,
+    "minimum_positive_symbols": 6,
+    "minimum_trades": 120,
+    "risk_budget_usdt": 100.0,
+    "slippage_bps": 2.0,
+    "stop_pct": 0.02,
+    "taker_fee_bps": 5.0,
+    "target_pct": 0.04
+  }
+}

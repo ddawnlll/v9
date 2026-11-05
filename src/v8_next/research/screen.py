@@ -73,7 +73,14 @@ def load_bars(
     start_ms: int | None = None,
     end_ms: int | None = None,
 ) -> list[Bar]:
-    """Load closed kline bars for one instrument from a multitape JSONL file."""
+    """Load closed kline bars for one instrument from a multitape JSONL file.
+
+    The tape records ``event_time`` in milliseconds; ``Bar.end_ns`` is the true
+    nanosecond close instant, so a bar can be compared directly with a native
+    timestamp (``Position.ts_opened``, ``FundingRateUpdate.ts_event``). Mixing
+    the two units silently skipped every bar, which is why the conversion is
+    explicit here and not left to callers.
+    """
     bars: list[Bar] = []
     with open(tape_path, encoding="utf-8") as handle:
         for line in handle:
@@ -95,7 +102,7 @@ def load_bars(
                 continue
             bars.append(
                 Bar(
-                    end_ns=int(row["event_time"]),
+                    end_ns=int(row["event_time"]) * NS_PER_MS,
                     open=float(payload["open"]),
                     high=float(payload["high"]),
                     low=float(payload["low"]),
@@ -105,6 +112,89 @@ def load_bars(
             )
     bars.sort(key=lambda bar: bar.end_ns)
     return bars
+
+
+def load_funding(
+    tape_path: Path | str,
+    *,
+    instrument: str = "BTCUSDT",
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+) -> tuple[tuple[int, float], ...]:
+    """Load ``(settlement_ns, rate)`` funding rows for one instrument.
+
+    The settlement instant is the venue's ``funding_time_ms``: that is when the
+    charge is actually applied. A row without it is not invented from the event
+    time, it is skipped and remains absent.
+    """
+    rows: list[tuple[int, float]] = []
+    with open(tape_path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if row.get("channel") != "funding":
+                continue
+            if str(row.get("instrument")) != instrument:
+                continue
+            payload = row.get("payload") or {}
+            settle_ms = payload.get("funding_time_ms")
+            rate = payload.get("funding_rate")
+            if settle_ms is None or rate is None:
+                continue
+            settle_ms = int(settle_ms)
+            if start_ms is not None and settle_ms < start_ms:
+                continue
+            if end_ms is not None and settle_ms >= end_ms:
+                continue
+            rows.append((settle_ms * NS_PER_MS, float(rate)))
+    rows.sort(key=lambda item: item[0])
+    return tuple(rows)
+
+
+def load_flow(
+    tape_path: Path | str,
+    *,
+    instrument: str = "BTCUSDT",
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+) -> dict[int, dict[str, float]]:
+    """Per closed bar: aggressive taker-buy share of quote volume.
+
+    Returns ``{end_ns: {"buy_share": s, "trades": n, "quote_volume": q}}``. Only
+    bars whose payload carries a positive quote volume are included: a share of
+    an empty denominator is not a measurement, so it is absent rather than 0.5.
+    """
+    flow: dict[int, dict[str, float]] = {}
+    with open(tape_path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if row.get("channel") != "kline":
+                continue
+            if str(row.get("instrument")) != instrument:
+                continue
+            payload = row.get("payload") or {}
+            if not payload.get("closed", True):
+                continue
+            open_ms = int(payload.get("open_time_ms") or 0)
+            if start_ms is not None and open_ms < start_ms:
+                continue
+            if end_ms is not None and open_ms >= end_ms:
+                continue
+            quote = float(payload.get("quote_asset_volume") or 0.0)
+            taker_buy = float(payload.get("taker_buy_quote_asset_volume") or 0.0)
+            if quote <= 0.0 or taker_buy < 0.0:
+                continue
+            flow[int(row["event_time"]) * NS_PER_MS] = {
+                "buy_share": taker_buy / quote,
+                "trades": float(payload.get("trades") or 0.0),
+                "quote_volume": quote,
+            }
+    return flow
 
 
 def bar_index_at(bars: Sequence[Bar], ts_ns: int) -> int:
@@ -170,6 +260,9 @@ def evaluate_path(
     partial_fraction: float = 0.5,
     partial_trigger_r: float = 1.0,
     max_bars: int | None = None,
+    slippage_bps: float = 0.0,
+    funding: Sequence[tuple[int, float]] = (),
+    target_maker: bool = False,
 ) -> dict[str, Any]:
     """Evaluate one declared exit policy from a declared entry.
 
@@ -178,6 +271,13 @@ def evaluate_path(
       ``BREAKEVEN_1R``    stop moves to breakeven (+round-trip cost) after +1R
       ``PARTIAL_50_1R``   half realised at +1R, rest under the initial bracket
       ``TIME_STOP``       flat exit at the close of ``max_bars`` bars
+
+    ``slippage_bps`` is charged per side on market fills only (entry, stop,
+    time stop, cutoff liquidation). ``target_maker`` charges the maker fee and
+    no slippage on a target fill, because the target is a resting limit order.
+    ``funding`` carries ``(settlement_ns, rate)`` pairs; a positive rate is paid
+    by longs and received by shorts. Both terms are reported separately so the
+    accounting identity stays auditable.
     """
     if stop is None:
         return {"outcome": "NO_STOP", "net_r": None, "metric_unavailable_reason": "NO_INITIAL_STOP"}
@@ -190,9 +290,12 @@ def evaluate_path(
     # figures are comparable with the native run. R economics are scale
     # invariant; only the nominal size depends on this choice.
     qty = (risk_budget_usdt / risk_price) if risk_budget_usdt else 1.0
+    slip = slippage_bps / 10_000.0
+    entry_fill = entry + direction * entry * slip
     remaining = qty
     realised_usdt = 0.0
-    fees_usdt = fees.fee_usdt(entry, qty, maker=False)  # entry crosses
+    slippage_usdt = qty * abs(entry_fill - entry)
+    fees_usdt = fees.fee_usdt(entry_fill, qty, maker=False)  # entry crosses
     active_stop = stop
     stop_updated = False
     bars_seen = 0
@@ -207,14 +310,8 @@ def evaluate_path(
             continue
         bars_seen += 1
         last_bar = bar
-        if max_bars is not None and policy == "TIME_STOP" and bars_seen > max_bars:
-            exit_price = bars[-1].close
-            exit_ns = bars[-1].end_ns
-            outcome = "TIME_STOP"
-            break
-
-        favourable = (bar.high - entry) if direction > 0 else (entry - bar.low)
-        trigger_price = entry + direction * risk_price * partial_trigger_r
+        favourable = (bar.high - entry_fill) if direction > 0 else (entry_fill - bar.low)
+        trigger_price = entry_fill + direction * risk_price * partial_trigger_r
         triggers = favourable >= risk_price * partial_trigger_r
 
         stop_hit = (bar.low <= active_stop) if direction > 0 else (bar.high >= active_stop)
@@ -236,7 +333,7 @@ def evaluate_path(
 
         if policy == "PARTIAL_50_1R" and not partial_done and triggers:
             close_qty = qty * partial_fraction
-            realised_usdt += (trigger_price - entry) * direction * close_qty
+            realised_usdt += (trigger_price - entry_fill) * direction * close_qty
             fees_usdt += fees.fee_usdt(trigger_price, close_qty, maker=True)
             remaining -= close_qty
             partial_done = True
@@ -244,8 +341,8 @@ def evaluate_path(
 
         if policy == "BREAKEVEN_1R" and not stop_updated and triggers:
             # Effective from the NEXT bar: the trigger is only known at close.
-            cost_buffer = abs(entry) * 2 * fees.taker
-            active_stop = entry + direction * cost_buffer
+            cost_buffer = abs(entry_fill) * 2 * fees.taker
+            active_stop = entry_fill + direction * cost_buffer
             stop_updated = True
             trigger_bar = bars_seen
 
@@ -255,9 +352,13 @@ def evaluate_path(
             outcome = "TIME_STOP"
             break
 
+    exit_fill: float | None = None
+    exit_maker = outcome == "TARGET" and target_maker
     if exit_price is not None and remaining > 0:
-        realised_usdt += (exit_price - entry) * direction * remaining
-        fees_usdt += fees.fee_usdt(exit_price, remaining, maker=False)
+        exit_fill = exit_price if exit_maker else exit_price - direction * exit_price * slip
+        realised_usdt += (exit_fill - entry_fill) * direction * remaining
+        slippage_usdt += remaining * abs(exit_fill - exit_price)
+        fees_usdt += fees.fee_usdt(exit_fill, remaining, maker=exit_maker)
     elif remaining > 0 and bars_seen > 0:
         # Still open at the end of the measured window: mark to market at the
         # last closed bar so an open campaign is not silently valued at zero.
@@ -266,18 +367,34 @@ def evaluate_path(
             exit_price = last.close
             exit_ns = last.end_ns
             outcome = "OPEN_AT_CUTOFF_MTM"
-            realised_usdt += (exit_price - entry) * direction * remaining
+            exit_fill = exit_price - direction * exit_price * slip
+            realised_usdt += (exit_fill - entry_fill) * direction * remaining
+            slippage_usdt += remaining * abs(exit_fill - exit_price)
+
+    # A positive funding rate is paid by longs and received by shorts. The
+    # charge uses the position notional at entry; settlements outside the
+    # holding window are not attributed to this campaign.
+    funding_usdt = 0.0
+    if funding and exit_ns is not None:
+        notional = qty * entry_fill
+        for settle_ns, rate in funding:
+            if entry_ns < settle_ns <= exit_ns:
+                funding_usdt += direction * notional * rate
 
     gross_usdt = realised_usdt
-    net_usdt = gross_usdt - fees_usdt
+    net_usdt = gross_usdt - fees_usdt - funding_usdt
     risk_usdt = risk_price * qty
     return {
         "outcome": outcome,
         "exit_ns": exit_ns,
         "exit_price": _round(exit_price),
+        "exit_fill_price": _round(exit_fill),
+        "entry_fill_price": _round(entry_fill),
         "gross_usdt": _round(gross_usdt),
         "net_usdt": _round(net_usdt),
         "fees_usdt": _round(fees_usdt),
+        "slippage_usdt": _round(slippage_usdt),
+        "funding_usdt": _round(funding_usdt),
         "gross_r": _round(gross_usdt / risk_usdt),
         "net_r": _round(net_usdt / risk_usdt),
         "risk_usdt": _round(risk_usdt),
@@ -290,6 +407,9 @@ def evaluate_path(
         "partial_done": partial_done,
         "intrabar_contract": INTRABAR,
         "limit_fill_model": "TOUCH_FILL_MODEL" if partial_done else None,
+        "slippage_bps_per_side": slippage_bps,
+        "funding_included": bool(funding),
+        "target_fill_model": ("MAKER_LIMIT" if target_maker else "TAKER_FALLBACK"),
         "evidence_class": "MODEL_DERIVED",
     }
 

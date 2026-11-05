@@ -10,3 +10,6 @@ dist/
 .hypothesis/
 artifacts/
 audit_out/
+
+# Cross-market validation tapes (generated from verified archives; not source)
+research/tape/*-2025H1/

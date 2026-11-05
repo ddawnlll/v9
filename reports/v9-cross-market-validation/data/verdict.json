@@ -1,0 +1,13 @@
+{
+ "verdict": "NO_EDGE",
+ "one_line": "Across ten USD-M perpetual futures and six months, the adaptive V9 arm fails to beat its own static control and fails to beat V8 after costs; no arm's costed net R differs from zero beyond statistical noise.",
+ "headline_findings": [
+  "D − C = −654.25 USDT: adaptive management subtracts value out of sample, reversing the +34.04 USDT BTC Q1 development result.",
+  "D − A = −284.44 USDT: the integrated V9 system does not beat the V8 baseline across markets.",
+  "C − B = +890.55 USDT (8 of 10 symbols): multi-horizon context is the only consistent improvement, and its 95% CI [+1.45, +7.13] does not survive Holm correction.",
+  "On entry-matched campaigns the adaptive stack costs only −33 USDT; −621 USDT of the gap is portfolio-path effect, not per-trade management.",
+  "Break-even stop amendments raise the win rate from 36.4% to 52.8% while destroying 1,014 USDT — a win-rate trap, not an edge.",
+  "Of six symbols positive at reference cost, five turn negative before +10 bps per side; only SOLUSDT survives.",
+  "Execution integrity holds: BTC baseline reproduced bit-for-bit, reconciliation residual ≤ 0.0038% of turnover, one protection-invariant violation in 1,709 V9 campaigns."
+ ]
+}

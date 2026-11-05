@@ -1,0 +1,14 @@
+{
+  "L1_k1": {
+    "control_mean_r": -0.042838854945902144,
+    "net_expectancy_r": -0.04194475139485105,
+    "positive_symbols": 2,
+    "trades": 5069
+  },
+  "L1_k3": {
+    "control_mean_r": -0.0440123582518049,
+    "net_expectancy_r": -0.05712403513358153,
+    "positive_symbols": 1,
+    "trades": 11953
+  }
+}

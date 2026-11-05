@@ -12,7 +12,13 @@ import time
 from types import FrameType
 from typing import Any
 
-from v8_next.experts.registry import CANONICAL_28_EXPERTS, _DISPATCHERS, get_expert, observe_expert, observe_spec
+from v8_next.experts.registry import (
+    _DISPATCHERS,
+    CANONICAL_28_EXPERTS,
+    get_expert,
+    observe_expert,
+    observe_spec,
+)
 
 
 def _stats(values: list[float]) -> dict[str, float | int]:
