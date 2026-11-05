@@ -899,90 +899,17 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
     def _reduce(self, decision_id: str, position: Position | None) -> str:
         if position is None:
             return "REDUCE_WITHOUT_POSITION"
-        instrument = self.cache.instrument(self.instrument_id)
-        if instrument is None:
-            return "SKIPPED_NO_INSTRUMENT"
-        held = position.quantity.as_decimal()
-        step = instrument.size_increment.as_decimal()
-        half = ((held / 2) // step) * step if step > 0 else held / 2
-        if half <= 0 or half < instrument.min_quantity.as_decimal():
-            return "REDUCE_BELOW_MIN_QUANTITY"
-        self._cancel_protection()
-        quantity = Quantity.from_str(format(half, f".{instrument.size_precision}f"))
-        long_side = position_direction(position) is ExposureDirection.LONG
-        side = OrderSide.SELL if long_side else OrderSide.BUY
-        short = decision_id[:12]
-        order = self.order_factory.market(
-            instrument_id=self.instrument_id,
-            order_side=side,
-            quantity=quantity,
-            reduce_only=True,
-            tags=self._tags(decision_id, "REDUCE"),
-            client_order_id=ClientOrderId(f"S-{short}-R"),
-        )
-        client_order_id = str(order.client_order_id)
-        self._order_facts[client_order_id] = _OrderFacts(
-            role=OrderRole.OTHER,
-            arm_role="REDUCE",
-            decision_id=decision_id,
-            direction=Direction.LONG if long_side else Direction.SHORT,
-            position_id=str(position.id),
-        )
-        self._mark_order(client_order_id, decision_id, "REDUCE")
-        self.submit_order(order, position_id=position.id)
-        self._any_order_seen = True
-        self._reprotect.add(str(position.id))
-        self._reduce_decision[str(position.id)] = decision_id
-        return f"SUBMITTED_REDUCE_ONLY_{quantity}"
+        # Cancel-first reduction leaves exposure without its only verified stop.
+        # Until a native, independently audited transition preserves coverage,
+        # keep the advisory visible but refuse its order side effect.
+        return "REDUCE_BLOCKED_UNVERIFIED_PROTECTION_TRANSITION"
 
     def _exit(self, decision_id: str, position: Position | None) -> str:
         if position is None:
             return "EXIT_WITHOUT_POSITION"
-        self._cancel_protection()
-        long_side = position_direction(position) is ExposureDirection.LONG
-        side = OrderSide.SELL if long_side else OrderSide.BUY
-        short = decision_id[:12]
-        order = self.order_factory.market(
-            instrument_id=self.instrument_id,
-            order_side=side,
-            quantity=position.quantity,
-            reduce_only=True,
-            tags=self._tags(decision_id, "EXIT"),
-            client_order_id=ClientOrderId(f"S-{short}-X"),
-        )
-        client_order_id = str(order.client_order_id)
-        self._order_facts[client_order_id] = _OrderFacts(
-            role=OrderRole.OTHER,
-            arm_role="EXIT",
-            decision_id=decision_id,
-            direction=Direction.LONG if long_side else Direction.SHORT,
-            position_id=str(position.id),
-        )
-        self._mark_order(client_order_id, decision_id, "EXIT")
-        self.submit_order(order, position_id=position.id)
-        self._any_order_seen = True
-        self._reprotect.discard(str(position.id))
-        return f"SUBMITTED_EXIT_REDUCE_ONLY_{position.quantity}"
-
-    def _cancel_protection(self) -> int:
-        """Cancel live protective children before changing the exposure.
-
-        A partial or full exit that left a full-size stop resting would leave
-        protection larger than the position (``REDUCE_ONLY_OVER_QUANTITY``) or
-        protection standing after the position is flat
-        (``STALE_PROTECTION_ORDER``); the arm therefore cancels first and
-        re-protects only what remains.
-        """
-        cancelled = 0
-        for order in list(self.cache.orders_open(instrument_id=self.instrument_id)):
-            order_type = str(order.order_type).upper()
-            is_stop = "STOP" in order_type
-            is_target = "LIMIT" in order_type and bool(order.is_reduce_only)
-            if not (is_stop or is_target):
-                continue
-            self.cancel_order(order.client_order_id)
-            cancelled += 1
-        return cancelled
+        # A submitted market exit is not a fill; retain the verified stop while
+        # the native exit/protection handoff remains unqualified.
+        return "EXIT_BLOCKED_UNVERIFIED_PROTECTION_TRANSITION"
 
     # ------------------------------------------------------- re-protection
     def _reprotect_remaining(self, candle: Candle) -> None:

@@ -82,6 +82,19 @@ def test_consensus_gate_matches_the_measured_v8_baseline() -> None:
     assert config.baseline_config().target_notional == Decimal("1000")
 
 
+def test_management_side_effects_refuse_unverified_stop_handoff() -> None:
+    # No access to cache, cancel_order, or submit_order is available on this
+    # sentinel: the blocked path must not cancel the position's only stop.
+    strategy = SimpleNamespace()
+    position = SimpleNamespace()
+    assert AdaptiveSimStrategy._reduce(strategy, "decision", position) == (
+        "REDUCE_BLOCKED_UNVERIFIED_PROTECTION_TRANSITION"
+    )
+    assert AdaptiveSimStrategy._exit(strategy, "decision", position) == (
+        "EXIT_BLOCKED_UNVERIFIED_PROTECTION_TRANSITION"
+    )
+
+
 def test_costed_smoke_run_on_the_authorized_tape() -> None:
     measurement = run_sim_arm(
         tape=TAPE,
