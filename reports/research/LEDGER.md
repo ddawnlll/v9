@@ -166,3 +166,46 @@ beta cannot explain a positive result.
   state transitions; matched null is a random two-and-two at the same bars, so
   long/short counts, timing, bracket and costs are identical.
 * Status: `PREREGISTERED` (results pending).
+
+### E-005 — results (2026-11-05)
+
+| Metric | Value |
+|---|---:|
+| Events (rank transitions) | 1,653 |
+| Legs priced | 2,114 |
+| Net expectancy per leg | **−0.1250 R** |
+| Gross expectancy per leg | −0.0795 R |
+| Matched random two-and-two (mean over 200 draws) | −0.0490 R |
+| Control p (one-sided) | 1.000 |
+| Positive symbols | 0 / 10 |
+| Net profit factor | 0.821 |
+| Leg mean 95% CI | [−0.182, −0.069] |
+| Symbol mean 95% CI | [−0.165, −0.086] |
+
+Sensitivity (all negative): L4_k2 −0.067 (4,962 legs), L72_k2 −0.104 (1,280),
+L24_k1 −0.027 (1,244), L24_k3 −0.137 (2,617). Status: `NO_EDGE`.
+
+#### Diagnosis
+
+The direction-balanced construction did what it was built to do: the matched
+random two-and-two selection is −0.049 R, essentially the cost drag, so there is
+no beta tailwind left in the null. The treatment is **worse than every one of the
+200 control draws** (p = 1.0) and negative in all ten symbols. Because the null
+is now beta-free, this is a genuine timing result, not a drift artefact:
+
+* buying the two weakest and selling the two strongest trailing-24h symbols had
+  a *negative gross* expectancy of −0.0795 R per leg before fees and funding;
+* i.e. relative strength **persisted** over the 48-bar horizon rather than
+  reverting, and the reversal rule paid the spread on both legs;
+* the sensitivity grid is monotone in the strength of the bet: k=1 (weakest
+  signal) is −0.027, k=3 is −0.137, and a longer lookback (72) is −0.104.
+
+#### Consequence for the program
+
+The sign of the cross-sectional effect is opposite to H-XS-001. The mirror
+hypothesis — long the strong, short the weak — is not a free find: it is the same
+information tested twice on the same window. It is nevertheless the only
+economically motivated hypothesis this data has produced with a measured *gross*
+effect larger than the cost drag (+0.0795 vs ~0.055 R), so it is worth one
+preregistered test with its parameters frozen before the holdout is touched.
+
