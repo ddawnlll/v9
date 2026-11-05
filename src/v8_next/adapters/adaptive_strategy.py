@@ -52,6 +52,7 @@ from v8_next.adapters.expert_strategy import (
     ExpertStrategyConfig,
     _bar_duration_ns,
 )
+from v8_next.adapters.native_callback_trace import capture_native_callback
 from v8_next.adapters.protection_invariants import (
     Direction,
     OrderRole,
@@ -372,6 +373,7 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self.order_markers: list[ArmOrderMarker] = []
         #: Protection-invariants input, in observed native order.
         self.protection_events: list[ProtectionEvent] = []
+        self.native_callback_trace: list[dict[str, Any]] = []
         self.book_transitions: list[dict[str, Any]] = []
         # ---- native order bookkeeping ---------------------------------------
         self._order_facts: dict[str, _OrderFacts] = {}
@@ -1084,6 +1086,7 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
     # ------------------------------------------------- native event translation
     def on_order_event(self, event: Any) -> None:
         """Record the native event, then translate it into a protection event."""
+        capture_native_callback(self.native_callback_trace, "on_order_event", event)
         super().on_order_event(event)
         kind = _PROTECTION_KIND.get(type(event).__name__)
         if kind is None:
@@ -1214,6 +1217,7 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self._live_protection[acknowledgement.client_order_id] = acknowledgement.position_id
 
     def on_position_opened(self, event: Any) -> None:
+        capture_native_callback(self.native_callback_trace, "on_position_opened", event)
         super().on_position_opened(event)
         position_id = str(getattr(event, "position_id", "") or "")
         if not position_id:
@@ -1259,7 +1263,12 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 replace(acknowledgement, position_id=resolved),
             )
 
+    def on_position_changed(self, event: Any) -> None:
+        capture_native_callback(self.native_callback_trace, "on_position_changed", event)
+        super().on_position_changed(event)
+
     def on_position_closed(self, event: Any) -> None:
+        capture_native_callback(self.native_callback_trace, "on_position_closed", event)
         super().on_position_closed(event)
         position_id = str(getattr(event, "position_id", "") or "")
         if not position_id:

@@ -587,6 +587,7 @@ def _measure(
             ],
             "events_applied": checker.events_applied,
             "transitions": protection_transitions,
+            "native_callback_trace": list(strategy.native_callback_trace),
             "snapshot": checker.snapshot(),
             "digest": checker.digest(),
         }
