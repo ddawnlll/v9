@@ -1,0 +1,264 @@
+{
+  "repo": "ddawnlll/v9",
+  "generated": "2026-11-05",
+  "counts": {
+    "total": 36,
+    "verified": 32,
+    "partial": 4,
+    "open": 0
+  },
+  "issues": [
+    {
+      "number": 2,
+      "planning_id": "M0-01",
+      "title": "Freeze migrated baseline and establish V9 provenance",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (reproducible baseline counts 1089/71/506; tape builder committed)"
+    },
+    {
+      "number": 3,
+      "planning_id": "M0-02",
+      "title": "Build independent two-campaign accounting oracle",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (arithmetic mismatch branch reachable, per-order sums)"
+    },
+    {
+      "number": 4,
+      "planning_id": "M0-03",
+      "title": "Enforce opportunity-to-cashflow lineage with fail-closed joins",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (opportunity layer enforced; report closure wired)"
+    },
+    {
+      "number": 5,
+      "planning_id": "M0-04",
+      "title": "Implement restart-safe DurableIntent and Outbox without duplicate risk",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (journal-level crash/duplicate/unknown-venue fail-closed)"
+    },
+    {
+      "number": 6,
+      "planning_id": "M0-05",
+      "title": "Qualify native bracket, reduce-only, partial-fill and protection invariants",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (single protection vocabulary, PARTIAL fail-closed)"
+    },
+    {
+      "number": 7,
+      "planning_id": "M0-06",
+      "title": "Reconcile funding boundary-time exposure, causal marks and account equity",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (future funding boundary excluded, report BLOCKED)"
+    },
+    {
+      "number": 8,
+      "planning_id": "M0-07",
+      "title": "Repair same-bar trade metrics and independent audit verdicts",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (post-entry lock; verdicts consumed by reports)"
+    },
+    {
+      "number": 9,
+      "planning_id": "M0-08",
+      "title": "Establish 4 GiB performance baseline, parity gate and incremental optimization",
+      "status": "PARTIAL",
+      "evidence": "PARTIAL: measured 28-expert/feature workloads on 2160 bars (1.34x, 5.73x); order/fill/report parity BLOCKED; 40-leg/12-month and 4 GiB cgroup NOT_RUN"
+    },
+    {
+      "number": 10,
+      "planning_id": "M1-01",
+      "title": "Implement PIT market observation and availability contract",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (PIT observation/availability contract)"
+    },
+    {
+      "number": 11,
+      "planning_id": "M1-02",
+      "title": "Build causal 15m/1h/4h multi-horizon context",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (causal 15m/1h/4h context)"
+    },
+    {
+      "number": 12,
+      "planning_id": "M1-03",
+      "title": "Implement MarketBeliefV1 as a versioned market-state view",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (MarketBeliefV1 schema, deterministic, PIT-bound)"
+    },
+    {
+      "number": 13,
+      "planning_id": "M1-04",
+      "title": "Implement incremental belief updates, transitions and abstention",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (clock-only ticks no longer advance hysteresis)"
+    },
+    {
+      "number": 14,
+      "planning_id": "M1-05",
+      "title": "Integrate all 28 expert witnesses as context-aware evidence producers",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (provenance content-bound, 28/28 coverage)"
+    },
+    {
+      "number": 15,
+      "planning_id": "M1-06",
+      "title": "Share incremental indicators and feature cache across all experts",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (1.34x warm, identical decision digest on real tape; 40-leg scope NOT_RUN)"
+    },
+    {
+      "number": 16,
+      "planning_id": "M2-01",
+      "title": "Extend canonical OpportunityBook for recurrent evaluations",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (PIT status history, snapshot, archive)"
+    },
+    {
+      "number": 17,
+      "planning_id": "M2-02",
+      "title": "Define typed TraderDecision, IntentKind and ReasonCode contracts",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (typed advisory contracts, no order path)"
+    },
+    {
+      "number": 18,
+      "planning_id": "M2-03",
+      "title": "Implement legal action priority and conflict-resolution policy",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (total legal-action table, documented precedence)"
+    },
+    {
+      "number": 19,
+      "planning_id": "M2-04",
+      "title": "Implement unified recurrent TraderDecisionPolicy in shadow mode",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (UNKNOWN belief now unusable evidence)"
+    },
+    {
+      "number": 20,
+      "planning_id": "M2-05",
+      "title": "Add immutable decision receipts and explainable policy provenance",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (receipts carry the policy constraints)"
+    },
+    {
+      "number": 21,
+      "planning_id": "M2-06",
+      "title": "Prove V8 policy-off parity and replay decision consistency",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (observable native sink; mutation gate falsifiable). Engine-level parity NOT_RUN"
+    },
+    {
+      "number": 22,
+      "planning_id": "M3-01",
+      "title": "Implement price-aware EntryIntent, order TTL and fill-uncertainty policy",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (full-record intent identity; fail-closed defaults; post-only passive side)"
+    },
+    {
+      "number": 23,
+      "planning_id": "M3-02",
+      "title": "Implement immutable PositionThesis and recurrent position evaluation",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (immutable thesis + recurrent evaluation; wired in the slice)"
+    },
+    {
+      "number": 24,
+      "planning_id": "M3-03",
+      "title": "Implement HOLD, REDUCE, EXIT and protective-intent proposal policies",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (shared ProtectionState; PARTIAL forces EXIT)"
+    },
+    {
+      "number": 25,
+      "planning_id": "M3-04",
+      "title": "Attribute factual occupancy and blocked portfolio opportunities",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (occupancy attribution, realized vs counterfactual separated)"
+    },
+    {
+      "number": 26,
+      "planning_id": "M3-05",
+      "title": "Implement constraint-aware portfolio allocation as a shadow challenger",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (deterministic challenger, caps/precision/no double spend)"
+    },
+    {
+      "number": 27,
+      "planning_id": "M3-06",
+      "title": "Validate PIT altcoin-perpetual universe and 20 USDT feasibility",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (as-of metadata filtered before contradiction scan). Economic universe NOT_RUN"
+    },
+    {
+      "number": 28,
+      "planning_id": "M3-07",
+      "title": "Deliver complete end-to-end Adaptive Shadow Trader vertical slice",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (six actions traced, no execution surface, engine parity NOT_RUN)"
+    },
+    {
+      "number": 29,
+      "planning_id": "M4-01",
+      "title": "Preregister economic hypotheses, matched baselines and acceptance gates",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (PASS requires result/gates/alpha/ordering; simple control arm required)"
+    },
+    {
+      "number": 30,
+      "planning_id": "M4-02",
+      "title": "Run costed native finalist replay and single-intervention ablations",
+      "status": "PARTIAL",
+      "evidence": "PARTIAL: costed V8 baseline measured (44 trades, net -21.23 USDT, net-R -0.0216, fees 37.92, funding 0.70, CI [-0.434, 0.391]); all five V9 arms NOT_RUN (adaptive orders disabled); microstructure UNSUPPORTED"
+    },
+    {
+      "number": 31,
+      "planning_id": "M4-03",
+      "title": "Implement walk-forward, multiple-testing and sealed OOS protocol",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (correction enforced, forged ledger authority refused)"
+    },
+    {
+      "number": 32,
+      "planning_id": "M4-04",
+      "title": "Qualify PIT altcoin universe and independent market regimes",
+      "status": "PARTIAL",
+      "evidence": "PARTIAL: coverage/regime machinery + real BTC slice report (2160/2160 bars, report_digest 72cbc814); altcoin universe BLOCKED (no tape, no delisting metadata)"
+    },
+    {
+      "number": 33,
+      "planning_id": "M4-05",
+      "title": "Run 24\u201348h shadow soak, fault injection and 4 GiB resource qualification",
+      "status": "PARTIAL",
+      "evidence": "PARTIAL: fault-injection matrix + soak harness with a 24 h qualification floor; real 24-48 h soak and 4 GiB cgroup qualification NOT_RUN"
+    },
+    {
+      "number": 34,
+      "planning_id": "M4-06",
+      "title": "Publish independent V9 scientific verdict and promotion matrix",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (earned ECONOMIC PASS predicates; test-log inspected; hashes reproducible)"
+    },
+    {
+      "number": 35,
+      "planning_id": "F-01",
+      "title": "Build durable GitHub issue queue, lease and crash recovery",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT (lease compare-and-swap, crash recovery, retry budget)"
+    },
+    {
+      "number": 36,
+      "planning_id": "F-02",
+      "title": "Implement bounded Pi issue-to-PR worker without production authority",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (lease-scoped block, capability validation, honest receipt). Real git/CI step NOT_RUN"
+    },
+    {
+      "number": 37,
+      "planning_id": "F-03",
+      "title": "Build durable research memory, audit receipts and agent-efficiency benchmark",
+      "status": "VERIFIED",
+      "evidence": "ACCEPT after audit repair (verified_findings <= findings; PENDING_REVIEW outcome)"
+    }
+  ]
+}

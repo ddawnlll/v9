@@ -372,6 +372,15 @@ def _write_preregistration(root: Path, *, costs: dict[str, object] | None = None
                     "kind": V9_INTERVENTION_KIND,
                 },
                 "costs": REGISTERED_COSTS if costs is None else costs,
+                "minimum_trades": 30,
+                "accepted_outcomes": ["NO_EDGE", "INCONCLUSIVE", "STOP", "INVALID"],
+                "hypothesis_budget": {
+                    "family": "v9-ablations-test",
+                    "max_hypotheses": 5,
+                    "max_trials": 5,
+                    "alpha": "0.05",
+                    "correction": "HOLM",
+                },
             }
         ),
         encoding="utf-8",
@@ -388,6 +397,7 @@ def _v9_arm(preregistration: Path, **overrides: object) -> ArmResult:
         "arm_id": PREREGISTERED_ARM_ID,
         "arm_kind": V9_INTERVENTION_KIND,
         "preregistration_digest": _prereg_digest(preregistration),
+        "trades": 44,
     }
     defaults.update(overrides)
     return _arm(**defaults)  # type: ignore[arg-type]
@@ -459,7 +469,13 @@ def test_publish_writes_a_digest_bound_result_the_verdict_accepts(tmp_path: Path
         prereg,
         net_return="1.25",
         verdict="pass",
-        uncertainty={"ci_low": "0.10", "ci_high": "2.00"},
+        uncertainty={
+            "correction": "HOLM",
+            "family_size": 5,
+            "ci_lower": "0.10",
+            "ci_upper": "2.00",
+            "alpha": "0.01",
+        },
     )
 
     payload = json.loads(written.read_text(encoding="utf-8"))
@@ -473,7 +489,8 @@ def test_publish_writes_a_digest_bound_result_the_verdict_accepts(tmp_path: Path
         "slippage_bps_per_side": "2",
         "funding_included": True,
     }
-    assert payload["uncertainty"] == {"ci_low": "0.10", "ci_high": "2.00"}
+    assert payload["uncertainty"]["ci_lower"] == "0.10"
+    assert payload["trades"] == 44
 
     verdict = _economic(tmp_path)
     assert verdict.status is DimensionStatus.PASS

@@ -1,0 +1,14 @@
+{"wave": 0, "tier": "baseline-T2", "command": "pytest -q", "passed": 1094, "skipped": 66, "deselected": 506, "wall_s": 12.7, "sha": "0b69fc4"}
+{"wave": 1, "tier": "T0", "command": "ruff check src tests", "result": "clean", "sha": "7b288cc"}
+{"wave": 1, "tier": "T0", "command": "mypy src", "result": "clean 220 files", "sha": "7b288cc"}
+{"wave": 1, "tier": "T2", "command": "pytest -q", "passed": 1897, "skipped": 66, "deselected": 506, "wall_s": 10.72, "sha": "7b288cc"}
+{"wave": 2, "tier": "T0", "command": "ruff check src tests", "result": "clean", "sha": "d497540"}
+{"wave": 2, "tier": "T0", "command": "mypy src", "result": "clean 234 files", "sha": "d497540"}
+{"wave": 2, "tier": "T2", "command": "pytest -q", "passed": 2151, "skipped": 66, "deselected": 512, "wall_s": 12.0, "sha": "d497540"}
+{"wave": "2-repair", "tier": "T2", "command": "pytest -q", "passed": 2188, "skipped": 66, "deselected": 512, "wall_s": 11.63, "sha": "a6b5697"}
+{"wave": 3, "tier": "T2", "command": "pytest -q", "passed": 2485, "skipped": 67, "deselected": 513, "wall_s": 11.88, "sha": "fda4580"}
+{"wave": 3, "tier": "T2", "passed": 2485, "skipped": 67, "deselected": 513, "wall_s": 12.26}
+{"wave": "final", "tier": "T2", "command": "pytest -q", "passed": 2676, "skipped": 67, "deselected": 512, "wall_s": 14.33, "sha": "7f1bcfe"}
+{"wave": 4, "tier": "T2", "passed": 2624, "skipped": 67, "deselected": 513, "wall_s": 13.98}
+{"wave": 5, "tier": "T2", "passed": 2713, "skipped": 67, "deselected": 512, "wall_s": 16.08}
+{"wave": 5, "tier": "T0", "ruff": "clean", "mypy": "clean"}

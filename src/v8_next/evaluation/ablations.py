@@ -637,6 +637,11 @@ def publish_costed_result(
         "net_return": str(net),
         "verdict": declared_verdict,
     }
+    # The trade count is part of the measurement, not an optional note: the
+    # verdict gate refuses a PASS below the registered minimum, so the producer
+    # carries what the arm actually observed (and refuses to invent it).
+    if arm.trades is not None:
+        payload["trades"] = int(arm.trades)
     if uncertainty is not None:
         if not isinstance(uncertainty, Mapping):
             raise CostedResultError(
