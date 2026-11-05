@@ -13,9 +13,12 @@ challenger`` -> ``DecisionReceipt``.
 The V8 native replay stays the validated control arm: the caller supplies a
 frozen :class:`~v8_next.evaluation.shadow_parity.ReplayScript` and this module
 captures its six native digests *before* and *after* the adaptive chain with
-:func:`~v8_next.evaluation.shadow_parity.capture_replay` (policy ``OFF``), then
-requires the two captures to be identical and the resulting shadow signature to
-pass :func:`~v8_next.evaluation.shadow_parity.assert_shadow_unmutated`. Every
+:func:`~v8_next.evaluation.shadow_parity.capture_replay` (policy ``OFF``),
+requiring the two captures to be identical. That is a determinism check of the
+control arm, not engine parity: this module has no execution surface to compare
+against, so it never claims parity. The trace records the structural property it
+can actually prove — ``verification="NO_EXECUTION_SURFACE"`` with an empty
+``native_side_effects`` tuple — and pins ``engine_parity="NOT_RUN"``. Every
 novel adaptive decision is recorded in shadow only.
 
 What it deliberately is not
@@ -155,7 +158,6 @@ from v8_next.evaluation.shadow_parity import (
     ReplayScript,
     ReplaySignature,
     ShadowNotExercised,
-    assert_shadow_unmutated,
     capture_replay,
     pin,
 )
@@ -326,6 +328,12 @@ class HardRiskLimits(BaseModel):
     max_size: StrictDecimal | None = None
     tick_size: StrictDecimal | None = None
     min_notional: StrictDecimal | None = None
+    #: Exact attribution of ``committed_exposure`` the risk plane supplies, if any.
+    #: The slice never derives these from the account total: charging the whole
+    #: account commitment to every candidate both double-counts it and vetoes every
+    #: instrument. ``None`` means *unknown*, which the challenger refuses closed.
+    instrument_committed: Mapping[str, StrictDecimal] | None = None
+    sector_committed: Mapping[str, StrictDecimal] | None = None
 
 
 class RiskObservation(BaseModel):
@@ -683,7 +691,17 @@ def _canonical_events(script: Sequence[MarketEvent]) -> tuple[MarketEvent, ...]:
 # trace surface
 # --------------------------------------------------------------------------- #
 class ParityBlock(BaseModel):
-    """The control-arm comparison captured around one adaptive run."""
+    """The control-arm state captured around one run — not an engine-parity claim.
+
+    ``verification`` names the property the slice actually established:
+    ``NO_EXECUTION_SURFACE`` for an adaptive run (structurally empty
+    ``native_side_effects``, no imported order path) or
+    ``POLICY_OFF_CONTROL_UNCHANGED`` for a disabled one. ``reference``/``observed``
+    are the two policy-off captures taken around the run; equality of the two
+    proves the control replay is deterministic, not that a shadow engine agrees
+    with the native one. ``engine_parity`` is therefore pinned ``NOT_RUN``: no
+    engine-level comparison exists anywhere in this slice.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -693,7 +711,7 @@ class ParityBlock(BaseModel):
     reference: str
     observed: str
     unchanged: bool
-    shadow: str | None = None
+    engine_parity: Literal["NOT_RUN"] = "NOT_RUN"
 
 
 class TraceStep(BaseModel):
@@ -726,6 +744,8 @@ class TraceStep(BaseModel):
     advisory_action: DecisionAction | None = None
     advisory_proposal_ids: tuple[str, ...] = ()
     allocation_outcome: str | None = None
+    #: The challenger's own reason for that outcome (``None`` when not attempted).
+    allocation_reason: str | None = None
     allocation_id: str | None = None
     #: Every proposal this step emitted is advisory; there is no other mode.
     advisory_only: Literal[True] = True
@@ -1082,7 +1102,7 @@ class ShadowTrader:
         if adaptive:
             steps, receipts = self._evaluate(events)
         observed = capture_replay(self._control, policy_state=POLICY_OFF)
-        parity = self._parity(reference, observed, receipts, adaptive)
+        parity = self._parity(reference, observed, adaptive)
         return ShadowTrace(
             adaptive_layer=adaptive,
             steps=steps,
@@ -1096,7 +1116,6 @@ class ShadowTrader:
         self,
         reference: ReplaySignature,
         observed: ReplaySignature,
-        receipts: Sequence[DecisionReceipt],
         adaptive: bool,
     ) -> ParityBlock:
         if reference != observed:
@@ -1113,29 +1132,18 @@ class ShadowTrader:
                 observed=pin(observed),
                 unchanged=True,
             )
-        shadow = ReplaySignature(
-            policy_state=POLICY_SHADOW,
-            opportunity=observed.opportunity,
-            orders=observed.orders,
-            protection=observed.protection,
-            fills=observed.fills,
-            funding=observed.funding,
-            lineage=observed.lineage,
-            decisions=canonical_digest(
-                f"{SLICE_VERSION}.decisions",
-                [[receipt.decision_id, receipt.digest] for receipt in receipts],
-            ),
-            decision_ids=tuple(receipt.decision_id for receipt in receipts),
-        )
-        assert_shadow_unmutated(reference, shadow)
+        # No shadow signature is fabricated here. Re-labelling the control capture
+        # as a "shadow" signature and then comparing it to itself would be a check
+        # that can never fail. What this slice can prove is structural: it exposes
+        # no execution surface and emits no native side effect. Engine-level
+        # parity with the native arm is NOT_RUN (there is no engine to compare).
         return ParityBlock(
             policy_state=POLICY_SHADOW,
-            verification="SHADOW_UNMUTATED",
+            verification="NO_EXECUTION_SURFACE",
             native_streams=NATIVE_STREAMS,
             reference=pin(reference),
             observed=pin(observed),
             unchanged=True,
-            shadow=pin(shadow),
         )
 
     # ---------------------------------------------------------------- the run
@@ -1228,6 +1236,7 @@ class ShadowTrader:
         steps: list[TraceStep] = []
         for proposal in proposals:
             outcome_value: str | None = None
+            outcome_reason: str | None = None
             allocation_id: str | None = None
             if proposal.candidate is not None:
                 if allocation is None:
@@ -1237,12 +1246,14 @@ class ShadowTrader:
                     outcome = allocation.outcome_for(proposal.candidate.opportunity_id)
                     if outcome is not None:
                         outcome_value = outcome.outcome.value
+                        outcome_reason = outcome.reason.value
                     else:
                         outcome_value = ALLOCATION_NOT_ATTEMPTED
             steps.append(
                 proposal.step.model_copy(
                     update={
                         "allocation_outcome": outcome_value,
+                        "allocation_reason": outcome_reason,
                         "allocation_id": allocation_id,
                     }
                 )
@@ -1283,6 +1294,9 @@ class ShadowTrader:
         bounds come from each candidate's own instrument reading, because a grid is
         a venue property, not an account one. An incomplete grid refuses the whole
         batch instead of allocating the other candidates on a guessed grid.
+        ``committed_exposure`` is a total, not an attribution: it is charged to an
+        instrument or sector only through the risk plane's declared split, never
+        by copying the total onto each candidate.
         """
         if not candidates:
             return None
@@ -1336,14 +1350,15 @@ class ShadowTrader:
                     min_notional=min_notional,
                 )
             )
-        instrument_committed = None
-        sector_committed = None
-        if committed is not None and committed > ZERO:
-            sector = limits.sector or "UNKNOWN"
-            instrument_committed = {
-                candidate.instrument: committed for candidate in allocation_candidates
-            }
-            sector_committed = {sector: committed}
+        # Existing commitment is attributed only from the risk plane's own exact
+        # split. The account total is *not* an attribution: copying it onto every
+        # candidate makes the maps sum to N x committed (which the challenger
+        # rejects as inconsistent) and, with one candidate, charges the whole
+        # account to that instrument and vetoes the entry. When the split is
+        # unknown the maps stay ``None`` and the challenger fails closed with its
+        # own UNKNOWN_EXPOSURE_DETAIL reason.
+        instrument_committed = limits.instrument_committed
+        sector_committed = limits.sector_committed
         return allocate_challenger(
             tuple(allocation_candidates),
             equity=equity,

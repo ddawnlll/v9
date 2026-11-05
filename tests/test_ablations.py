@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -19,14 +20,17 @@ from v8_next.evaluation.ablations import (
     MICROSTRUCTURE_UNSUPPORTED,
     MICROSTRUCTURE_UNSUPPORTED_TOKEN,
     NOT_RUN_ADAPTIVE_ORDERS,
+    V9_INTERVENTION_KIND,
     AblationReport,
     ArmResult,
+    CostedResultError,
     Intervention,
     Provenance,
     bootstrap_mean_ci,
     build_report,
     compute_delta,
     main,
+    publish_costed_result,
     run_native_baseline,
 )
 
@@ -73,6 +77,8 @@ def _arm(
     samples: tuple[float, ...] = (0.0, 1.0),
     unsupported: tuple[str, ...] = (),
     provenance: Provenance | None = None,
+    arm_kind: str | None = None,
+    preregistration_digest: str | None = None,
 ) -> ArmResult:
     return ArmResult(
         arm_id=arm_id,
@@ -95,6 +101,8 @@ def _arm(
         risk_basis="BRACKET_RISK",
         open_campaigns=1,
         unsupported=unsupported,
+        arm_kind=arm_kind,
+        preregistration_digest=preregistration_digest,
     )
 
 
@@ -298,8 +306,177 @@ def test_delta_refuses_an_uncosted_arm() -> None:
 
     with pytest.raises(ValueError, match="both arms costed"):
         compute_delta(_arm(), uncosted)
-    with pytest.raises(ValueError, match="both arms costed"):
-        compute_delta(uncosted, _arm(intervention=Intervention.BELIEF))
+
+
+def test_delta_refuses_arms_measured_on_different_tapes() -> None:
+    baseline = _arm(provenance=_provenance("a" * 64))
+    treatment = _arm(
+        arm_id="belief_arm",
+        intervention=Intervention.BELIEF,
+        provenance=_provenance("b" * 64),
+    )
+
+    with pytest.raises(ValueError, match="mismatched: tape"):
+        compute_delta(baseline, treatment)
+
+
+def test_delta_refuses_arms_measured_on_a_different_engine_or_profile() -> None:
+    baseline = _arm()
+    other_engine = replace(_provenance(), engine="some_other_engine", engine_version="9.9.9")
+    other_profile = replace(_provenance(), execution_profile_digest="e" * 64)
+
+    for provenance, mismatch in (
+        (other_engine, "engine, engine_version"),
+        (other_profile, "execution_profile_digest"),
+    ):
+        treatment = _arm(
+            arm_id="entry_timing_arm",
+            intervention=Intervention.ENTRY_TIMING,
+            provenance=provenance,
+        )
+        with pytest.raises(ValueError, match=f"mismatched: {mismatch}"):
+            compute_delta(baseline, treatment)
+
+
+def test_delta_accepts_arms_measured_on_one_basis() -> None:
+    delta = compute_delta(_arm(), _arm(
+        arm_id="belief_arm",
+        intervention=Intervention.BELIEF,
+        net_r=0.7,
+    ))
+    assert delta.delta_net_r == pytest.approx(0.2)
+
+
+# --------------------------------------------------------------------------- #
+# the costed-result producer (shared contract)
+# --------------------------------------------------------------------------- #
+REGISTERED_COSTS = {
+    "fee_bps_per_side": "5",
+    "funding_bps_per_day": "1",
+    "slippage_bps_per_side": "2",
+    "funding_included": True,
+}
+PREREGISTERED_ARM_ID = "v9-adaptive-policy"
+
+
+def _write_preregistration(root: Path, *, costs: dict[str, object] | None = None) -> Path:
+    path = root / "reports" / "evaluation" / "preregistration.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "hypothesis_id": "V9-H1-test",
+                "dataset_role": "DEVELOPMENT",
+                "intervention": {
+                    "arm_id": PREREGISTERED_ARM_ID,
+                    "kind": V9_INTERVENTION_KIND,
+                },
+                "costs": REGISTERED_COSTS if costs is None else costs,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _prereg_digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _v9_arm(preregistration: Path, **overrides: object) -> ArmResult:
+    defaults: dict[str, object] = {
+        "arm_id": PREREGISTERED_ARM_ID,
+        "arm_kind": V9_INTERVENTION_KIND,
+        "preregistration_digest": _prereg_digest(preregistration),
+    }
+    defaults.update(overrides)
+    return _arm(**defaults)  # type: ignore[arg-type]
+
+
+def _publish(arm: ArmResult | None, preregistration: Path, **overrides: object) -> Path:
+    arguments: dict[str, object] = {
+        "costs": REGISTERED_COSTS,
+        "net_return": "1.25",
+        "verdict": "PASS",
+        "preregistration_path": preregistration,
+        "output_path": preregistration.parent / "costed_result.json",
+    }
+    arguments.update(overrides)
+    return publish_costed_result(arm, **arguments)  # type: ignore[arg-type]
+
+
+def test_publish_refuses_an_absent_or_uncosted_arm_and_writes_nothing(tmp_path: Path) -> None:
+    prereg = _write_preregistration(tmp_path)
+    out = prereg.parent / "costed_result.json"
+
+    with pytest.raises(CostedResultError, match="ARM_MISSING"):
+        _publish(None, prereg)
+    with pytest.raises(CostedResultError, match="NOT_COSTED"):
+        _publish(_v9_arm(prereg, costed=False), prereg)
+    assert not out.exists()
+
+
+def test_publish_refuses_the_v8_baseline_arm(tmp_path: Path) -> None:
+    prereg = _write_preregistration(tmp_path)
+    baseline = _arm(
+        arm_id=BASELINE_ARM_ID,
+        arm_kind="V8_BASELINE",
+        preregistration_digest=_prereg_digest(prereg),
+    )
+
+    with pytest.raises(CostedResultError, match="NOT_V9_INTERVENTION"):
+        _publish(baseline, prereg)
+    assert not (prereg.parent / "costed_result.json").exists()
+
+
+def test_publish_refuses_a_digest_or_cost_mismatch(tmp_path: Path) -> None:
+    prereg = _write_preregistration(tmp_path)
+    out = prereg.parent / "costed_result.json"
+
+    with pytest.raises(CostedResultError, match="DIGEST_MISMATCH"):
+        _publish(_v9_arm(prereg, preregistration_digest="0" * 64), prereg)
+    with pytest.raises(CostedResultError, match="COSTS_DIFFER_FROM_REGISTRATION"):
+        _publish(
+            _v9_arm(prereg),
+            prereg,
+            costs={**REGISTERED_COSTS, "fee_bps_per_side": "6"},
+        )
+    with pytest.raises(CostedResultError, match="PREREGISTRATION_MISSING"):
+        _publish(_v9_arm(prereg), tmp_path / "absent.json")
+    assert not out.exists()
+
+
+def test_publish_writes_a_digest_bound_result_the_verdict_accepts(tmp_path: Path) -> None:
+    from v8_next.evaluation.verdict import DimensionStatus, _economic
+
+    prereg = _write_preregistration(tmp_path)
+    (prereg.parent / "access_report.json").write_text(
+        json.dumps({"permitted_roles": ["DEVELOPMENT"]}), encoding="utf-8"
+    )
+
+    written = _publish(
+        _v9_arm(prereg),
+        prereg,
+        net_return="1.25",
+        verdict="pass",
+        uncertainty={"ci_low": "0.10", "ci_high": "2.00"},
+    )
+
+    payload = json.loads(written.read_text(encoding="utf-8"))
+    assert payload["preregistration_digest"] == _prereg_digest(prereg)
+    assert payload["dataset_role"] == "DEVELOPMENT"
+    assert payload["net_return"] == "1.25"
+    assert payload["verdict"] == "PASS"
+    assert payload["costs"] == {
+        "fee_bps_per_side": "5",
+        "funding_bps_per_day": "1",
+        "slippage_bps_per_side": "2",
+        "funding_included": True,
+    }
+    assert payload["uncertainty"] == {"ci_low": "0.10", "ci_high": "2.00"}
+
+    verdict = _economic(tmp_path)
+    assert verdict.status is DimensionStatus.PASS
 
 
 def test_bootstrap_ci_is_deterministic_and_exact_for_constant_samples() -> None:

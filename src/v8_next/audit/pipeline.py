@@ -1646,10 +1646,12 @@ def _economic_section(
 ) -> tuple[VerdictState, tuple[str, ...], tuple[str, ...]]:
     """Economic state, from the run's own reconciliation evidence only.
 
-    ``PASS`` requires the published conservation check to be present, within its
-    own tolerance and free of unexplained cashflows, and the realized PnL figure
-    to be published. A missing or residual-failing reconciliation is
-    ``INCOMPLETE`` — never a pass by omission.
+    ``PASS`` requires a closed campaign to exist, the published conservation
+    check to be present, within its own tolerance and free of unexplained
+    cashflows, and the realized PnL figure to be published. An open-only run is
+    ``INCOMPLETE`` (``ECONOMIC_NO_CLOSED_CAMPAIGN``): nothing was realized, so a
+    balanced reconciliation cannot evidence an economic outcome. A missing or
+    residual-failing reconciliation is ``INCOMPLETE`` — never a pass by omission.
     """
     if not lifecycles:
         return VerdictState.NOT_RUN, ("ECONOMIC_NO_TRADE_ROWS",), ()
@@ -1669,6 +1671,17 @@ def _economic_section(
         if str(row.get("position_status") or "").upper() == "CLOSED"
         or row.get("closed_ns") is not None
     ]
+    if not closed_rows:
+        # A run that closed nothing has no realized economic outcome to reconcile.
+        # The reconciliation file may still balance (nothing moved, or the ledger
+        # only marks open campaigns), so a residual within tolerance is *not*
+        # evidence of a realized edge. Reporting PASS here would let an open-only
+        # run render AUDIT_COMPLETE.
+        return (
+            VerdictState.INCOMPLETE,
+            ("ECONOMIC_NO_CLOSED_CAMPAIGN",),
+            ("OPEN_ONLY_NO_CLOSED_CAMPAIGN",),
+        )
     missing_pnl = sum(
         1
         for row in closed_rows
@@ -1916,6 +1929,23 @@ def _cashflow_records(
     return records
 
 
+#: Keys that make a ``fills.jsonl`` line a persisted fill claim rather than a
+#: placeholder row. A row with none of them was never a fill to begin with.
+_FILL_ROW_KEYS = (
+    "last_trade_id",
+    "trade_id",
+    "fill_id",
+    "client_order_id",
+    "venue_order_id",
+    "ts_last",
+    "event_time_ns",
+)
+
+
+def _is_fill_row(fill: Mapping[str, Any]) -> bool:
+    return any(fill.get(key) is not None for key in _FILL_ROW_KEYS)
+
+
 def _lineage_from_disk(
     store: AuditStore, fills: Sequence[Mapping[str, Any]]
 ) -> tuple[LineageChain | None, int | None]:
@@ -1923,12 +1953,25 @@ def _lineage_from_disk(
 
     Returns ``None`` when the run persisted no decision/order/fill/cashflow row,
     so a run that never claimed a chain is not downgraded for the absence of one.
+    When rows *were* persisted but every one lacked the identity needed to join,
+    an empty ``LineageChain`` is returned with ``as_of_ns=0``: the claim exists,
+    it cannot be certified, and ``certify`` reports BLOCKED.
     Every join is by an explicit id; a row that lacks its parent key keeps the
     blank key and is reported as a violation by :func:`~v8_next.audit.lineage.certify`.
     The certification cut is the latest availability persisted with the chain, so
     re-deriving from the same directory can never produce a different label.
     """
     events = _jsonl_rows(store, "events.jsonl")
+    # Any persisted chain-layer row counts as a claim, even when every row later
+    # turns out to be unidentifiable. Dropping such rows and returning "no chain"
+    # would silently convert a broken ledger into "nothing was claimed" — and the
+    # report could then render COMPLETE for a run whose fills cannot be joined.
+    chain_row_persisted = any(_is_fill_row(fill) for fill in fills) or any(
+        str(event.get("event_type") or "") in _DECISION_EVENT_TYPES
+        or str(event.get("event_type") or "") in _ORDER_EVENT_TYPES
+        or str(event.get("event_type") or "") == "CASHFLOW_RECORDED"
+        for event in events
+    )
     decisions = [
         event
         for event in events
@@ -1940,6 +1983,13 @@ def _lineage_from_disk(
     fill_records = _fill_records(fills, orders, _venue_client_map(events))
     cashflows = _cashflow_records(events, fill_records)
     if not (decisions or orders or fill_records or cashflows):
+        if chain_row_persisted:
+            # The run persisted fills/orders/decisions/cashflows but none of them
+            # carried enough identity to join. Return an empty *declared* chain so
+            # ``certify`` reports the structural gap and the report is BLOCKED;
+            # returning no chain would treat the claim as absent and let the
+            # label reach COMPLETE.
+            return LineageChain(), 0
         return None, None
 
     decision_rows: list[LineageDecision] = []

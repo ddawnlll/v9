@@ -127,10 +127,16 @@ def _quote(index: int) -> QuoteUpdate:
     )
 
 
-def _limits(equity: str = "1200") -> HardRiskLimits:
+def _limits(
+    equity: str = "1200",
+    *,
+    committed: str = "0",
+    instrument_committed: dict[str, Decimal] | None = None,
+    sector_committed: dict[str, Decimal] | None = None,
+) -> HardRiskLimits:
     return HardRiskLimits(
         equity=Decimal(equity),
-        committed_exposure=Decimal("0"),
+        committed_exposure=Decimal(committed),
         max_gross_exposure=Decimal("900"),
         max_per_sector=Decimal("600"),
         risk_budget=Decimal("300"),
@@ -141,6 +147,8 @@ def _limits(equity: str = "1200") -> HardRiskLimits:
         max_size=Decimal("100"),
         tick_size=Decimal("0.01"),
         min_notional=Decimal("10"),
+        instrument_committed=instrument_committed,
+        sector_committed=sector_committed,
     )
 
 
@@ -527,26 +535,28 @@ def test_trace_reports_no_native_side_effects() -> None:
     assert trace.native_side_effects == ()
     assert isinstance(trace.native_side_effects, tuple)
     assert trace.parity.unchanged is True
-    assert trace.parity.verification == "SHADOW_UNMUTATED"
+    # The adaptive run proves a structural property, not engine parity.
+    assert trace.parity.verification == "NO_EXECUTION_SURFACE"
+    assert trace.parity.engine_parity == "NOT_RUN"
     assert trace.parity.reference == trace.parity.observed
-    assert trace.parity.shadow is not None
 
 
-def test_native_control_matches_the_policy_off_capture_around_the_run() -> None:
+def test_control_capture_is_deterministic_and_no_engine_parity_is_claimed() -> None:
     trace = _trace()
     policy_off = sp.capture_replay(_native_control(), policy_state=sp.POLICY_OFF)
 
+    # The two policy-off captures around the run are the same replay: the control
+    # arm is deterministic. This is *not* evidence that a shadow engine agrees
+    # with the native one, and the trace does not claim that it is.
     assert trace.parity.reference == sp.pin(policy_off)
     assert trace.parity.observed == sp.pin(policy_off)
     assert trace.parity.policy_state == sp.POLICY_SHADOW
     assert trace.parity.native_streams == sp.NATIVE_STREAMS
+    assert trace.parity.engine_parity == "NOT_RUN"
+    assert not hasattr(trace.parity, "shadow")
     for stream in sp.NATIVE_STREAMS:
         assert policy_off.digest(stream) is not None
-
-    # The shadow signature built by the slice is *not* native and proves it.
-    shadow = sp.ReplaySignature.model_validate(json.loads(trace.parity.shadow or "{}"))
-    sp.assert_shadow_unmutated(policy_off, shadow)
-    assert shadow.decision_ids == trace.receipt_ids
+    assert trace.parity.verification == "NO_EXECUTION_SURFACE"
 
 
 def test_trace_model_refuses_a_native_side_effect() -> None:
@@ -662,7 +672,7 @@ def test_disabled_adaptive_layer_produces_no_decision_and_no_native_drift() -> N
     assert trace.parity.policy_state == sp.POLICY_OFF
     assert trace.parity.verification == "POLICY_OFF_CONTROL_UNCHANGED"
     assert trace.parity.reference == trace.parity.observed == sp.pin(policy_off)
-    assert trace.parity.shadow is None
+    assert trace.parity.engine_parity == "NOT_RUN"
 
     payload = trace.model_dump()
     payload["steps"] = (_trace().steps[0].model_dump(),)
@@ -808,8 +818,10 @@ def _mirror(instrument_id: str) -> list[object]:
     return events
 
 
-def test_simultaneous_candidates_are_allocated_by_the_portfolio_plane() -> None:
-    other = "ETHUSDT-PERP.BINANCE"
+OTHER = "ETHUSDT-PERP.BINANCE"
+
+
+def _two_candidate_script() -> list[object]:
     script = [
         event
         for event in _script()
@@ -819,7 +831,7 @@ def test_simultaneous_candidates_are_allocated_by_the_portfolio_plane() -> None:
         CutUpdate(
             event_time_ns=BASE + 90 * M15,
             available_at_ns=BASE + 90 * M15,
-            instruments=(IID, other),
+            instruments=(IID, OTHER),
         )
     )
     # The second instrument needs its own belief history, so it is cut at the same
@@ -828,21 +840,90 @@ def test_simultaneous_candidates_are_allocated_by_the_portfolio_plane() -> None:
         CutUpdate(
             event_time_ns=BASE + closed * M15,
             available_at_ns=BASE + closed * M15,
-            instruments=(other,),
+            instruments=(OTHER,),
         )
         for closed in (4, 12, 20)
     )
-    script.extend(_mirror(other))
-    trace = _trader().run(script)
+    script.extend(_mirror(OTHER))
+    return script
+
+
+def _with_commitment(
+    script: list[object],
+    *,
+    committed: str,
+    instrument_committed: dict[str, Decimal] | None = None,
+    sector_committed: dict[str, Decimal] | None = None,
+) -> list[object]:
+    """Re-publish every fresh risk reading with a committed total (and optional split)."""
+    limits = _limits(
+        committed=committed,
+        instrument_committed=instrument_committed,
+        sector_committed=sector_committed,
+    )
+    rewritten: list[object] = []
+    for event in script:
+        if isinstance(event, RiskUpdate) and event.observation.status is RiskStatus.AVAILABLE:
+            event = event.model_copy(
+                update={"observation": event.observation.model_copy(update={"limits": limits})}
+            )
+        rewritten.append(event)
+    return rewritten
+
+
+def test_simultaneous_candidates_are_allocated_by_the_portfolio_plane() -> None:
+    trace = _trader().run(_two_candidate_script())
 
     entries = [step for step in trace.steps if step.action is DecisionAction.ENTER]
-    assert {step.instrument_id for step in entries} == {IID, other}
+    assert {step.instrument_id for step in entries} == {IID, OTHER}
     assert len(entries) == 2
     (allocation_ids,) = {step.allocation_id for step in entries}
     assert allocation_ids is not None
     assert {step.allocation_outcome for step in entries} == {"ADMITTED"}
     assert all(step.entry_intent_id is not None for step in entries)
     assert [step.cut_time_ns for step in entries] == [BASE + 90 * M15, BASE + 90 * M15]
+
+
+# --------------------------------------------------------------------------- #
+# committed exposure is attributed, never copied onto every candidate
+# --------------------------------------------------------------------------- #
+def test_committed_exposure_with_a_real_split_allocates_both_candidates() -> None:
+    """The risk plane's own per-instrument/per-sector split is honoured as supplied."""
+    script = _with_commitment(
+        _two_candidate_script(),
+        committed="100",
+        instrument_committed={"SOLUSDT-PERP.BINANCE": Decimal("100")},
+        sector_committed={"CRYPTO": Decimal("100")},
+    )
+    trace = _trader().run(script)
+
+    entries = [step for step in trace.steps if step.action is DecisionAction.ENTER]
+    assert {step.instrument_id for step in entries} == {IID, OTHER}
+    assert len(entries) == 2
+    assert {step.allocation_outcome for step in entries} == {"ADMITTED"}
+    assert {step.allocation_reason for step in entries} == {"CAPACITY_AVAILABLE"}
+
+
+def test_committed_exposure_without_a_split_fails_closed_as_unknown() -> None:
+    """No attribution is never invented: the challenger reports its honest UNKNOWN."""
+    script = _with_commitment(_two_candidate_script(), committed="100")
+    trace = _trader().run(script)
+
+    entries = [step for step in trace.steps if step.action is DecisionAction.ENTER]
+    assert len(entries) == 2  # the risk plane is not an entry veto
+    assert {step.allocation_outcome for step in entries} == {"BLOCKED_EXPOSURE"}
+    # Not INCONSISTENT_EXPOSURE_INPUT (the old fabricated 2x attribution) and not
+    # EXISTING_INSTRUMENT_EXPOSURE: the slice simply has no split to offer.
+    assert {step.allocation_reason for step in entries} == {"UNKNOWN_EXPOSURE_DETAIL"}
+    (allocation_ids,) = {step.allocation_id for step in entries}
+    assert allocation_ids is not None
+
+
+def test_zero_committed_exposure_needs_no_attribution() -> None:
+    trace = _trace()
+    (enter,) = [step for step in trace.steps if step.action is DecisionAction.ENTER]
+    assert enter.allocation_outcome == "ADMITTED"
+    assert enter.allocation_reason == "CAPACITY_AVAILABLE"
 
 
 # --------------------------------------------------------------------------- #
