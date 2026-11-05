@@ -1,109 +1,45 @@
 {
   "alpha_after_holm": 0.05,
   "candidates": {
-    "bollinger_reversion": {
-      "control_mean_r": -0.044735629884465014,
-      "holm_p": 1.0,
-      "net_expectancy_r": -0.12099052397922747,
-      "p_value": 0.724,
+    "funding_extreme_reversion": {
+      "control_mean_r": -0.04329073098847111,
+      "holm_p": 0.645,
+      "net_expectancy_r": -0.13811352850852573,
+      "p_value": 0.645,
       "reasons": [
         "NON_POSITIVE_EXPECTANCY",
         "NOT_ABOVE_RANDOM_ENTRY",
-        "CONCENTRATED:0<6",
+        "CONCENTRATED:3<6",
         "CONTROL_P_VALUE_NOT_SIGNIFICANT"
       ],
       "sensitivity": {
-        "{\"k\": 1.5}": {
-          "net_profit_factor": 0.8524817990091053,
-          "pooled_net_expectancy_r": -0.10308009551453409,
-          "trades": 8167
+        "{\"quantile\": 0.05}": {
+          "net_profit_factor": 0.8340856602740073,
+          "pooled_net_expectancy_r": -0.11626198231852941,
+          "trades": 340
         },
-        "{\"k\": 2.5}": {
-          "net_profit_factor": 0.9185609955489068,
-          "pooled_net_expectancy_r": -0.05615773771464227,
-          "trades": 1202
+        "{\"quantile\": 0.2}": {
+          "net_profit_factor": 0.7405606748395845,
+          "pooled_net_expectancy_r": -0.1898507021230281,
+          "trades": 1103
         },
-        "{\"window\": 10}": {
-          "net_profit_factor": 0.9100645940519779,
-          "pooled_net_expectancy_r": -0.06177657807342762,
-          "trades": 2687
+        "{\"window\": 15}": {
+          "net_profit_factor": 0.7746679096089266,
+          "pooled_net_expectancy_r": -0.16294438403712871,
+          "trades": 808
         },
-        "{\"window\": 40}": {
-          "net_profit_factor": 0.8364643167111022,
-          "pooled_net_expectancy_r": -0.11572762063000262,
-          "trades": 3813
+        "{\"window\": 60}": {
+          "net_profit_factor": 0.7746585624792041,
+          "pooled_net_expectancy_r": -0.16258724370754715,
+          "trades": 477
         }
       },
       "status": "NO_EDGE",
-      "symbols_positive": 0,
-      "trades": 3495
-    },
-    "liquidity_sweep_reclaim": {
-      "control_mean_r": -0.044636419605305774,
-      "holm_p": 1.0,
-      "net_expectancy_r": -0.11161377893884972,
-      "p_value": 0.6715,
-      "reasons": [
-        "NON_POSITIVE_EXPECTANCY",
-        "NOT_ABOVE_RANDOM_ENTRY",
-        "CONCENTRATED:1<6",
-        "CONTROL_P_VALUE_NOT_SIGNIFICANT"
-      ],
-      "sensitivity": {
-        "{\"lookback\": 12}": {
-          "net_profit_factor": 0.852988996181407,
-          "pooled_net_expectancy_r": -0.10251801028048026,
-          "trades": 4206
-        },
-        "{\"lookback\": 48}": {
-          "net_profit_factor": 0.8630900554236435,
-          "pooled_net_expectancy_r": -0.09608012936969,
-          "trades": 1742
-        }
-      },
-      "status": "NO_EDGE",
-      "symbols_positive": 1,
-      "trades": 2695
-    },
-    "volume_climax_reversal": {
-      "control_mean_r": -0.043896206900649874,
-      "holm_p": 0.7905,
-      "net_expectancy_r": -0.22248140974466749,
-      "p_value": 0.7905,
-      "reasons": [
-        "NON_POSITIVE_EXPECTANCY",
-        "NOT_ABOVE_RANDOM_ENTRY",
-        "CONCENTRATED:0<6",
-        "CONTROL_P_VALUE_NOT_SIGNIFICANT"
-      ],
-      "sensitivity": {
-        "{\"multiple\": 3.0}": {
-          "net_profit_factor": 0.7834241679938092,
-          "pooled_net_expectancy_r": -0.15866409927838196,
-          "trades": 1508
-        },
-        "{\"multiple\": 6.0}": {
-          "net_profit_factor": 0.6039062214110328,
-          "pooled_net_expectancy_r": -0.31701844725899997,
-          "trades": 300
-        },
-        "{\"window\": 100}": {
-          "net_profit_factor": 0.7441108249244386,
-          "pooled_net_expectancy_r": -0.19227522177249387,
-          "trades": 818
-        },
-        "{\"window\": 20}": {
-          "net_profit_factor": 0.7224545540303828,
-          "pooled_net_expectancy_r": -0.20764762473550488,
-          "trades": 614
-        }
-      },
-      "status": "NO_EDGE",
-      "symbols_positive": 0,
-      "trades": 797
+      "symbols_positive": 3,
+      "trades": 563
     }
   },
-  "code_sha": "692931414056a0aa54a01d758da5dcd5b5738a8a",
+  "code_sha": "e7ab5171bd427efc5e3df881073dbe1c754c5ec7",
   "config": {
     "alpha": 0.05,
     "bootstrap_resamples": 2000,

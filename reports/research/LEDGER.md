@@ -111,3 +111,48 @@ every verified tape and was unused by all three failed candidates.
   the crowded side reverses; strict quartile comparisons mean the modal constant
   rate never triggers.
 * Status: `PREREGISTERED` (results pending).
+
+### E-004 — results (2026-11-05)
+
+| Trades | Net exp. R | Matched random entry | Positive symbols | Control p | Holm p | Status |
+|---:|---:|---:|---:|---:|---:|---|
+| 563 | **−0.1381** | −0.0433 | 3/10 | 0.645 | 0.645 | `NO_EDGE` |
+
+Sensitivity (all negative): quantile 0.05 / 0.20 → −0.116 / −0.190;
+window 15 / 60 → −0.163 / −0.163.
+
+#### Diagnosis
+
+* The long side (fading crowded shorts) loses on every horizon: −0.18 / −0.13 /
+  −0.25 / −0.25 R at 1 / 8 / 24 / 48 bars. The short side (fading crowded longs)
+  is +0.26 / +0.33 R at 24 / 48 bars. The side asymmetry is the same shape as
+  E-001..E-003.
+* Out of 563 campaigns, 425 were longs and 138 shorts. The signal is therefore
+  direction-imbalanced in a window where the long side carried a negative drift
+  for alt perpetuals.
+* This matters for the null design: the control draws random directions 50/50,
+  so a direction-imbalanced treatment is compared against a direction-balanced
+  control. That conflates *timing* with *directional beta*. The repo already has
+  a direction-matched sampler (`research.screen.matched_random_sample`), which
+  the next registration uses.
+
+#### Cross-experiment finding
+
+Four independent mechanisms (band reversion, volume climax, sweep reclaim,
+funding crowding) all show the same shape: short-side cells positive, long-side
+cells negative. The common factor is the market's drift in 2025-01..04, not the
+signal. Two consequences for the program:
+
+1. A direction-balanced (cross-sectional, dollar-neutral) construction is
+   required to separate signal from beta.
+2. The matched random-entry control must be direction-matched whenever the
+   treatment is direction-imbalanced.
+
+#### Next hypothesis
+
+`cross_sectional_relative_strength`: rank the ten perpetuals by trailing 24-hour
+return at each aligned hourly bar, go long the weakest two and short the
+strongest two, and compare with a random two-and-two selection at the same bars.
+The construction is dollar- and direction-balanced by design, so the window's
+beta cannot explain a positive result.
+
