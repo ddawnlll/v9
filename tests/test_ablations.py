@@ -668,3 +668,43 @@ def test_delta_blocks_contract_disagreeing_with_receipt() -> None:
     treatment = replace(treatment, economic_contract=replace(treatment.economic_contract, maker_fee=Decimal("0.5")))
     with pytest.raises(ValueError, match="conflicts with provenance"):
         compute_delta(baseline, treatment)
+
+
+def test_unqualified_protection_blocks_comparison_and_complete_report() -> None:
+    from dataclasses import replace
+
+    supplied = _supplied_for_all()
+    intervention = Intervention.BELIEF
+    candidate = replace(
+        supplied[intervention],
+        unsupported=("PROTECTION_NOT_QUALIFIED_BUFFERED_NATIVE_CALLBACKS",),
+    )
+    supplied[intervention] = candidate
+    baseline = _arm()
+    with pytest.raises(ValueError, match="BLOCKED.*unsupported"):
+        compute_delta(baseline, candidate)
+    report = build_report(baseline=baseline, supplied_arms=supplied)
+    assert report.status == "BLOCKED"
+    assert all(delta.intervention != intervention for delta in report.deltas)
+    assert candidate in report.arms
+    assert candidate.net_pnl is not None
+    assert dict(report.unsupported)[candidate.arm_id] == candidate.unsupported
+
+
+def test_unsupported_baseline_blocks_every_comparison() -> None:
+    from dataclasses import replace
+
+    baseline = replace(_arm(), unsupported=("FUNDING_TOTAL_PARTIAL",))
+    report = build_report(baseline=baseline, supplied_arms=_supplied_for_all())
+    assert report.status == "BLOCKED"
+    assert report.deltas == ()
+    assert report.baseline is baseline
+
+
+def test_complete_report_constructor_rejects_unsupported_arm() -> None:
+    from dataclasses import replace
+
+    complete = build_report(baseline=_arm(), supplied_arms=_supplied_for_all())
+    bad_arm = replace(complete.arms[0], unsupported=("PROTECTION_NOT_QUALIFIED",))
+    with pytest.raises(ValueError, match="COMPLETE cannot carry unsupported"):
+        replace(complete, arms=(bad_arm, *complete.arms[1:]))

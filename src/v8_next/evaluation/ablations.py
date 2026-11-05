@@ -446,6 +446,8 @@ def compute_delta(
     """
     if not baseline.costed or not treatment.costed:
         raise ValueError("a delta requires both arms costed")
+    if baseline.unsupported or treatment.unsupported:
+        raise ValueError("economic comparison BLOCKED: unsupported arm evidence")
     if treatment.intervention is None:
         raise ValueError("a treatment arm must declare its intervention")
     _require_comparable_provenance(baseline, treatment)
@@ -724,7 +726,7 @@ class AblationReport:
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if self.status not in ("COMPLETE", "PARTIAL", "NOT_RUN"):
+        if self.status not in ("COMPLETE", "PARTIAL", "NOT_RUN", "BLOCKED"):
             raise ValueError(f"unknown ablation status {self.status!r}")
         arm_by_intervention = {
             arm.intervention: arm for arm in self.arms if arm.intervention is not None
@@ -752,6 +754,10 @@ class AblationReport:
                     raise ValueError(
                         f"COMPLETE requires a delta confidence interval for {intervention.value}"
                     )
+            if self.baseline.unsupported or self.unsupported or any(
+                arm.unsupported for arm in self.arms
+            ):
+                raise ValueError("COMPLETE cannot carry unsupported evidence")
         if self.status == "NOT_RUN" and self.baseline is not None and self.baseline.costed:
             raise ValueError("NOT_RUN cannot carry a costed baseline")
 
@@ -839,6 +845,8 @@ def build_report(
             unsupported[arm.arm_id] = arm.unsupported
         if arm.costed and baseline_costed:
             assert baseline is not None
+            if arm.unsupported or baseline.unsupported:
+                continue
             delta = compute_delta(baseline, arm)
             deltas.append(delta)
             if delta.delta_net_r is None:
@@ -860,6 +868,8 @@ def build_report(
     )
     if not baseline_costed:
         status = "NOT_RUN"
+    elif all_costed and unsupported:
+        status = "BLOCKED"
     elif all_costed and len(deltas) == len(Intervention) and deltas_complete:
         status = "COMPLETE"
     else:
