@@ -58,6 +58,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from v8_next.evaluation.accounting_contract import EconomicContract, compare_economic_contracts
+
 SCHEMA_VERSION = "v9.ablation.1"
 BASELINE_ARM_ID = "baseline_v8_no_intervention"
 #: The preregistered intervention kind a costed result may be bound to.
@@ -288,6 +290,7 @@ class ArmResult:
     arm_kind: str | None = None
     #: sha256 of the preregistration this arm was measured under, when it declares one.
     preregistration_digest: str | None = None
+    economic_contract: EconomicContract | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -311,6 +314,7 @@ class ArmResult:
             "unsupported": list(self.unsupported),
             "arm_kind": self.arm_kind,
             "preregistration_digest": self.preregistration_digest,
+            "economic_contract": (None if self.economic_contract is None else self.economic_contract.to_dict()),
         }
 
     @classmethod
@@ -349,6 +353,10 @@ class ArmResult:
             ),
             unsupported=tuple(str(value) for value in payload.get("unsupported", ())),
             arm_kind=None if payload.get("arm_kind") is None else str(payload["arm_kind"]),
+            economic_contract=(
+                None if payload.get("economic_contract") is None
+                else EconomicContract.from_dict(payload["economic_contract"])
+            ),
             preregistration_digest=(
                 None
                 if payload.get("preregistration_digest") is None
@@ -441,6 +449,30 @@ def compute_delta(
     if treatment.intervention is None:
         raise ValueError("a treatment arm must declare its intervention")
     _require_comparable_provenance(baseline, treatment)
+    left_contract = baseline.economic_contract
+    right_contract = treatment.economic_contract
+    if left_contract is None or right_contract is None:
+        raise ValueError("economic comparison BLOCKED: missing economic contract")
+    comparison = compare_economic_contracts(left_contract, right_contract)
+    if comparison.status == "BLOCKED":
+        raise ValueError(
+            "economic comparison BLOCKED: "
+            f"missing={comparison.missing}, mismatched={comparison.mismatched}"
+        )
+    for arm in (baseline, treatment):
+        contract = arm.economic_contract
+        provenance = arm.provenance
+        assert contract is not None and provenance is not None
+        try:
+            receipt_fees = (Decimal(provenance.maker_fee), Decimal(provenance.taker_fee))
+        except InvalidOperation as exc:
+            raise ValueError("economic comparison BLOCKED: invalid provenance fees") from exc
+        if (
+            contract.tape_sha256 != provenance.tape_sha256
+            or contract.execution_profile != provenance.execution_profile
+            or (contract.maker_fee, contract.taker_fee) != receipt_fees
+        ):
+            raise ValueError("economic comparison BLOCKED: contract conflicts with provenance")
     low, high = bootstrap_mean_difference_ci(
         baseline.net_r_samples,
         treatment.net_r_samples,

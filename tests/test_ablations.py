@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import replace
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,7 @@ from v8_next.evaluation.ablations import (
     publish_costed_result,
     run_native_baseline,
 )
+from v8_next.evaluation.accounting_contract import EconomicContract
 
 #: The authorised development tape is committed inside this checkout; the
 #: optional-dataset resolver points at the owner's external tree, so the test
@@ -103,6 +105,14 @@ def _arm(
         unsupported=unsupported,
         arm_kind=arm_kind,
         preregistration_digest=preregistration_digest,
+        economic_contract=EconomicContract(
+            tape_sha256=(_provenance() if provenance is None else provenance).tape_sha256,
+            window="development", instrument="BTCUSDT", initial_balance=Decimal("10000"),
+            sizing_policy="notional:1000", execution_profile="baseline",
+            maker_fee=Decimal("0.0002"), taker_fee=Decimal("0.0005"),
+            funding_model="settlement", mark_model="close", capital_and_exposure_basis="netting",
+            outcome_basis="balance-delta", cutoff_policy="retain-open",
+        ) if costed else None,
     )
 
 
@@ -632,3 +642,29 @@ def test_cli_records_process_measurement_when_asked(tmp_path: Path) -> None:
         "ru_maxrss_bytes_macos",
         "ru_maxrss_kilobytes_converted",
     )
+
+
+def test_delta_blocks_legacy_and_incompatible_economic_contracts() -> None:
+    baseline = _arm()
+    treatment = _arm(intervention=Intervention.ENTRY_TIMING)
+    restored = ArmResult.from_dict(replace(baseline, economic_contract=None).to_dict())
+    assert restored.economic_contract is None
+    with pytest.raises(ValueError, match="missing economic contract"):
+        compute_delta(restored, treatment)
+    assert treatment.economic_contract is not None
+    different = replace(treatment, economic_contract=replace(
+        treatment.economic_contract, sizing_policy="fixed:0.01 BTC"
+    ))
+    with pytest.raises(ValueError, match="sizing_policy"):
+        compute_delta(baseline, different)
+    assert ArmResult.from_dict(treatment.to_dict()).economic_contract == treatment.economic_contract
+
+
+def test_delta_blocks_contract_disagreeing_with_receipt() -> None:
+    baseline = _arm()
+    treatment = _arm(intervention=Intervention.ENTRY_TIMING)
+    assert baseline.economic_contract is not None and treatment.economic_contract is not None
+    baseline = replace(baseline, economic_contract=replace(baseline.economic_contract, maker_fee=Decimal("0.5")))
+    treatment = replace(treatment, economic_contract=replace(treatment.economic_contract, maker_fee=Decimal("0.5")))
+    with pytest.raises(ValueError, match="conflicts with provenance"):
+        compute_delta(baseline, treatment)

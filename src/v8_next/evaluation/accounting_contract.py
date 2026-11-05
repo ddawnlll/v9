@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal, Mapping
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,22 @@ class EconomicContract:
     outcome_basis: str | None
     cutoff_policy: str | None
 
+    def to_dict(self) -> dict[str, str | None]:
+        return {field.name: None if (value := getattr(self, field.name)) is None else str(value)
+                for field in fields(self)}
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> EconomicContract:
+        values: dict[str, Any] = {}
+        for field in fields(cls):
+            value = payload.get(field.name)
+            if value is not None:
+                value = str(value)
+                if field.name in {"initial_balance", "maker_fee", "taker_fee"}:
+                    value = Decimal(value)
+            values[field.name] = value
+        return cls(**values)
+
 
 @dataclass(frozen=True)
 class ContractComparison:
@@ -57,7 +73,12 @@ def compare_economic_contracts(
     for field in fields(EconomicContract):
         a = getattr(left, field.name)
         b = getattr(right, field.name)
-        if a is None or b is None or a == "" or b == "":
+        if any(
+            value is None
+            or (isinstance(value, str) and value.strip().upper() in {"", "UNKNOWN", "UNSPECIFIED"})
+            or (isinstance(value, Decimal) and not value.is_finite())
+            for value in (a, b)
+        ):
             missing.append(field.name)
         elif a != b:
             mismatched.append(field.name)

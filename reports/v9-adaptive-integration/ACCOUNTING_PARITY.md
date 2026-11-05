@@ -48,10 +48,12 @@ zero merely because an adjustment is absent.
 is an explicit, fail-closed building block for binding tape, window, capital,
 sizing, fees, funding, mark, exposure and cutoff assumptions. Unknowns and
 mismatches block it, including the old fixed-quantity and marked-equity versus
-balance bases. **It is not yet wired into `compute_delta` or populated by the
-runners**; existing `compute_delta` checks tape, engine and execution profile
-but does not establish sizing or capital parity. Until runner receipts carry
-and enforce the full contract, cross-run economic deltas remain unsupported.
+balance bases. `compute_delta` now requires matching serialized contracts, in addition to the
+existing provenance checks, and cross-checks tape, profile and fees against the
+receipt. Legacy receipts remain readable but cannot produce deltas when the
+contract is absent. **The runners do not yet populate this contract**, so their
+cross-run economic deltas remain blocked until their actual assumptions can be
+bound and independently audited.
 Even matching declarations alone cannot prove accounting correctness.
 
 Commands executed in the isolated worktree:
