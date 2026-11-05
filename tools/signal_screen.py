@@ -168,7 +168,7 @@ def _treatment_rows(
     *,
     overrides: dict[str, float] | None = None,
 ) -> list[dict[str, Any]]:
-    built = signals.build_signals(candidate_id, bars, **(overrides or {}))
+    built = signals.build_signals(candidate_id, bars, funding=funding, **(overrides or {}))
     rows: list[dict[str, Any]] = []
     for signal in built:
         if signal.bar_index + 1 >= len(bars):

@@ -117,9 +117,14 @@ def _series(count: int) -> list[tuple[float, float, float, float, float]]:
 @pytest.mark.parametrize("candidate_id", sorted(signals.SIGNAL_SPECS))
 def test_signals_do_not_depend_on_later_bars(candidate_id: str) -> None:
     rows = _series(120)
-    baseline = signals.build_signals(candidate_id, _bars(rows))
+    spec = signals.SIGNAL_SPECS[candidate_id]
+    funding: list[tuple[int, float]] = []
+    if spec.needs_funding:
+        funding = [((index * 8 + 1) * 3_600_000_000_000, 0.0001 * ((index % 7) - 3)) for index in range(20)]
+    bars = _bars(rows)
+    baseline = signals.build_signals(candidate_id, bars, funding=funding)
     mutated_rows = rows[:-1] + [(rows[-1][0], rows[-1][1] + 50, rows[-1][2] - 50, rows[-1][3], 1e6)]
-    mutated = signals.build_signals(candidate_id, _bars(mutated_rows))
+    mutated = signals.build_signals(candidate_id, _bars(mutated_rows), funding=funding)
     keep = len(rows) - 1
     assert [s for s in baseline if s.bar_index < keep] == [
         s for s in mutated if s.bar_index < keep
@@ -194,3 +199,46 @@ def test_tape_timestamps_and_funding_share_one_unit(tmp_path) -> None:
     assert bars[0].end_ns == 3_600_000 * 1_000_000
     assert settlements == ((4_000_000 * 1_000_000, 0.001),)
     assert bars[0].end_ns < settlements[0][0] <= bars[1].end_ns
+
+
+def _funding_case(rates: list[float]) -> list[tuple[int, float]]:
+    hour_ns = 3_600_000_000_000
+    return [((index * 8 + 1) * hour_ns, rate) for index, rate in enumerate(rates)]
+
+
+def test_funding_extreme_fades_the_crowded_side() -> None:
+    hour_ns = 3_600_000_000_000
+    bars = _bars([(100, 101, 99, 100, 100.0)] * 60)
+    for index, bar in enumerate(bars):
+        bars[index] = screen.Bar(
+            end_ns=(index + 1) * hour_ns,
+            open=bar.open,
+            high=bar.high,
+            low=bar.low,
+            close=bar.close,
+            volume=bar.volume,
+        )
+    high = signals.funding_extreme_reversion(
+        bars, _funding_case([0.0001] * 5 + [0.001]), window=5, quantile=0.10
+    )
+    low = signals.funding_extreme_reversion(
+        bars, _funding_case([0.0001] * 5 + [-0.001]), window=5, quantile=0.10
+    )
+    assert [(s.direction, s.reason) for s in high] == [(signals.SHORT, "funding_crowded_long")]
+    assert [(s.direction, s.reason) for s in low] == [(signals.LONG, "funding_crowded_short")]
+    # The settlement is only knowable when it prints; the entry bar is later.
+    settlement_ns = _funding_case([0.0001] * 6)[-1][0]
+    ends = [bar.end_ns for bar in bars]
+    assert high[0].bar_index == next(i for i, end in enumerate(ends) if end >= settlement_ns)
+
+
+def test_constant_funding_is_never_extreme() -> None:
+    hour_ns = 3_600_000_000_000
+    bars = [
+        screen.Bar(end_ns=(i + 1) * hour_ns, open=100, high=101, low=99, close=100, volume=1.0)
+        for i in range(40)
+    ]
+    built = signals.funding_extreme_reversion(
+        bars, _funding_case([0.0001] * 12), window=5, quantile=0.10
+    )
+    assert built == []

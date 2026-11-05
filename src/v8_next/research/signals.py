@@ -11,6 +11,7 @@ This is measurement code. It never claims an economic edge and never trades.
 
 from __future__ import annotations
 
+import bisect
 import statistics
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -46,6 +47,7 @@ class SignalSpec:
     params: dict[str, float]
     warmup_bars: int
     hypothesis: str
+    needs_funding: bool = False
 
 
 def _typical_bar_direction(bar: Bar) -> float:
@@ -141,6 +143,63 @@ def liquidity_sweep_reclaim(
     return signals
 
 
+def _quantile(sorted_values: Sequence[float], q: float) -> float:
+    if len(sorted_values) == 1:
+        return float(sorted_values[0])
+    position = q * (len(sorted_values) - 1)
+    lower = int(position)
+    upper = min(lower + 1, len(sorted_values) - 1)
+    weight = position - lower
+    return float(sorted_values[lower]) * (1.0 - weight) + float(sorted_values[upper]) * weight
+
+
+def funding_extreme_reversion(
+    bars: Sequence[Bar],
+    funding: Sequence[tuple[int, float]],
+    *,
+    window: int = 30,
+    quantile: float = 0.10,
+) -> list[RawSignal]:
+    """Fade the crowded side when the settlement funding rate is extreme.
+
+    Hypothesis: the funding rate is the price of leveraged crowding, so an
+    extreme settlement rate marks a one-sided book that unwinds. A rate above the
+    trailing ``1 - quantile`` band is a crowded long (fade short); a rate below
+    the ``quantile`` band is a crowded short (fade long). Ties are not signals:
+    the comparison is strict, so the modal constant rate never triggers.
+
+    The settlement instant is the first moment the rate is an accomplished venue
+    fact; the entry is the next bar open after the first bar that closes at or
+    after it. Rates are never back-filled or interpolated between settlements.
+    """
+    if window < 5:
+        raise ValueError("window must be at least 5 settlements")
+    if not 0.0 < quantile < 0.5:
+        raise ValueError("quantile must be in (0, 0.5)")
+    settlements = [ns for ns, _ in funding]
+    rates = [rate for _, rate in funding]
+    if len(rates) <= window:
+        return []
+    ends = [bar.end_ns for bar in bars]
+    signals: list[RawSignal] = []
+    for index in range(window - 1, len(rates)):
+        trailing = sorted(rates[index - window + 1 : index + 1])
+        lower = _quantile(trailing, quantile)
+        upper = _quantile(trailing, 1.0 - quantile)
+        latest = rates[index]
+        if latest < lower:
+            direction, reason = LONG, "funding_crowded_short"
+        elif latest > upper:
+            direction, reason = SHORT, "funding_crowded_long"
+        else:
+            continue
+        bar_index = bisect.bisect_left(ends, settlements[index])
+        if bar_index >= len(bars) - 1:
+            continue
+        signals.append(RawSignal(bar_index, direction, reason))
+    return signals
+
+
 #: The preregistered primary parameterisation of each candidate.
 SIGNAL_SPECS: Final[dict[str, SignalSpec]] = {
     "bollinger_reversion": SignalSpec(
@@ -173,6 +232,18 @@ SIGNAL_SPECS: Final[dict[str, SignalSpec]] = {
             "range continues in the reclaim direction."
         ),
     ),
+    "funding_extreme_reversion": SignalSpec(
+        candidate_id="funding_extreme_reversion",
+        builder=funding_extreme_reversion,
+        params={"window": 30, "quantile": 0.10},
+        warmup_bars=1,
+        hypothesis=(
+            "An extreme settlement funding rate marks leveraged crowding, and the "
+            "crowded side reverses over the following bars by more than the "
+            "round-trip cost."
+        ),
+        needs_funding=True,
+    ),
 }
 
 #: Declared sensitivity grid per candidate. Reported, never used for selection.
@@ -193,10 +264,21 @@ SENSITIVITY_GRID: Final[dict[str, tuple[dict[str, float], ...]]] = {
         {"lookback": 12},
         {"lookback": 48},
     ),
+    "funding_extreme_reversion": (
+        {"quantile": 0.05},
+        {"quantile": 0.20},
+        {"window": 15},
+        {"window": 60},
+    ),
 }
 
 
-def build_signals(candidate_id: str, bars: Sequence[Bar], **overrides: float) -> list[RawSignal]:
+def build_signals(
+    candidate_id: str,
+    bars: Sequence[Bar],
+    funding: Sequence[tuple[int, float]] = (),
+    **overrides: float,
+) -> list[RawSignal]:
     """Build one candidate's signals with the registered parameters, or overrides."""
     try:
         spec = SIGNAL_SPECS[candidate_id]
@@ -214,5 +296,11 @@ def build_signals(candidate_id: str, bars: Sequence[Bar], **overrides: float) ->
             window=int(params["window"]),
             multiple=params["multiple"],
             close_extreme=params["close_extreme"],
+        )
+    if candidate_id == "funding_extreme_reversion":
+        if not funding:
+            raise ValueError("funding_extreme_reversion needs the funding series")
+        return spec.builder(
+            bars, funding, window=int(params["window"]), quantile=params["quantile"]
         )
     return spec.builder(bars, lookback=int(params["lookback"]))
