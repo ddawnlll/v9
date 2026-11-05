@@ -11,7 +11,7 @@ from v8_next.domain.horizon_aggregation import M15_NS
 from v8_next.domain.horizons import Timeframe
 from v8_next.domain.market import Candle
 from v8_next.domain.observation import QualityState
-from v8_next.evaluation.sim_arm import _drive, _Window, run_sim_arm
+from v8_next.evaluation.sim_arm import _drive, _Window, run_baseline_arm, run_sim_arm
 
 IID = "BTCUSDT-PERP.BINANCE"
 TYPE = f"{IID}-15-MINUTE-LAST-EXTERNAL"
@@ -57,6 +57,8 @@ def test_config_and_runner_refuse_unverified_or_wrong_resolution(tmp_path):
     config = SimArmConfig(enabled=True, multi_horizon_shadow=True, bar_type_str=TYPE)
     with pytest.raises(SimArmRefused, match="SHADOW_TAPE_AVAILABILITY_UNPROVEN"):
         run_sim_arm(tape=tmp_path, config=config)
+    with pytest.raises(SimArmRefused, match="SHADOW_TAPE_AVAILABILITY_UNPROVEN"):
+        run_baseline_arm(tape=tmp_path, config=config)
 
 
 def test_short_native_shadow_fixture_routes_events_without_orders():

@@ -814,6 +814,9 @@ def run_baseline_arm(
     """
     if not isinstance(config, SimArmConfig):
         raise TypeError(f"expected SimArmConfig, got {type(config).__name__}")
+    if config.multi_horizon_shadow:
+        raise SimArmRefused("SHADOW_TAPE_AVAILABILITY_UNPROVEN",
+                            "load_multitape assumes close-time availability; use a verified shadow feed")
     expected = config.baseline_config()
     if baseline_config is not None and baseline_config != expected:
         raise SimArmRefused(
