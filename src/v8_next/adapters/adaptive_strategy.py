@@ -383,6 +383,7 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self._pending_protective: dict[str, ProtectionEvent] = {}
         self._pending_protective_ack: dict[str, ProtectionEvent] = {}
         self._position_decision: dict[str, str] = {}
+        self._entry_opportunities: dict[str, str] = {}
         self._reduce_decision: dict[str, str] = {}
         self._live_protection: dict[str, str] = {}
         self._pending_flat: dict[str, ProtectionEvent] = {}
@@ -469,7 +470,13 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         request = self._request(cut, belief, opportunity_view, bundle, position)
         decision = self._policy.evaluate(request)
         explanation = self._policy.explain(request)
+        if decision.action is DecisionAction.ENTER and opportunity_view is not None:
+            # Bind the actual entry decision before native submission callbacks
+            # can fire. A later opportunity must never replace the entry thesis.
+            self._entry_opportunities[decision.decision_id] = opportunity_view.opportunity_id
         outcome = self._apply(decision.action, decision.decision_id, candle, position, direction)
+        if decision.action is DecisionAction.ENTER and not outcome.startswith("SUBMITTED_BRACKET_"):
+            self._entry_opportunities.pop(decision.decision_id, None)
 
         self.arm_decisions.append(
             {
@@ -610,11 +617,10 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
     ) -> _OpportunityFacts | None:
         """The episode the policy may act on, as it was knowable at ``cut``.
 
-        While flat, only the episode *this bar detected* is offered: an episode
-        that stayed armed from an earlier bar is not a fresh entry signal, so it
-        must not become one (the V8 gate is per detection bar too). With an open
-        position the book's latest live episode is offered instead, because the
-        management actions need the identity the position was opened under.
+        While flat, only the episode *this bar detected* is offered. With an
+        open position, only the episode attached to its actual entry decision
+        may be used. A missing join fails closed instead of selecting a newer,
+        unrelated opportunity.
         """
         snapshot = self.opportunity_book.snapshot(cut)
         episodes = {episode.opportunity.opportunity_id: episode for episode in snapshot.episodes}
@@ -629,24 +635,15 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 lifecycle=lifecycle_of(episode.status),
                 as_of_ns=episode.opportunity.as_of_time_ns,
             )
-        live = [
-            episode
-            for episode in episodes.values()
-            if episode.opportunity.instrument_id == str(self.instrument_id)
-            and lifecycle_of(episode.status)
-            in (
-                OpportunityLifecycle.WATCHING,
-                OpportunityLifecycle.ARMED,
-                OpportunityLifecycle.ADMITTED,
-            )
-        ]
-        if not live:
+        entry_decision = self._position_decision.get(str(position.id))
+        opportunity_id = self._entry_opportunities.get(entry_decision or "")
+        episode = episodes.get(opportunity_id or "")
+        if episode is None or episode.opportunity.instrument_id != str(self.instrument_id):
             return None
-        latest = max(live, key=lambda episode: episode.opportunity.as_of_time_ns)
         return _OpportunityFacts(
-            opportunity_id=latest.opportunity.opportunity_id,
-            lifecycle=lifecycle_of(latest.status),
-            as_of_ns=latest.opportunity.as_of_time_ns,
+            opportunity_id=episode.opportunity.opportunity_id,
+            lifecycle=lifecycle_of(episode.status),
+            as_of_ns=episode.opportunity.as_of_time_ns,
         )
 
     def _request(
@@ -1282,6 +1279,9 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self._flush_pending_flat(position_id=position_id)
         self._seen_open_positions.discard(position_id)
         self._reprotect.discard(position_id)
+        decision_id = self._position_decision.pop(position_id, None)
+        if decision_id is not None:
+            self._entry_opportunities.pop(decision_id, None)
 
     def _append_snapshot(
         self, ts_ns: int, position_id: str, quantity: Decimal, direction: Direction | None

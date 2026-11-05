@@ -30,6 +30,7 @@ from v8_next.adapters.adaptive_strategy import (
     _as_decimal,
 )
 from v8_next.evaluation.sim_arm import run_baseline_arm, run_sim_arm
+from v8_next.opportunities.models import OpportunityStatus
 
 TAPE = Path(__file__).resolve().parents[1] / "research/tape/btcusdt-1h-2025Q1"
 
@@ -93,6 +94,34 @@ def test_management_side_effects_refuse_unverified_stop_handoff() -> None:
     assert AdaptiveSimStrategy._exit(strategy, "decision", position) == (
         "EXIT_BLOCKED_UNVERIFIED_PROTECTION_TRANSITION"
     )
+
+
+def test_open_position_uses_its_entry_opportunity_not_latest() -> None:
+    def episode(identity: str, at: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            opportunity=SimpleNamespace(
+                opportunity_id=identity, instrument_id="BTC", as_of_time_ns=at
+            ),
+            status=OpportunityStatus.CANDIDATE,
+        )
+
+    strategy = SimpleNamespace(
+        opportunity_book=SimpleNamespace(
+            snapshot=lambda _: SimpleNamespace(episodes=[episode("entry", 1), episode("new", 2)])
+        ),
+        instrument_id="BTC",
+        _position_decision={"position": "decision"},
+        _entry_opportunities={"decision": "entry"},
+    )
+    result = AdaptiveSimStrategy._opportunity_view(
+        strategy, 3, None, SimpleNamespace(id="position")
+    )
+    assert result is not None
+    assert result.opportunity_id == "entry"
+    strategy._entry_opportunities.clear()
+    assert AdaptiveSimStrategy._opportunity_view(
+        strategy, 3, None, SimpleNamespace(id="position")
+    ) is None
 
 
 def test_costed_smoke_run_on_the_authorized_tape() -> None:
