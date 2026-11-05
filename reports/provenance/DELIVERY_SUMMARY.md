@@ -199,23 +199,27 @@ position snapshot and a fail-closed overlap guard.
 | Full slice (2,160 bars) | V9 | V8 | Δ |
 |---|---|---|---|
 | Closed campaigns | 24 | 44 | −20 |
-| Net PnL (USDT) | **−33.92107028** | **−8.57430674** | **−25.34676354** |
+| Net PnL (USDT) | **−23.10228485** | **−21.23495118** | **−1.86733367** |
 | Mean net R | −0.049252 | −0.021638 | −0.027613 |
-| Max DD | 1.847% | 1.804% | +0.043 pp |
-| Fees | 20.5712 | 36.7661 | −16.1948 |
+| Max DD | 1.798% | 1.998% | −0.199 pp |
+| Fees | 20.9187 | 37.9154 | −16.9967 |
 
-**V9 underperformed V8 on this single slice.** Descriptive only, claim `NONE`. Protection findings
-(`MISSING_ACK`, quantity/netting conflicts) are reported, not suppressed; the arm is not claimed
-production-ready. Matched random-entry controls and PIT regime splits are implemented; their
-end-to-end comparison awaits a costed V9 treatment pool. The measured V8 baseline replay
-(`per_leg_notional=1000`) remains available; its −21.235 USDT result uses a different accounting
-basis from the −8.574 sim-arm baseline and must not be compared without equalisation.
+**V9 still underperforms V8 on this single slice** (Δ −1.87 USDT after parity sizing). Protection
+reconciliation now passes: the cutoff open position is **PROTECTED** with **0 violations**
+(submission/resolution batching, fill-as-ACK, position binding, transient-conflict clearing).
+The two V8 runners now agree exactly on net PnL, net R, trade count and fees; the earlier −8.57 vs
+−21.23 gap was fixed-0.01-BTC versus `per_leg_notional=1000` sizing, not accounting. Funding
+isolation attribution still differs (0.367 vs 0.705) and is reported as a basis, not a PnL gap.
+Status is `MEASURED_INCONCLUSIVE_SAMPLE` (24 < preregistered minimum 30), claim `NONE`.
+The V9 replay is **13.0 s** versus 95.8 s before (7.4× faster; build_view deepcopy/identity
+re-derivation removed). Matched random-entry controls and PIT regime splits remain implemented but
+their costed end-to-end comparison is `NOT_RUN`.
 
-### Gates on `079d33c`
+### Gates on the repaired integration head
 
 - `ruff check src tests`: clean
 - `mypy src`: clean, 253 files
-- `pytest -q`: **2796 passed, 67 skipped, 512 deselected, 12.86 s**
+- `pytest -q`: **2806 passed, 67 skipped, 512 deselected** (protection/parity/performance tests included)
 - GitHub Actions V9 gate: runs on push/PR for this head
 
 ### Still not claimed

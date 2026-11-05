@@ -635,3 +635,65 @@ def test_module_is_native_agnostic_and_has_no_order_authority() -> None:
     assert not any("nautilus" in module for module in imported)
     for forbidden in ("submit_order", "cancel_order", "submit_order_list", "order_factory"):
         assert forbidden not in source
+
+
+# --------------------------------------------------------------------------- #
+# 10 — engine-step batches do not publish transient missing ACKs
+# --------------------------------------------------------------------------- #
+def test_batch_does_not_record_transient_missing_ack() -> None:
+    """A submission and its ACK in one batch is not a genuine protection gap."""
+    entry = _entry_log()
+    stop = [
+        submitted("S-1", "P-1", OrderRole.STOP, 4, "1", side=Side.SELL, price="95"),
+        ack("S-1", "P-1", OrderRole.STOP, 5, "1", side=Side.SELL, price="95"),
+    ]
+    target = [
+        submitted("T-1", "P-1", OrderRole.TARGET, 6, "1", side=Side.SELL, price="105"),
+        ack("T-1", "P-1", OrderRole.TARGET, 7, "1", side=Side.SELL, price="105"),
+    ]
+    batched = BracketInvariantChecker()
+    batched.apply_all(entry)
+    batched.apply_batch(stop)
+    batched.apply_batch(target)
+    assert batched.state is ProtectionState.PROTECTED
+    assert not any(
+        violation.code is ViolationCode.MISSING_ACK for violation in batched.violations
+    )
+
+    per_event = BracketInvariantChecker()
+    per_event.apply_all(entry + stop + target)
+    assert any(
+        violation.code is ViolationCode.MISSING_ACK for violation in per_event.violations
+    ), "per-event semantics must remain unchanged"
+
+
+def test_a_genuine_unacknowledged_submission_still_fails_in_a_batch() -> None:
+    checker = BracketInvariantChecker()
+    checker.apply_all(_entry_log())
+    checker.apply_batch(
+        [submitted("S-1", "P-1", OrderRole.STOP, 4, "1", side=Side.SELL, price="95")]
+    )
+    assert checker.state is ProtectionState.GAP
+    assert any(
+        violation.code is ViolationCode.MISSING_ACK for violation in checker.violations
+    )
+
+
+def test_a_fill_is_accepted_as_implicit_acknowledgement() -> None:
+    """An order can fill before an observable ACK; the fill is venue proof."""
+    entry = _entry_log()
+    stop = [
+        submitted("S-1", "P-1", OrderRole.STOP, 4, "1", side=Side.SELL, price="95"),
+        fill("S-1", "P-1", OrderRole.STOP, 5, "1", side=Side.SELL, price="95", reduce_only=True),
+    ]
+    target = [
+        submitted("T-1", "P-1", OrderRole.TARGET, 6, "1", side=Side.SELL, price="105"),
+        ack("T-1", "P-1", OrderRole.TARGET, 7, "1", side=Side.SELL, price="105"),
+    ]
+    checker = BracketInvariantChecker()
+    checker.apply_all(entry)
+    checker.apply_batch(stop)
+    checker.apply_batch(target)
+    assert not any(
+        violation.code is ViolationCode.MISSING_ACK for violation in checker.violations
+    )

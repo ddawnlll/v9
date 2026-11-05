@@ -354,6 +354,7 @@ class BracketInvariantChecker:
         self._violation_keys: set[tuple[str, str, str, str]] = set()
         self._applied: set[str] = set()
         self._active_position_id: str | None = None
+        self._suppress_records = False
 
     # ------------------------------------------------------------------ public
     @property
@@ -465,6 +466,38 @@ class BracketInvariantChecker:
             state = self.apply(event)
         return state
 
+    def apply_batch(self, events: Iterable[ProtectionEvent]) -> ProtectionState:
+        """Apply one engine-step batch, recording only its final-state violations.
+
+        Native callbacks for a bracket leg can arrive in the same engine step as
+        the leg's submission. Applying them one by one records a transient
+        ``MISSING_ACK`` that the ACK in the same step immediately resolves. A
+        batch is the honest unit for that observation: intermediate microstates
+        are not published, but the final state (and a genuinely unacknowledged
+        leg) still records every violation. Per-event ``apply``/``apply_all``
+        semantics are unchanged.
+        """
+        batch = list(events)
+        affected: set[str] = set()
+        previous = self._suppress_records
+        self._suppress_records = True
+        try:
+            for event in batch:
+                self.apply(event)
+                if event.position_id:
+                    affected.add(event.position_id)
+                if event.client_order_id:
+                    order = self._orders.get(event.client_order_id)
+                    if order is not None and order.position_id:
+                        affected.add(order.position_id)
+        finally:
+            self._suppress_records = previous
+        if affected:
+            ts_ns = batch[-1].ts_ns if batch else 0
+            for position_id in sorted(affected):
+                self._validate(position_id, ts_ns)
+        return self.state
+
     def snapshot(self) -> dict[str, object]:
         """Canonical JSON-safe view of the derived state (no wall clock)."""
         return {
@@ -553,6 +586,8 @@ class BracketInvariantChecker:
         client_order_id: str,
         detail: str,
     ) -> None:
+        if self._suppress_records:
+            return
         key = (code.value, position_id, client_order_id, detail)
         if key in self._violation_keys:
             return
@@ -609,6 +644,10 @@ class BracketInvariantChecker:
 
     def _on_position_changed(self, event: ProtectionEvent) -> None:
         position = self._position(event.position_id)
+        # Conflict is a property of the current snapshot, not a permanent brand.
+        # A later authoritative snapshot that reconciles with the fills clears it;
+        # a snapshot that still disagrees sets it again below.
+        position.conflicted = False
         if event.direction is not None:
             if position.direction is not None and position.direction is not event.direction:
                 self._record_event(
@@ -785,6 +824,10 @@ class BracketInvariantChecker:
                 detail=f"cumulative={cumulative} order-quantity={order.quantity}",
             )
         order.filled = cumulative
+        # A venue fill is stronger evidence of acceptance than the ACK callback:
+        # an order can fill before (or without) an observable OrderAccepted
+        # callback, and reporting that as MISSING_ACK would be a false gap.
+        order.acked = True
         if order.stale:
             self._record_event(
                 ViolationCode.STALE_FILL_IGNORED,

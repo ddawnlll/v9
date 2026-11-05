@@ -42,6 +42,7 @@ instrument's quality state).
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
@@ -230,8 +231,11 @@ def observation_id(observation: Observation) -> str:
     same id on any machine; a different payload or availability clock yields a
     different id.
     """
+    cached = _OBSERVATION_ID_CACHE.get(id(observation))
+    if cached is not None and cached[0] is observation:
+        return cached[1]
     try:
-        return canonical_digest(
+        identity = canonical_digest(
             "market_observation",
             {
                 "instrument_id": observation.instrument_id,
@@ -250,6 +254,19 @@ def observation_id(observation: Observation) -> str:
         raise PitViolationError(
             f"observation payload is not canonical JSON: {exc}", code="MALFORMED_PAYLOAD"
         ) from exc
+    _OBSERVATION_ID_CACHE[id(observation)] = (observation, identity)
+    while len(_OBSERVATION_ID_CACHE) > _OBSERVATION_ID_CACHE_SIZE:
+        _OBSERVATION_ID_CACHE.popitem(last=False)
+    return identity
+
+
+#: Observations are frozen and their payload is treated as immutable once built.
+#: The view is rebuilt every cut from the same growing journal, so re-deriving
+#: the same content digest for every historical row was the dominant replay cost.
+_OBSERVATION_ID_CACHE_SIZE = 8_192
+_OBSERVATION_ID_CACHE: OrderedDict[int, tuple[Observation, str]] = OrderedDict()
+_CANDLE_CACHE_SIZE = 8_192
+_CANDLE_CACHE: OrderedDict[str, Candle] = OrderedDict()
 
 
 def _payload_signature(observation: Observation) -> str:
@@ -289,6 +306,9 @@ def _payload_price(payload: Mapping[str, Any], key: str) -> Decimal:
 
 def _candle_from_observation(observation: Observation, identity: str) -> Candle:
     """Materialise the canonical bar payload; malformed data fails closed."""
+    cached = _CANDLE_CACHE.get(identity)
+    if cached is not None:
+        return cached
     payload = observation.payload
     start_ns = _payload_int(payload, "start_ns")
     end_ns = _payload_int(payload, "end_ns")
@@ -302,7 +322,7 @@ def _candle_from_observation(observation: Observation, identity: str) -> Candle:
     if not isinstance(source_hash, str) or not source_hash:
         source_hash = identity
     try:
-        return Candle(
+        candle = Candle(
             instrument_id=observation.instrument_id,
             start_ns=start_ns,
             end_ns=end_ns,
@@ -317,6 +337,10 @@ def _candle_from_observation(observation: Observation, identity: str) -> Candle:
         )
     except ValueError as exc:
         raise PitViolationError(f"BAR payload is not a valid candle: {exc}", code="MALFORMED_BAR") from exc
+    _CANDLE_CACHE[identity] = candle
+    while len(_CANDLE_CACHE) > _CANDLE_CACHE_SIZE:
+        _CANDLE_CACHE.popitem(last=False)
+    return candle
 
 
 @dataclass(frozen=True, slots=True)
@@ -412,7 +436,13 @@ class ObservationView:
         raise KeyError((instrument_id, start))
 
 
-def build_view(observations: Iterable[Observation], *, cut_time_ns: int) -> ObservationView:
+def build_view(
+    observations: Iterable[Observation],
+    *,
+    cut_time_ns: int,
+    copy_inputs: bool = True,
+    assume_ordered: bool = False,
+) -> ObservationView:
     """Partition ``observations`` into the usable and rejected sets at ``cut_time_ns``.
 
     The input is snapshotted (deep-copied) first, so later mutation of caller-owned
@@ -432,7 +462,9 @@ def build_view(observations: Iterable[Observation], *, cut_time_ns: int) -> Obse
                 f"{observation.kind.value} at {observation.event_time}",
                 code=QualityState.AMENDED_FUTURE.value,
             )
-        snapshot.append(observation.model_copy(deep=True))
+        snapshot.append(
+            observation.model_copy(deep=True) if copy_inputs else observation
+        )
 
     def sort_key(observation: Observation) -> tuple[object, ...]:
         return (
@@ -446,7 +478,8 @@ def build_view(observations: Iterable[Observation], *, cut_time_ns: int) -> Obse
             observation.quality.value,
         )
 
-    snapshot.sort(key=sort_key)
+    if not assume_ordered:
+        snapshot.sort(key=sort_key)
 
     usable: list[Observation] = []
     rejections: list[ObservationRejection] = []

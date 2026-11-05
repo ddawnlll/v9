@@ -531,7 +531,33 @@ def _measure(
         orders_digest = str(ledger["digest"])
         protection_events = list(strategy.protection_events)
         checker = BracketInvariantChecker()
-        checker.apply_all(protection_events)
+        # A protective submission is one observation unit with its first native
+        # resolution (ACK, fill, cancel or reject). The ACK can arrive in the same
+        # engine step, and an order can fill before any observable ACK; publishing
+        # the submission alone would record a transient MISSING_ACK that the
+        # resolution immediately disproves. Unresolved submissions are still
+        # applied alone below and therefore still report a genuine gap.
+        resolution_kinds = {"ACK", "FILL", "PARTIAL_FILL", "CANCELED", "REJECTED"}
+        index = 0
+        while index < len(protection_events):
+            event = protection_events[index]
+            if event.kind.value == "ORDER_SUBMITTED":
+                resolved_at = next(
+                    (
+                        offset
+                        for offset in range(index + 1, len(protection_events))
+                        if protection_events[offset].client_order_id
+                        == event.client_order_id
+                        and protection_events[offset].kind.value in resolution_kinds
+                    ),
+                    None,
+                )
+                if resolved_at is not None:
+                    checker.apply_batch(protection_events[index : resolved_at + 1])
+                    index = resolved_at + 1
+                    continue
+            checker.apply_batch((event,))
+            index += 1
         protection = {
             "state": str(checker.state),
             "violations": [
@@ -545,6 +571,7 @@ def _measure(
                 for violation in checker.violations
             ],
             "events_applied": checker.events_applied,
+            "snapshot": checker.snapshot(),
             "digest": checker.digest(),
         }
         arm_kind_value = arm_kind

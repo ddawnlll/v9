@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import ROUND_CEILING, Decimal
 from typing import Any, Final, cast
 
@@ -181,7 +181,10 @@ class SimArmConfig:
     #: V9-vs-V8 delta would include a gate change, not only the decision source.
     max_contradiction_tolerance: int = 28
     order_quantity: Decimal = Decimal("0.01")
-    target_notional: Decimal | None = None
+    #: Matches the measured V8 portfolio baseline (`per_leg_notional=1000`).
+    #: Fixed 0.01 BTC would size a different notional as price moves, making the
+    #: absolute PnL incomparable even when the trade and net-R series match.
+    target_notional: Decimal | None = Decimal("1000")
     bracket_stop_pct: Decimal = Decimal("0.02")
     bracket_target_pct: Decimal = Decimal("0.04")
     max_notional_per_order: Decimal | None = None
@@ -372,10 +375,11 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self.book_transitions: list[dict[str, Any]] = []
         # ---- native order bookkeeping ---------------------------------------
         self._order_facts: dict[str, _OrderFacts] = {}
-        self._pending_children: dict[str, list[ProtectionEvent]] = {}
-        #: Client ids whose protective submission is still buffered. Their ACK
-        #: must wait too, or the checker sees ACK before ORDER_SUBMITTED.
-        self._pending_child_ids: set[str] = set()
+        #: Protective submission awaiting its native ACK. Published together with
+        #: the ACK so the invariant checker never observes an intra-step
+        #: submission→ACK gap as a real missing acknowledgement.
+        self._pending_protective: dict[str, ProtectionEvent] = {}
+        self._pending_protective_ack: dict[str, ProtectionEvent] = {}
         self._position_decision: dict[str, str] = {}
         self._reduce_decision: dict[str, str] = {}
         self._live_protection: dict[str, str] = {}
@@ -402,6 +406,7 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
 
         self._flush_pending_flat(unconditional=True)
         self._flush_pending_snapshots()
+        self._flush_pending_pairs()
         self._reprotect_remaining(candle)
         for transitioned in self.opportunity_book.on_candle(candle):
             self.book_transitions.append(
@@ -417,7 +422,12 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         )
         self._frame = frame
 
-        view = build_view(self._observations, cut_time_ns=cut)
+        view = build_view(
+            self._observations,
+            cut_time_ns=cut,
+            copy_inputs=False,
+            assume_ordered=True,
+        )
         context = assemble_context(
             {Timeframe.H1: view}, instrument_id=str(self.instrument_id), decision_time_ns=cut
         )
@@ -500,10 +510,15 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         truth (protection without exposure) and lets the invariant checker say
         so instead of silently dropping the order from the ledger.
         """
-        for decision_id in sorted(self._pending_children):
-            for buffered in self._pending_children[decision_id]:
-                self.protection_events.append(buffered)
-        self._pending_children.clear()
+        # A protective submission that never received an ACK is published as
+        # submitted so the checker reports a genuine MISSING_ACK instead of the
+        # event silently disappearing.
+        for client_id in sorted(self._pending_protective):
+            self.protection_events.append(self._pending_protective[client_id])
+        for client_id in sorted(self._pending_protective_ack):
+            self.protection_events.append(self._pending_protective_ack[client_id])
+        self._pending_protective.clear()
+        self._pending_protective_ack.clear()
         self._flush_pending_flat(unconditional=True)
 
     # ----------------------------------------------------------- V9 chain bits
@@ -1201,45 +1216,53 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self, event: ProtectionEvent, order: Any, facts: _OrderFacts | None
     ) -> None:
         protective = facts is not None and facts.role in (OrderRole.STOP, OrderRole.TARGET)
-        is_submission = event.kind is ProtectionEventKind.ORDER_SUBMITTED
-        bufferable = event.kind in (
-            ProtectionEventKind.ORDER_SUBMITTED,
-            ProtectionEventKind.ACK,
-        )
-        already_buffered = event.client_order_id in self._pending_child_ids
-        if (
-            bufferable
-            and protective
-            and (
-                not event.position_id
-                or (
-                    event.kind is ProtectionEventKind.ACK
-                    and already_buffered
-                )
-            )
-        ):
-            # A bracket child is submitted before the entry can fill, so the
-            # native position does not exist yet. Buffer the submission *and* its
-            # acknowledgement until the position is known; otherwise the ACK is
-            # recorded with a blank position id and the invariant checker reports
-            # a live protective order without acknowledgement.
-            if facts is not None:
-                self._pending_children.setdefault(facts.decision_id, []).append(event)
-                if is_submission:
-                    self._pending_child_ids.add(event.client_order_id)
-            return
-        if is_submission and protective:
-            self._live_protection[event.client_order_id] = event.position_id
-        if event.kind is ProtectionEventKind.ACK and protective:
-            self._live_protection.setdefault(event.client_order_id, event.position_id)
-        if event.kind in (ProtectionEventKind.CANCELED, ProtectionEventKind.REJECTED):
-            self._live_protection.pop(event.client_order_id, None)
-        if (
-            event.kind is ProtectionEventKind.FILL
-            and event.quantity > 0
-            and event.filled_quantity >= event.quantity
-        ):
-            self._live_protection.pop(event.client_order_id, None)
+        if protective:
+            client_id = event.client_order_id
+            if event.kind is ProtectionEventKind.ORDER_SUBMITTED:
+                # Publish the submission only together with its ACK. Publishing
+                # it first makes the checker evaluate a transient "live order
+                # without ACK" that the same engine step then resolves.
+                self._pending_protective[client_id] = event
+                return
+            if event.kind is ProtectionEventKind.ACK:
+                submission = self._pending_protective.pop(client_id, None)
+                if submission is not None:
+                    position_id = event.position_id or submission.position_id
+                    if position_id:
+                        self._publish_protective(
+                            replace(submission, position_id=position_id),
+                            replace(event, position_id=position_id),
+                        )
+                    else:
+                        # The ACK arrived before the position id is known; keep
+                        # the pair until a position callback supplies it.
+                        self._pending_protective[client_id] = submission
+                        self._pending_protective_ack[client_id] = event
+                    return
+                self.protection_events.append(event)
+                self._live_protection.setdefault(client_id, event.position_id)
+                return
+            if event.kind in (
+                ProtectionEventKind.CANCELED,
+                ProtectionEventKind.REJECTED,
+                ProtectionEventKind.FILL,
+            ):
+                submission = self._pending_protective.pop(client_id, None)
+                if submission is not None:
+                    position_id = event.position_id or submission.position_id
+                    if position_id:
+                        submission = replace(submission, position_id=position_id)
+                        event = replace(event, position_id=position_id)
+                    self.protection_events.append(submission)
+                self.protection_events.append(event)
+                if event.kind in (
+                    ProtectionEventKind.CANCELED,
+                    ProtectionEventKind.REJECTED,
+                ):
+                    self._live_protection.pop(client_id, None)
+                elif event.quantity > 0 and event.filled_quantity >= event.quantity:
+                    self._live_protection.pop(client_id, None)
+                return
         if (
             event.kind is ProtectionEventKind.FILL
             and facts is not None
@@ -1255,6 +1278,13 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self.protection_events.append(event)
         if event.position_id:
             self._flush_pending_flat(position_id=event.position_id)
+
+    def _publish_protective(
+        self, submission: ProtectionEvent, acknowledgement: ProtectionEvent
+    ) -> None:
+        self.protection_events.append(submission)
+        self.protection_events.append(acknowledgement)
+        self._live_protection[acknowledgement.client_order_id] = acknowledgement.position_id
 
     def on_position_opened(self, event: Any) -> None:
         super().on_position_opened(event)
@@ -1278,30 +1308,28 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
 
     def _flush_pending_children(self, position_id: str) -> None:
         """Append buffered protective submission/ACK events for ``position_id``."""
-        decision_id = self._position_decision.get(position_id, "")
-        if not decision_id:
-            return
-        for buffered in self._pending_children.pop(decision_id, []):
-            facts = self._order_facts.get(buffered.client_order_id)
-            if facts is None:
+        self._flush_pending_pairs(position_id)
+
+    def _flush_pending_pairs(self, position_id: str | None = None) -> None:
+        """Publish any submission/ACK pair whose position id is now known."""
+        for client_id in sorted(self._pending_protective_ack):
+            acknowledgement = self._pending_protective_ack.pop(client_id)
+            submission = self._pending_protective.pop(client_id, None)
+            if submission is None:
                 continue
-            self._pending_child_ids.discard(buffered.client_order_id)
-            facts.position_id = position_id
-            self._live_protection[buffered.client_order_id] = position_id
-            self.protection_events.append(
-                ProtectionEvent(
-                    kind=buffered.kind,
-                    ts_ns=buffered.ts_ns,
-                    client_order_id=buffered.client_order_id,
-                    position_id=position_id,
-                    role=buffered.role,
-                    direction=buffered.direction,
-                    side=buffered.side,
-                    quantity=buffered.quantity,
-                    filled_quantity=buffered.filled_quantity,
-                    price=buffered.price,
-                    reduce_only=buffered.reduce_only,
-                )
+            resolved = acknowledgement.position_id or submission.position_id or position_id
+            if not resolved and len(self._seen_open_positions) == 1:
+                # Netting mode reuses one position id; while exactly one position
+                # is open, a protective ACK with no explicit id belongs to it.
+                resolved = next(iter(self._seen_open_positions))
+            if not resolved:
+                # Keep the pair until a position callback supplies the id.
+                self._pending_protective_ack[client_id] = acknowledgement
+                self._pending_protective[client_id] = submission
+                continue
+            self._publish_protective(
+                replace(submission, position_id=resolved),
+                replace(acknowledgement, position_id=resolved),
             )
 
     def on_position_closed(self, event: Any) -> None:

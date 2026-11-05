@@ -77,7 +77,9 @@ def test_consensus_gate_matches_the_measured_v8_baseline() -> None:
     config = SimArmConfig()
     assert config.min_support_quorum == 1
     assert config.max_contradiction_tolerance == 28
+    assert config.target_notional == Decimal("1000")
     assert config.baseline_config().max_contradiction_tolerance == 28
+    assert config.baseline_config().target_notional == Decimal("1000")
 
 
 def test_costed_smoke_run_on_the_authorized_tape() -> None:
@@ -110,3 +112,24 @@ def test_adaptive_strategy_is_a_native_strategy_subclass() -> None:
     from nautilus_trader.trading import Strategy
 
     assert issubclass(AdaptiveSimStrategy, Strategy)
+
+
+def test_baseline_pnl_parity_with_the_measured_portfolio_runner() -> None:
+    """The sim runner must reproduce the measured V8 portfolio baseline exactly."""
+    baseline = run_baseline_arm(
+        tape=TAPE,
+        config=SimArmConfig(enabled=True),
+    )
+    assert baseline.trades == 44
+    assert baseline.net_pnl == pytest.approx(-21.23495118, abs=1e-9)
+    assert baseline.net_r == pytest.approx(-0.021638104017588564, abs=1e-12)
+    assert baseline.fee_total == pytest.approx(37.91535683, abs=1e-8)
+
+
+def test_protection_audit_is_clean_over_500_bars() -> None:
+    measurement = run_sim_arm(
+        tape=TAPE,
+        config=SimArmConfig(enabled=True),
+        limit=500,
+    )
+    assert measurement.protection["violations"] == []
