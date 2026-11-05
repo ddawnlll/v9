@@ -71,3 +71,40 @@ and carries no simulated or real-market PnL. A native settlement-level audit,
 mark-to-market equity series, comparable random controls and statistical
 inference with dependence-preserving blocks remain **NOT_RUN**. No new native
 replay or economic superiority conclusion was produced.
+
+## Funding snapshot investigation
+
+A separate small deterministic native fixture, based on
+`test_two_closed_campaigns_survive_same_native_netting_id_and_reconcile` in
+`tests/test_native_engine.py`, observed two closed campaigns sharing the same
+NETTING position ID. The first campaign closure recorded −1.00000000 USDT in a
+funding adjustment; the second recorded none. At replay end,
+`economic_state()` contained one final position snapshot, corresponding to the
+second campaign, with no adjustments, although account balance included both
+campaigns. Therefore `sim_arm._funding_total`, which previously summed only
+`engine.cache.positions()` at cutoff, can omit funding from earlier
+incarnations. This supplies a demonstrated mechanism for undercounting, but
+**does not prove that the archived +0.33775927 USDT residual is exactly that
+omission**; matching the historical residual requires the archived funded and
+unfunded native fill, settlement and position-incarnation timeline with
+independently bound quantities, prices and cashflows. The archived totals alone
+cannot establish that identity. The dual-run `trade_signature` verifies opens,
+not every exit/fill or account cashflow, so its `VALID` label is also not an
+independent full funding audit.
+
+`_funding_total` now refuses the final-cache aggregate for multiple campaign
+openings or missing opening records with cached positions; unparsable
+adjustments and missing in-window settlements also yield `None` and an
+unsupported reason rather than a partial or zero figure. This is deliberately
+conservative: it does not reconstruct funding or change account balance.
+`tests/test_accounting_contract.py::test_funding_snapshot_refuses_multiple_netting_campaigns`
+is a deterministic regression; the native two-campaign fixture has additional
+assertions pinning the observed history loss. The standalone fixture was run
+before those assertions were added and returned the two campaign closures and
+final position snapshot described above; the modified native test is **NOT_RUN**
+pending the shared native runner. No profitability inference follows.
+
+Follow-up checks: `uv run --locked --extra dev pytest -q
+tests/test_accounting_contract.py` (4 passed); targeted Ruff on
+`sim_arm.py`, `test_accounting_contract.py`, `test_native_engine.py` and mypy
+on `sim_arm.py` passed.

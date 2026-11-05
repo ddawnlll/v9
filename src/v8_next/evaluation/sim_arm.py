@@ -266,10 +266,13 @@ def _commission_total(fill_records: tuple[dict[str, Any], ...] | list[dict[str, 
     return float(total), unparsable
 
 
-def _funding_total(positions: list[dict[str, Any]]) -> tuple[float, int]:
-    """Funding cost carried by the engine's own position adjustments."""
+def _funding_total(
+    positions: list[dict[str, Any]], *, campaign_openings: int
+) -> tuple[float | None, int]:
+    """Sum a final snapshot only if it can contain the whole campaign history."""
+    if campaign_openings > 1 or bool(campaign_openings) != bool(positions):
+        return None, 0
     total = _ZERO
-    counted = 0
     unparsable = 0
     for position in positions:
         for adjustment in position.get("adjustments") or []:
@@ -280,8 +283,7 @@ def _funding_total(positions: list[dict[str, Any]]) -> tuple[float, int]:
                 unparsable += 1
                 continue
             total += parsed
-            counted += 1
-    return float(total), unparsable
+    return (None if unparsable else float(total)), unparsable
 
 
 def _campaign_metrics(
@@ -546,8 +548,19 @@ def _measure(
     if unparsable_fees:
         unsupported.append(f"FEE_TOTAL_PARTIAL:{unparsable_fees} fill(s) without a parsable commission")
     funding_total: float | None
-    funding_total, unparsable_funding = _funding_total(positions)
+    funding_total, unparsable_funding = _funding_total(
+        positions, campaign_openings=len(strategy.opened_positions)
+    )
+    # The NETTING cache holds only the latest incarnation for a reused position
+    # identity. A final snapshot cannot prove lifetime adjustments across
+    # multiple campaigns, even when its observed sum happens to be zero.
+    if len(strategy.opened_positions) > 1 or bool(strategy.opened_positions) != bool(positions):
+        unsupported.append(
+            "FUNDING_UNSUPPORTED_NETTING_CACHE_HISTORY: final position cache "
+            "cannot establish complete campaign adjustment history"
+        )
     if unparsable_funding:
+        funding_total = None
         unsupported.append(f"FUNDING_TOTAL_PARTIAL:{unparsable_funding} adjustment(s) unparsable")
     if not window.funding:
         funding_total = None
@@ -556,6 +569,7 @@ def _measure(
             "a zero here would be absence, not a measured cost"
         )
     elif result["funding_settlements_fed"] == 0:
+        funding_total = None
         unsupported.append("FUNDING_UNSUPPORTED_NO_SETTLEMENTS_IN_WINDOW")
 
     decisions: list[dict[str, Any]]

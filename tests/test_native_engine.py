@@ -798,6 +798,13 @@ def test_two_closed_campaigns_survive_same_native_netting_id_and_reconcile():
     )
     closures = list(strategy.position_closures.values())
     assert len(closures) == 2 and len({c["position_id"] for c in closures}) == 1
+    # The first incarnation has funding; the final cache exposes the second
+    # incarnation only. Summing the cache is not a lifetime funding measure.
+    from v8_next.evaluation.sim_arm import _funding_total
+
+    assert closures[0]["adjustments"][0]["pnl_change"] == "-1.00000000 USDT"
+    assert len(state["positions"]) == 1 and state["positions"][0]["adjustments"] == []
+    assert _funding_total(state["positions"], campaign_openings=2) == (None, 0)
     records = [c.to_record() for c in campaigns]
     sample = observed_outcomes(records, closures, state, Decimal(10000))
     assert sample["closed_outcome_count"] == 2

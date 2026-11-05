@@ -38,3 +38,17 @@ def test_unknown_on_both_sides_still_blocks_and_reports_all_mismatches() -> None
     assert result.status == "BLOCKED"
     assert result.missing == ("funding_model",)
     assert result.mismatched == ("initial_balance",)
+
+
+def test_funding_snapshot_refuses_multiple_netting_campaigns() -> None:
+    from v8_next.evaluation.sim_arm import _funding_total
+
+    # Mechanical fixture: campaign 1 received -1, then a second campaign reused
+    # the position ID; final cache now contains only campaign 2, with no funding.
+    final_cache = [{"adjustments": []}]
+    assert _funding_total(final_cache, campaign_openings=2) == (None, 0)
+    assert _funding_total([], campaign_openings=1) == (None, 0)
+    assert _funding_total(final_cache, campaign_openings=0) == (None, 0)
+    assert _funding_total(final_cache, campaign_openings=1) == (0.0, 0)
+    malformed = [{"adjustments": [{"adjustment_type": "FUNDING", "pnl_change": None}]}]
+    assert _funding_total(malformed, campaign_openings=1) == (None, 1)
