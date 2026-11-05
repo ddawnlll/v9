@@ -12,6 +12,7 @@ resume point for the next session.
 | Working branch | `research/edge-discovery` |
 | Worktree | `/Users/hootie/src/v9-worktrees/edge` |
 | Engine | NautilusTrader 2.0.0rc4, Python 3.12 |
+| Draft PR | https://github.com/ddawnlll/v9/pull/71 (base `integration/wave1`, draft, not merged) |
 
 `main` is `0b69fc4` and holds none of the integration work. PR #67
 (`integration/wave1` = `09908af`) and PR #70 (`codex/adaptive-integration` =
