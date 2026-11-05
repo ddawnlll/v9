@@ -44,6 +44,10 @@ unread** (`VALIDATION_DATA_UNSPENT`): no candidate qualified to spend it.
   * `screen.evaluate_path` had no slippage or funding; both are now first-class,
     reported separately, with the accounting identity under test (`0157fc4`).
   * `screen.load_flow` added for aggressive taker-buy share (`b3a312c`).
+* Native protection/accounting evidence re-run on the frozen BTCUSDT Q1 slice
+  (arm D): 247 protection events, **0 violations**, 23 trades, 0 open campaigns,
+  `funding_total` 0.219 USDT with `FULL_WITH_UNKNOWN_RECEIPT_TIME` coverage, and
+  no `unsupported` fields. Net PnL 20.162531 still matches the frozen parity.
 * Shared-account multi-instrument execution already exists:
   `run_portfolio_backtest` runs one engine, one MARGIN/NETTING account, several
   instruments, native funding settlement — verified with two legs (one
