@@ -8,3 +8,5 @@ On the H1 tape with SHA-256 `84978f2d53a70afb769f760380b1587f073edfdc07d628c3a3b
 | V9 | 13.828 | 14.159 | 261586944 |
 
 RSS is cumulative peak of the shared process, not an isolated per-arm peak. The wall/CPU divergence of the V8 run means this single observation is unsuitable for a speed ratio; contention and startup were not controlled. A 4 GiB constrained run and before/after parity profile were not performed. The checked-in earlier report records 95.827 s before and 13.036 s after its optimization; that is historical, not a newly replicated before/after benchmark. No new performance improvement is claimed.
+
+A later sequential full replay at `27fe512` measured V8 1.216 s wall / 1.215 s CPU / process peak RSS 229277696 bytes, and V9 12.362 s wall / 12.743 s CPU / cumulative peak RSS 250298368 bytes. Same command/configuration/tape as above. This is an additional observation, not an isolated before/after optimization or a 4 GiB qualification. V9 decision digest changed after correcting position opportunity identity; order digest stayed the same.
