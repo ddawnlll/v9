@@ -312,33 +312,64 @@ def enrich_ledger_from_native(run_dir: Path, native_reports: Mapping[str, Any]) 
 def assign_campaign_ids(run_dir: Path) -> int:
     """Attribute every ledger row to a position campaign, stably and in place.
 
-    Rule: campaign N begins at the N-th POSITION_OPENED and continues to the next
-    open. Because entry orders are submitted just before the position opens, the
-    entry leg (client id suffix -1) and the admission decision at the same
-    timestamp are attributed forward to the campaign they create. C%04d ids are
-    stable for a given tape and replay.
+    Rule: campaign N begins at the N-th POSITION_OPENED (``C0001`` is the first
+    campaign — there is no campaign 0) and continues to the next open. Identity
+    wins over position in the row stream: an event that names a ``decision_id``
+    inherits the campaign that decision opened, and an event that names a
+    ``client_order_id``/``venue_order_id`` inherits its order's campaign. That is
+    what attributes the entry leg and its admission decision, both emitted just
+    before POSITION_OPENED, forward to the campaign they create. Rows with no
+    identity and no open yet stay unattributed: an absent campaign is never
+    guessed. ``C%04d`` ids are a pure function of the persisted event order, so
+    re-deriving from the same tape/replay yields the same ids.
     """
     path = Path(run_dir) / "events.jsonl"
     events = read_events(path)
     opened = [e for e in events if e["event_type"] == "POSITION_OPENED"]
     open_sequences = [int(e["sequence_number"]) for e in opened]
-    open_time_to_campaign = {
-        int(e["event_time_ns"]): index + 1 for index, e in enumerate(opened)
-    }
-    forward_types = {
-        "ORDER_SUBMITTED",
-        "ORDER_ACCEPTED",
-        "ORDER_FILLED",
-        "ADMISSION_ACCEPTED",
-    }
+
+    campaign_by_decision: dict[str, int] = {}
+    for index, event in enumerate(opened):
+        decision = _text(event.get("decision_id"))
+        if decision is not None:
+            campaign_by_decision.setdefault(decision, index + 1)
+    campaign_by_order: dict[str, int] = {}
+    campaign_by_venue: dict[str, int] = {}
     for event in events:
-        campaign = bisect_right(open_sequences, int(event["sequence_number"]))
-        if campaign in open_time_to_campaign.values() and event["event_type"] in forward_types:
-            client_id = str(event.get("client_order_id") or "")
-            if open_time_to_campaign.get(int(event["event_time_ns"])) == campaign + 1 and (
-                client_id.endswith("-1") or event["event_type"].startswith("ADMISSION")
-            ):
-                campaign += 1
+        client_id = _text(event.get("client_order_id"))
+        decision = _text(event.get("decision_id"))
+        if client_id is None or decision is None:
+            continue
+        resolved_campaign = campaign_by_decision.get(decision)
+        if resolved_campaign is not None:
+            campaign_by_order.setdefault(client_id, resolved_campaign)
+    for event in events:
+        venue_id = _text(event.get("venue_order_id"))
+        client_id = _text(event.get("client_order_id"))
+        if venue_id is None or client_id is None:
+            continue
+        resolved_campaign = campaign_by_order.get(client_id)
+        if resolved_campaign is not None:
+            campaign_by_venue.setdefault(venue_id, resolved_campaign)
+
+    for event in events:
+        campaign: int | None = None
+        decision = _text(event.get("decision_id"))
+        if decision is not None:
+            campaign = campaign_by_decision.get(decision)
+        if campaign is None:
+            client_id = _text(event.get("client_order_id"))
+            if client_id is not None:
+                campaign = campaign_by_order.get(client_id)
+        if campaign is None:
+            venue_id = _text(event.get("venue_order_id"))
+            if venue_id is not None:
+                campaign = campaign_by_venue.get(venue_id)
+        if campaign is None:
+            # Position interval: the greatest open at or before this sequence
+            # owns the row. Nothing before the first open is claimed.
+            position = bisect_right(open_sequences, int(event.get("sequence_number") or 0))
+            campaign = position or None
         if campaign:
             event["campaign_id"] = f"C{campaign:04d}"
         else:
@@ -349,6 +380,46 @@ def assign_campaign_ids(run_dir: Path) -> int:
             handle.write(json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n")
     tmp.replace(path)
     return len(opened)
+
+
+def _order_identities(events: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, str]]:
+    """``client_order_id -> {campaign_id, decision_id}`` from the order rows.
+
+    An identity key is filled only from a row that carries it; a blank value is
+    never substituted from a neighbouring order.
+    """
+    identities: dict[str, dict[str, str]] = {}
+    for event in events:
+        client_id = _text(event.get("client_order_id"))
+        if client_id is None:
+            continue
+        slot = identities.setdefault(client_id, {"campaign_id": "", "decision_id": ""})
+        for key in ("campaign_id", "decision_id"):
+            if not slot[key]:
+                slot[key] = _text(event.get(key)) or ""
+    return identities
+
+
+def attach_fill_identities(
+    fills: Sequence[Mapping[str, Any]], events: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    """Attach campaign/decision to each fill row from the order it belongs to.
+
+    A fill whose ``client_order_id`` names no persisted order keeps neither key:
+    the row stays unattributed so the lineage audit reports the gap instead of
+    certifying a guessed campaign.
+    """
+    identities = _order_identities(events)
+    rows: list[dict[str, Any]] = []
+    for fill in fills:
+        row = dict(fill)
+        identity = identities.get(str(row.get("client_order_id") or ""))
+        for key in ("campaign_id", "decision_id"):
+            row.pop(key, None)
+            if identity is not None and identity[key]:
+                row[key] = identity[key]
+        rows.append(row)
+    return rows
 
 
 def write_family_artifacts(run_dir: Path, expert_filter: str | None) -> dict[str, int]:
@@ -1129,7 +1200,10 @@ def run_native_audit(
     all_events = read_events(run_dir / "events.jsonl")
 
     family_counts = write_family_artifacts(run_dir, expert)
-    _write_jsonl(run_dir / "fills.jsonl", _enrich_fill_rows(native_fills, result))
+    _write_jsonl(
+        run_dir / "fills.jsonl",
+        attach_fill_identities(_enrich_fill_rows(native_fills, result), all_events),
+    )
     _write_jsonl(run_dir / "trade_lifecycles.jsonl", lifecycles)
     _write_json(run_dir / "opportunity_funnel.json", funnel)
     _write_json(run_dir / "execution_metrics.json", execution_metrics)
@@ -1776,33 +1850,13 @@ def _source_id_section(
     return ids, tuple(reasons), tuple(dict.fromkeys(labels))
 
 
-def _campaign_decisions(
-    decisions: Sequence[Mapping[str, Any]],
-) -> dict[str, str]:
-    """Campaign -> its single decision id, only when exactly one decision exists.
+def _order_records(events: Sequence[Mapping[str, Any]]) -> dict[str, LineageOrder]:
+    """One lineage order per ``client_order_id``, at its first persisted event.
 
-    An order or fill that does not carry ``decision_id`` may be joined to the
-    campaign's decision only when the campaign names exactly one; an ambiguous
-    campaign yields no mapping, so the record stays unjoined instead of guessing.
+    The decision is read from the order's own rows, never borrowed from the
+    campaign's single decision: an order that lost its ``decision_id`` must report
+    ``MISSING_JOIN`` and keep the report from certifying.
     """
-    by_campaign: dict[str, set[str]] = {}
-    for row in decisions:
-        campaign = _text(row.get("campaign_id"))
-        decision = _text(row.get("decision_id"))
-        if campaign is None or decision is None:
-            continue
-        by_campaign.setdefault(campaign, set()).add(decision)
-    return {
-        campaign: next(iter(found))
-        for campaign, found in by_campaign.items()
-        if len(found) == 1
-    }
-
-
-def _order_records(
-    events: Sequence[Mapping[str, Any]], campaign_decisions: Mapping[str, str]
-) -> dict[str, LineageOrder]:
-    """One lineage order per ``client_order_id``, at its first persisted event."""
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     for event in events:
         if event.get("event_type") not in _ORDER_EVENT_TYPES:
@@ -1829,8 +1883,6 @@ def _order_records(
             (found for found in (_text(row.get("decision_id")) for row in ordered) if found),
             None,
         )
-        if decision is None and campaign is not None:
-            decision = campaign_decisions.get(campaign)
         records[order_id] = LineageOrder(
             order_id=order_id,
             decision_id=decision or "",
@@ -1978,8 +2030,7 @@ def _lineage_from_disk(
         if event.get("event_type") in _DECISION_EVENT_TYPES
         and _text(event.get("decision_id")) is not None
     ]
-    campaign_decisions = _campaign_decisions(decisions)
-    orders = _order_records(events, campaign_decisions)
+    orders = _order_records(events)
     fill_records = _fill_records(fills, orders, _venue_client_map(events))
     cashflows = _cashflow_records(events, fill_records)
     if not (decisions or orders or fill_records or cashflows):

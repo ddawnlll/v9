@@ -244,6 +244,10 @@ class ExpertEnsembleStrategy(Strategy):
         self._feature_engine = FeatureEngine()
         self.decisions: list[dict[str, Any]] = []
         self.order_events: list[dict[str, Any]] = []
+        #: Entry decision that originated each submitted order, by client order
+        #: id. Registered at submission so native ORDER_*/POSITION_OPENED events
+        #: can name their decision instead of being joined by timestamp guesswork.
+        self._order_decisions: dict[str, dict[str, str]] = {}
         self.opened_positions: list[dict[str, Any]] = []
         self.closed_positions: list[dict[str, Any]] = []
         # Pending TWAP child slices: dicts with side/quantity/bracket/prices.
@@ -451,6 +455,8 @@ class ExpertEnsembleStrategy(Strategy):
             return None
         sl = self.pending_twap.pop(0)
         qty = Quantity.from_str(format(sl["quantity"], f".{instrument.size_precision}f"))
+        decision_id = str(sl.get("decision_id") or "") or None
+        opportunity_id = sl.get("opportunity_id")
         if sl["bracket"]:
             order_list = self.order_factory.bracket(
                 instrument_id=self.instrument_id,
@@ -461,24 +467,25 @@ class ExpertEnsembleStrategy(Strategy):
                 sl_trigger_price=sl["sl_price"],
                 tp_price=sl["tp_price"],
             )
+            self._bind_order_decision(order_list, decision_id, opportunity_id)
             self.submit_order_list(order_list)
         elif sl["entry_order_type"] == OrderType.LIMIT:
-            self.submit_order(
-                self.order_factory.limit(
-                    instrument_id=self.instrument_id,
-                    order_side=sl["side"],
-                    quantity=qty,
-                    price=sl["entry_price"],
-                )
+            order = self.order_factory.limit(
+                instrument_id=self.instrument_id,
+                order_side=sl["side"],
+                quantity=qty,
+                price=sl["entry_price"],
             )
+            self._bind_order_decision(order, decision_id, opportunity_id)
+            self.submit_order(order)
         else:
-            self.submit_order(
-                self.order_factory.market(
-                    instrument_id=self.instrument_id,
-                    order_side=sl["side"],
-                    quantity=qty,
-                )
+            order = self.order_factory.market(
+                instrument_id=self.instrument_id,
+                order_side=sl["side"],
+                quantity=qty,
             )
+            self._bind_order_decision(order, decision_id, opportunity_id)
+            self.submit_order(order)
         if record is not None:
             self.opportunity_book.update_status(record.opportunity_id, OpportunityStatus.ADMITTED)
         return f"TWAP_CHILD_{sl['done']}/{sl['total']}"
@@ -848,6 +855,7 @@ class ExpertEnsembleStrategy(Strategy):
             if d4_entry is not None
             else (record.opportunity_id if record is not None else None)
         )
+        decision_id = f"D{candle.end_ns}"
         if gate_open and twap_action is None:
             open_positions = [
                 p
@@ -1036,15 +1044,17 @@ class ExpertEnsembleStrategy(Strategy):
                             # stop entry is submitted on its own and the ledger
                             # says UNBRACKETED rather than dropping the protection
                             # orders silently.
-                            self.submit_order(
-                                self.order_factory.stop_market(
-                                    instrument_id=self.instrument_id,
-                                    order_side=side,
-                                    quantity=quantity,
-                                    trigger_price=entry_trigger_price,
-                                    emulation_trigger=emulation_trigger,
-                                )
+                            entry_order = self.order_factory.stop_market(
+                                instrument_id=self.instrument_id,
+                                order_side=side,
+                                quantity=quantity,
+                                trigger_price=entry_trigger_price,
+                                emulation_trigger=emulation_trigger,
                             )
+                            self._bind_order_decision(
+                                entry_order, decision_id, entry_opportunity_id
+                            )
+                            self.submit_order(entry_order)
                             if record is not None:
                                 self.opportunity_book.update_status(
                                     record.opportunity_id, OpportunityStatus.ADMITTED
@@ -1085,6 +1095,8 @@ class ExpertEnsembleStrategy(Strategy):
                                                 "tp_price": tp_price,
                                                 "done": idx,
                                                 "total": len(slices),
+                                                "decision_id": decision_id,
+                                                "opportunity_id": entry_opportunity_id,
                                             }
                                         )
                                     twap_tag = f"TWAP_PARENT_1/{len(slices)}_"
@@ -1098,6 +1110,9 @@ class ExpertEnsembleStrategy(Strategy):
                                 emulation_trigger=emulation_trigger,
                                 sl_trigger_price=sl_price,
                                 tp_price=tp_price,
+                            )
+                            self._bind_order_decision(
+                                order_list, decision_id, entry_opportunity_id
                             )
                             self.submit_order_list(order_list)
                             # Protection lifecycle is recorded at submission: the
@@ -1113,6 +1128,8 @@ class ExpertEnsembleStrategy(Strategy):
                                 trigger_price=str(sl_price),
                                 quantity=str(submit_qty),
                                 child_index=1,
+                                decision_id=decision_id,
+                                opportunity_id=entry_opportunity_id,
                             )
                             self._audit(
                                 "TARGET_CREATED",
@@ -1123,6 +1140,8 @@ class ExpertEnsembleStrategy(Strategy):
                                 price=str(tp_price),
                                 quantity=str(submit_qty),
                                 child_index=2,
+                                decision_id=decision_id,
+                                opportunity_id=entry_opportunity_id,
                             )
                             if record is not None:
                                 self.opportunity_book.update_status(
@@ -1213,9 +1232,14 @@ class ExpertEnsembleStrategy(Strategy):
                                                 "tp_price": None,
                                                 "done": idx,
                                                 "total": len(slices),
+                                                "decision_id": decision_id,
+                                                "opportunity_id": entry_opportunity_id,
                                             }
                                         )
                                     twap_tag = f"TWAP_PARENT_1/{len(slices)}_"
+                            self._bind_order_decision(
+                                submit_order, decision_id, entry_opportunity_id
+                            )
                             self.submit_order(submit_order)
                             if record is not None:
                                 self.opportunity_book.update_status(
@@ -1237,7 +1261,7 @@ class ExpertEnsembleStrategy(Strategy):
                     candle.end_ns,
                     evidence="DERIVED",
                     opportunity_id=entry_opportunity_id,
-                    decision_id=f"D{candle.end_ns}",
+                    decision_id=decision_id,
                     action=action,
                     sizing_mode=sizing_mode,
                 )
@@ -1246,9 +1270,9 @@ class ExpertEnsembleStrategy(Strategy):
                     candle.end_ns,
                     evidence="OBSERVED_SIMULATION",
                     opportunity_id=entry_opportunity_id,
-                    decision_id=f"D{candle.end_ns}",
+                    decision_id=decision_id,
                     action=action,
-                    intent_id=f"D{candle.end_ns}",
+                    intent_id=decision_id,
                     order_linkage="INTENT_ONLY (submit return value not exposed; native ids follow)",
                 )
             elif action in {"POSITION_OCCUPIED"}:
@@ -1257,7 +1281,7 @@ class ExpertEnsembleStrategy(Strategy):
                     candle.end_ns,
                     evidence="DERIVED",
                     opportunity_id=entry_opportunity_id,
-                    decision_id=f"D{candle.end_ns}",
+                    decision_id=decision_id,
                     reason_code=action,
                     action=action,
                 )
@@ -1372,6 +1396,42 @@ class ExpertEnsembleStrategy(Strategy):
             "state_counts": policy.state_counts(),
         }
 
+    def _bind_order_decision(
+        self, orders: Any, decision_id: str | None, opportunity_id: str | None
+    ) -> None:
+        """Register the decision that originated each order, by client order id.
+
+        Called at submission time (the only point where the strategy still knows
+        which decision an order belongs to). A missing decision id registers
+        nothing: an unknown identity is never fabricated.
+        """
+        if not decision_id:
+            return
+        if isinstance(orders, (list, tuple)):
+            # ``order_factory.bracket`` returns the order list as a plain list
+            # in the pinned Nautilus release; later releases return OrderList.
+            candidates = [
+                str(getattr(order, "client_order_id", "") or "") for order in orders
+            ]
+        else:
+            client_ids = getattr(orders, "client_order_ids", None)
+            if callable(client_ids):
+                candidates = [str(candidate or "") for candidate in client_ids()]
+            else:
+                single = str(getattr(orders, "client_order_id", "") or "")
+                candidates = [single] if single else []
+        for client_id in candidates:
+            if not client_id:
+                continue
+            self._order_decisions[client_id] = {
+                "decision_id": str(decision_id),
+                "opportunity_id": str(opportunity_id or ""),
+            }
+
+    def _order_decision(self, client_order_id: Any) -> dict[str, str] | None:
+        """The registered decision context of an order, or ``None`` when unknown."""
+        return self._order_decisions.get(str(client_order_id or ""))
+
     def _audit(self, event_type: str, event_time_ns: int, *, evidence: str, **fields: Any) -> None:
         """Append one forensic event. Never raises into the replay path."""
         recorder = self.audit_recorder
@@ -1433,6 +1493,15 @@ class ExpertEnsembleStrategy(Strategy):
                 elif trigger_price is not None:
                     record["price"] = str(trigger_price)
         self.order_events.append(record)
+        # The decision that submitted this order travels with every lifecycle
+        # event of the order; without it the ledger cannot join order -> decision
+        # and the lineage audit reports MISSING_JOIN instead of certifying.
+        decision_fields: dict[str, str] = {}
+        bound = self._order_decision(record["client_order_id"])
+        if bound is not None:
+            decision_fields["decision_id"] = bound["decision_id"]
+            if bound["opportunity_id"]:
+                decision_fields["opportunity_id"] = bound["opportunity_id"]
         from v8_next.audit.forensic import ORDER_EVENT_TYPES
 
         mapped = ORDER_EVENT_TYPES.get(record["event_type"])
@@ -1451,6 +1520,7 @@ class ExpertEnsembleStrategy(Strategy):
                 filled_qty=record["filled_qty"],
                 reason=record["reason"],
                 native_event_class=record["event_type"],
+                **decision_fields,
             )
             # Bracket children are the only orders whose client id ends in -2
             # (stop) or -3 (target); emit explicit protection lifecycle events so
@@ -1482,6 +1552,7 @@ class ExpertEnsembleStrategy(Strategy):
                             "FILLED" if mapped == "ORDER_FILLED" else None
                         ),
                         native_event_class=record["event_type"],
+                        **decision_fields,
                     )
 
     def on_position_opened(self, event: Any) -> None:
@@ -1514,8 +1585,32 @@ class ExpertEnsembleStrategy(Strategy):
             side=record["side"],
             quantity=record["quantity"],
             avg_px_open=record["avg_px_open"],
-            linkage_note="decision_id resolved by audit pipeline from entry fill timestamp",
+            **self._opening_decision_fields(event),
         )
+
+    def _opening_decision_fields(self, event: Any) -> dict[str, str]:
+        """The entry decision behind a native position, from its opening order.
+
+        ``PositionOpened.opening_order_id`` is the client id of the order that
+        created the campaign; the strategy registered that order's decision at
+        submission. An unresolvable opening order yields no fields at all, so the
+        audit reports the gap instead of borrowing a neighbouring decision.
+        """
+        opening_order_id = str(getattr(event, "opening_order_id", "") or "")
+        fields: dict[str, str] = {}
+        if opening_order_id:
+            fields["opening_order_id"] = opening_order_id
+        bound = self._order_decision(opening_order_id) if opening_order_id else None
+        if bound is not None:
+            fields["decision_id"] = bound["decision_id"]
+            if bound["opportunity_id"]:
+                fields["opportunity_id"] = bound["opportunity_id"]
+        fields["linkage_note"] = (
+            "decision_id joined from opening_order_id"
+            if bound is not None
+            else "opening order carries no registered decision"
+        )
+        return fields
 
     def on_position_closed(self, event: Any) -> None:
         """Track closed native position and realized PnL."""
