@@ -852,14 +852,13 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 direction=order_direction,
             )
             self._mark_order(client_order_id, decision_id, role)
-        self.submit_order_list(children)
-        self._any_order_seen = True
         self._audit(
-            "PROTECTIVE_STOP_CREATED",
+            "ORDER_CREATED",
             int(candle.end_ns),
             evidence=ARM_EVIDENCE_CLASS,
             decision_id=decision_id,
             arm_role="STOP",
+            client_order_id=str(children[1].client_order_id),
             order_role="STOP_LOSS",
             order_type="STOP_MARKET",
             trigger_price=str(sl_price),
@@ -869,11 +868,12 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             advisory_only=False,
         )
         self._audit(
-            "TARGET_CREATED",
+            "ORDER_CREATED",
             int(candle.end_ns),
             evidence=ARM_EVIDENCE_CLASS,
             decision_id=decision_id,
             arm_role="TARGET",
+            client_order_id=str(children[2].client_order_id),
             order_role="TAKE_PROFIT",
             order_type="LIMIT",
             price=str(tp_price),
@@ -882,6 +882,8 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             sim_arm=True,
             advisory_only=False,
         )
+        self.submit_order_list(children)
+        self._any_order_seen = True
         return f"SUBMITTED_BRACKET_{'LONG' if side is OrderSide.BUY else 'SHORT'}_{quantity}({sizing_note})"
 
     def _entry_quantity(self, instrument: Any, px: Decimal) -> tuple[Quantity | None, str]:
@@ -1014,21 +1016,22 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                     position_id=position_id,
                 )
                 self._mark_order(client_order_id, decision_id, arm_role)
+                self._audit(
+                    "ORDER_CREATED",
+                    int(candle.end_ns),
+                    evidence=ARM_EVIDENCE_CLASS,
+                    decision_id=decision_id,
+                    client_order_id=client_order_id,
+                    position_id=position_id,
+                    arm_role=arm_role,
+                    quantity=str(quantity),
+                    reason="REPROTECT_REDUCED_POSITION",
+                    sim_arm=True,
+                    advisory_only=False,
+                )
                 self.submit_order(order, position_id=position.id)
             self._any_order_seen = True
             self._reprotect.discard(position_id)
-            self._audit(
-                "PROTECTIVE_STOP_CREATED",
-                int(candle.end_ns),
-                evidence=ARM_EVIDENCE_CLASS,
-                decision_id=decision_id,
-                arm_role="STOP",
-                quantity=str(quantity),
-                trigger_price=str(stop_px),
-                reason="REPROTECT_REDUCED_POSITION",
-                sim_arm=True,
-                advisory_only=False,
-            )
 
     def _protection_in_flight(self, position_id: str) -> bool:
         """True while a reduce/exit order for this position has not resolved."""
