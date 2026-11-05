@@ -264,3 +264,12 @@ none of E-001..E-006 used (price rank and volume spikes only). Long the symbols
 with the strongest buy-side aggression and short the weakest, with the same
 dollar-neutral construction, costs and random two-and-two null.
 
+
+---
+
+## 2026-11-05 — E-007: cross-sectional aggressive-flow imbalance
+
+* Preregistration: `reports/research/PREREGISTRATION_flow.json` (code `b3a312c`).
+* Rank by taker-buy share of quote volume; long the two highest, short the two
+  lowest, on rank transitions. Matched random two-and-two null, 50 draws.
+* Status: `PREREGISTERED` (results pending).
