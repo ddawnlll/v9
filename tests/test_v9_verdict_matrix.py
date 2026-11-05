@@ -245,21 +245,33 @@ def _write_economic_bundle(
     verdict: str = "PASS",
     costs: dict[str, object] | None = None,
     digest: str | None = None,
+    net_return: str = "0.012",
+    trades: object = 42,
+    uncertainty: object = None,
+    prereg_extra: dict[str, object] | None = None,
 ) -> str:
     directory = root / "reports/evaluation"
     directory.mkdir(parents=True, exist_ok=True)
     prereg_path = directory / "preregistration.json"
     if prereg:
-        prereg_path.write_text(
-            json.dumps(
-                {
-                    "hypothesis_id": "H-1",
-                    "dataset_role": role,
-                    "costs": costs or COSTS,
-                }
-            ),
-            encoding="utf-8",
-        )
+        registration: dict[str, object] = {
+            "hypothesis_id": "H-1",
+            "dataset_role": role,
+            "costs": costs or COSTS,
+            "minimum_trades": 30,
+            "accepted_outcomes": ["NO_EDGE", "INCONCLUSIVE", "STOP", "INVALID"],
+            "decision_rule": ("PASS only when the Holm-corrected interval excludes zero."),
+            "hypothesis_budget": {
+                "family": "v9-test-family",
+                "max_hypotheses": 4,
+                "max_trials": 4,
+                "alpha": "0.05",
+                "correction": "HOLM",
+            },
+        }
+        if prereg_extra is not None:
+            registration.update(prereg_extra)
+        prereg_path.write_text(json.dumps(registration), encoding="utf-8")
     digest_value = digest or (
         hashlib.sha256(prereg_path.read_bytes()).hexdigest() if prereg else "0" * 64
     )
@@ -274,15 +286,25 @@ def _write_economic_bundle(
             encoding="utf-8",
         )
     if costed:
+        if uncertainty is None:
+            uncertainty = {
+                "ci_lower": "0.004",
+                "ci_upper": "0.028",
+                "family_size": 4,
+                "correction": "HOLM",
+                "p_value": "0.002",
+                "ci_alpha": "0.0125",
+            }
         (directory / "costed_result.json").write_text(
             json.dumps(
                 {
                     "preregistration_digest": digest_value,
                     "dataset_role": role,
                     "costs": costs or COSTS,
-                    "net_return": "0.012",
+                    "net_return": net_return,
+                    "trades": trades,
                     "verdict": verdict,
-                    "uncertainty": {"ci95_low": "-0.004", "ci95_high": "0.028"},
+                    "uncertainty": uncertainty,
                 }
             ),
             encoding="utf-8",
@@ -345,6 +367,152 @@ def test_economic_costed_result_must_carry_funding(tmp_path: Path) -> None:
 def test_economic_negative_outcomes_are_publishable(tmp_path: Path) -> None:
     _write_economic_bundle(tmp_path, verdict="NO_EDGE")
     assert collect_from_artifacts(tmp_path).economic.status is DimensionStatus.NO_EDGE
+
+
+def test_economic_registered_pass_is_earned_not_declared(tmp_path: Path) -> None:
+    _write_economic_bundle(tmp_path, verdict="PASS")
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.PASS
+    assert any("earned by the registered decision rule" in note for note in verdict.notes)
+    assert any("not preregistered as an accepted outcome" in note for note in verdict.notes)
+
+
+def test_economic_pass_refused_without_positive_net_return(tmp_path: Path) -> None:
+    # Audit repro: accepted_outcomes has no PASS, minimum_trades=30, costed
+    # net_return=-0.50 with a declared PASS must not render PASS.
+    _write_economic_bundle(tmp_path, verdict="PASS", net_return="-0.50", trades=1)
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.BLOCKED
+    joined = " ".join(verdict.notes)
+    assert "non-positive costed net_return" in joined
+    assert "below the registered minimum" in joined
+
+
+def test_economic_pass_refused_below_minimum_trades(tmp_path: Path) -> None:
+    _write_economic_bundle(tmp_path, verdict="PASS", trades=29)
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.BLOCKED
+    assert any("below the registered minimum of 30" in note for note in verdict.notes)
+
+
+def test_economic_pass_refused_without_integer_trade_count(tmp_path: Path) -> None:
+    _write_economic_bundle(tmp_path, verdict="PASS", trades="many")
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.BLOCKED
+    assert any("integer trade count" in note for note in verdict.notes)
+
+
+def test_economic_verdict_must_be_an_accepted_outcome(tmp_path: Path) -> None:
+    _write_economic_bundle(
+        tmp_path,
+        verdict="INCONCLUSIVE",
+        prereg_extra={"accepted_outcomes": ["NO_EDGE", "STOP"]},
+    )
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.BLOCKED
+    assert any("not an accepted outcome" in note for note in verdict.notes)
+
+
+def test_economic_pass_refused_when_pass_is_preregistered(tmp_path: Path) -> None:
+    _write_economic_bundle(
+        tmp_path,
+        verdict="PASS",
+        prereg_extra={"accepted_outcomes": ["NO_EDGE", "INCONCLUSIVE", "STOP", "INVALID", "PASS"]},
+    )
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.BLOCKED
+    assert any("pre-accepts PASS" in note for note in verdict.notes)
+
+
+def test_economic_pass_refused_when_ci_includes_zero(tmp_path: Path) -> None:
+    _write_economic_bundle(
+        tmp_path,
+        verdict="PASS",
+        uncertainty={
+            "ci_lower": "-0.004",
+            "ci_upper": "0.028",
+            "family_size": 4,
+            "correction": "HOLM",
+            "p_value": "0.002",
+        },
+    )
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.BLOCKED
+    assert any("does not exclude zero" in note for note in verdict.notes)
+
+
+def test_economic_pass_refused_without_holm_correction(tmp_path: Path) -> None:
+    _write_economic_bundle(
+        tmp_path,
+        verdict="PASS",
+        uncertainty={
+            "ci_lower": "0.004",
+            "ci_upper": "0.028",
+            "family_size": 4,
+            "correction": "NONE",
+            "p_value": "0.002",
+        },
+    )
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.BLOCKED
+    assert any("does not declare the registered HOLM" in note for note in verdict.notes)
+
+
+@pytest.mark.parametrize(
+    "uncertainty",
+    [
+        # An uncorrected 95% interval: alpha 0.05 > Holm-adjusted 0.0125.
+        {
+            "ci_lower": "0.004",
+            "ci_upper": "0.028",
+            "family_size": 4,
+            "correction": "HOLM",
+            "ci_alpha": "0.05",
+        },
+        # A p-value that does not survive Holm over the registered family.
+        {
+            "ci_lower": "0.004",
+            "ci_upper": "0.028",
+            "family_size": 4,
+            "correction": "HOLM",
+            "p_value": "0.030",
+        },
+        # Family size understated relative to the registration.
+        {
+            "ci_lower": "0.004",
+            "ci_upper": "0.028",
+            "family_size": 1,
+            "correction": "HOLM",
+            "p_value": "0.002",
+        },
+        # No uncertainty block at all.
+        {},
+    ],
+)
+def test_economic_pass_refused_without_corrected_rule(
+    tmp_path: Path, uncertainty: dict[str, object]
+) -> None:
+    _write_economic_bundle(tmp_path, verdict="PASS", uncertainty=uncertainty)
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.BLOCKED
+    assert verdict.status is not DimensionStatus.PASS
+
+
+def test_economic_pass_refused_without_registered_decision_rule(tmp_path: Path) -> None:
+    _write_economic_bundle(tmp_path, verdict="PASS", prereg_extra={"hypothesis_budget": None})
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.BLOCKED
+    assert any("hypothesis budget" in note for note in verdict.notes)
+
+
+def test_economic_bundle_bound_to_another_preregistration_is_refused(
+    tmp_path: Path,
+) -> None:
+    # A digest that is a valid 64-hex string but is not the on-disk prereg digest.
+    _write_economic_bundle(tmp_path, digest="a" * 64)
+    verdict = collect_from_artifacts(tmp_path).economic
+    assert verdict.status is DimensionStatus.BLOCKED
+    assert any("different preregistration" in note for note in verdict.notes)
 
 
 def _write_resource_receipt(
@@ -423,6 +591,66 @@ def test_corrupt_optional_test_log_blocks_mechanical(tmp_path: Path) -> None:
     assert any("unreadable" in note for note in matrix.mechanical.notes)
 
 
+def _write_mechanical_bundle(root: Path, rows: list[dict[str, object]]) -> None:
+    baseline = root / "reports/provenance/baseline.json"
+    baseline.parent.mkdir(parents=True, exist_ok=True)
+    baseline.write_text(
+        json.dumps({"code_sha": "abcdef0", "baseline_tests": {"passed": 10}}),
+        encoding="utf-8",
+    )
+    for relative in (
+        "reports/overnight/evidence/M0-02.md",
+        "reports/overnight/evidence/M0-03.md",
+    ):
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("lineage\n", encoding="utf-8")
+    (root / "reports/overnight/test-results.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+    )
+
+
+def test_failing_test_log_blocks_mechanical(tmp_path: Path) -> None:
+    _write_mechanical_bundle(
+        tmp_path,
+        [{"wave": 0, "passed": 0, "failed": 2693, "result": "FAILED"}],
+    )
+    verdict = collect_from_artifacts(tmp_path).mechanical
+    assert verdict.status is DimensionStatus.BLOCKED
+    joined = " ".join(verdict.notes)
+    assert "failed=2693" in joined
+    assert "reports/overnight/test-results.jsonl" in joined
+    assert any(ref.path == "reports/overnight/test-results.jsonl" for ref in verdict.evidence)
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        {"wave": 1, "passed": 10, "errors": 2},
+        {"wave": 2, "passed": 10, "result": "error"},
+        {"wave": 3, "passed": 10, "status": "FAILED_IMPORT"},
+    ],
+)
+def test_any_failure_marker_in_the_test_log_blocks_mechanical(
+    tmp_path: Path, row: dict[str, object]
+) -> None:
+    _write_mechanical_bundle(tmp_path, [{"wave": 0, "passed": 2693, "failed": 0}, row])
+    assert collect_from_artifacts(tmp_path).mechanical.status is DimensionStatus.BLOCKED
+
+
+def test_passing_test_log_keeps_mechanical_pass(tmp_path: Path) -> None:
+    _write_mechanical_bundle(
+        tmp_path,
+        [
+            {"wave": 0, "passed": 2693, "failed": 0, "result": "PASSED"},
+            {"wave": 1, "passed": 2701, "failed": 0, "status": "ok"},
+        ],
+    )
+    verdict = collect_from_artifacts(tmp_path).mechanical
+    assert verdict.status is DimensionStatus.PASS
+    assert any("recorded test-run rows: 2" in note for note in verdict.notes)
+
+
 def test_rendered_markdown_lists_every_dimension_and_is_deterministic(tmp_path: Path) -> None:
     matrix = collect_from_artifacts(tmp_path)
     rendered = render_markdown(matrix)
@@ -469,3 +697,24 @@ def test_repository_collector_reports_the_current_honest_verdict() -> None:
     assert matrix.overall_verdict is DimensionStatus.BLOCKED
     assert matrix.live_approved is False
     assert matrix.requires_owner_authorization is True
+
+
+def test_published_evidence_hashes_match_disk() -> None:
+    """Every hash quoted in M4-06.md must equal the file on disk at this commit."""
+
+    root = Path(__file__).resolve().parents[1]
+    evidence_path = root / "reports/overnight/evidence/M4-06.md"
+    evidence = evidence_path.read_text(encoding="utf-8")
+    checked = 0
+    for line in evidence.splitlines():
+        quoted = re.findall(r"`([^`]+)`", line)
+        paths = [item for item in quoted if (root / item).is_file()]
+        hashes = re.findall(r"\b[0-9a-f]{64}\b", line)
+        if not hashes:
+            continue
+        assert len(paths) == len(hashes), f"unpaired evidence hash in line: {line}"
+        for relative, expected in zip(paths, hashes, strict=True):
+            actual = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+            assert actual == expected, f"stale hash quoted for {relative}: {expected}"
+            checked += 1
+    assert checked >= 15, f"only {checked} evidence hashes checked"

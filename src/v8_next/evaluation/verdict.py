@@ -471,6 +471,36 @@ def _blocked(
     )
 
 
+def _test_log_failures(rows: Sequence[dict[str, Any]]) -> tuple[str, ...]:
+    """Return one named reason per recorded test row that reports a failure.
+
+    A passing summary is not enough: the recorded rows are the mechanical
+    evidence, so a single row with a non-zero ``failed``/``errors`` count or a
+    ``result``/``status`` beginning with fail/error blocks the dimension. Rows
+    without any of those fields are counted but assert nothing.
+    """
+
+    problems: list[str] = []
+    for index, row in enumerate(rows, start=1):
+        for field in ("failed", "errors"):
+            value = row.get(field)
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                problems.append(
+                    f"recorded test log row {index} reports {field}={value} "
+                    f"({MECHANICAL_TEST_RESULTS})"
+                )
+        for field in ("result", "status"):
+            value = row.get(field)
+            if isinstance(value, str) and value.strip().lower().startswith(
+                ("fail", "error")
+            ):
+                problems.append(
+                    f"recorded test log row {index} reports {field}={value!r} "
+                    f"({MECHANICAL_TEST_RESULTS})"
+                )
+    return tuple(problems)
+
+
 def _mechanical(root: Path) -> DimensionVerdict:
     missing = _missing(root, MECHANICAL_EVIDENCE)
     if missing:
@@ -480,6 +510,9 @@ def _mechanical(root: Path) -> DimensionVerdict:
             _present_refs(root, MECHANICAL_EVIDENCE),
         )
     test_results_path = root / MECHANICAL_TEST_RESULTS
+    evidence_paths = MECHANICAL_EVIDENCE + (
+        (MECHANICAL_TEST_RESULTS,) if test_results_path.is_file() else ()
+    )
     try:
         baseline = _read_json(root / "reports/provenance/baseline.json")
         code_sha = baseline.get("code_sha")
@@ -503,9 +536,13 @@ def _mechanical(root: Path) -> DimensionVerdict:
             [f"mechanical evidence is unreadable: {exc}"],
             _present_refs(root, MECHANICAL_EVIDENCE + (MECHANICAL_TEST_RESULTS,)),
         )
-    evidence_paths = MECHANICAL_EVIDENCE + (
-        (MECHANICAL_TEST_RESULTS,) if test_results_path.is_file() else ()
-    )
+    failures = _test_log_failures(rows)
+    if failures:
+        return _blocked(
+            PromotionDimension.MECHANICAL,
+            failures,
+            _present_refs(root, evidence_paths),
+        )
     notes = [
         f"provenance code_sha: {code_sha}; baseline passed: {baseline_tests['passed']}",
         "lineage evidence present: M0-02 (two-campaign oracle), M0-03 (opportunity lineage)",
@@ -593,6 +630,161 @@ _COSTED_VERDICTS: Final[dict[str, DimensionStatus]] = {
     "STOP": DimensionStatus.FAIL,
     "INVALID": DimensionStatus.BLOCKED,
 }
+
+
+def _accepted_outcomes(prereg: dict[str, Any]) -> frozenset[str] | None:
+    """The registered admissible non-claim outcomes, uppercased; ``None`` if absent."""
+
+    outcomes = prereg.get("accepted_outcomes")
+    if not isinstance(outcomes, list) or not outcomes:
+        return None
+    if not all(isinstance(outcome, str) and outcome.strip() for outcome in outcomes):
+        return None
+    return frozenset(outcome.upper() for outcome in outcomes)
+
+
+def _pass_claim_problems(
+    prereg: dict[str, Any], costed: dict[str, Any], net_return: Decimal
+) -> tuple[str, ...]:
+    """Every reason a declared ``PASS`` may not become an ECONOMIC ``PASS``.
+
+    ``PASS`` is never inferred from the costed result's own verdict string. It is
+    earned only when all of the following hold, each with its own named reason:
+
+    * the costed net return is strictly positive;
+    * the trade count reaches the registered ``minimum_trades``;
+    * the registration never pre-accepts ``PASS`` (a conclusion is claimed by
+      evidence, never preregistered as accepted);
+    * the registered decision rule is satisfied: a Holm-corrected interval over
+      the registered family excludes zero, at the Holm-adjusted alpha.
+    """
+
+    problems: list[str] = []
+    if net_return <= 0:
+        problems.append(
+            f"PASS claimed with a non-positive costed net_return ({net_return})"
+        )
+
+    minimum = prereg.get("minimum_trades")
+    trades = costed.get("trades")
+    if isinstance(trades, bool) or not isinstance(trades, int):
+        problems.append(
+            "PASS claimed without an integer trade count in the costed result"
+        )
+    elif isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 1:
+        problems.append(
+            "preregistration does not register a positive minimum_trades"
+        )
+    elif trades < minimum:
+        problems.append(
+            f"PASS claimed on {trades} trades, below the registered minimum of {minimum}"
+        )
+
+    outcomes = _accepted_outcomes(prereg)
+    if outcomes is None:
+        problems.append("preregistration does not register an accepted_outcomes list")
+    elif "PASS" in outcomes:
+        problems.append(
+            "preregistration pre-accepts PASS; PASS is claimed by evidence, never "
+            "preregistered as an accepted outcome"
+        )
+
+    problems.extend(_decision_rule_problems(prereg, costed, net_return))
+    return tuple(problems)
+
+
+def _decision_rule_problems(
+    prereg: dict[str, Any], costed: dict[str, Any], net_return: Decimal
+) -> tuple[str, ...]:
+    """Concretely evaluate the registered Holm-corrected CI decision rule."""
+
+    budget = prereg.get("hypothesis_budget")
+    if not isinstance(budget, dict):
+        return (
+            "preregistration does not register a hypothesis budget "
+            "(alpha, family size and correction)",
+        )
+    problems: list[str] = []
+    alpha = _decimal(budget.get("alpha"))
+    correction = budget.get("correction")
+    declared_family = budget.get("max_hypotheses")
+    if not isinstance(correction, str) or correction.upper() != "HOLM":
+        problems.append(
+            f"registered correction is {correction!r}, not the HOLM rule the "
+            "decision rule requires"
+        )
+    if alpha is None or not (Decimal(0) < alpha < Decimal(1)):
+        problems.append("registered alpha is missing or outside (0, 1)")
+    if (
+        isinstance(declared_family, bool)
+        or not isinstance(declared_family, int)
+        or declared_family < 1
+    ):
+        problems.append(
+            "registered family size (hypothesis_budget.max_hypotheses) is missing "
+            "or not positive"
+        )
+        return tuple(problems)
+
+    uncertainty = costed.get("uncertainty")
+    if not isinstance(uncertainty, dict) or not uncertainty:
+        problems.append(
+            "PASS claimed without an uncertainty block; the registered CI rule "
+            "cannot be evaluated"
+        )
+        return tuple(problems)
+
+    reported_correction = uncertainty.get("correction")
+    if not isinstance(reported_correction, str) or reported_correction.upper() != "HOLM":
+        problems.append(
+            "costed uncertainty does not declare the registered HOLM correction"
+        )
+    family = uncertainty.get("family_size")
+    if isinstance(family, bool) or not isinstance(family, int) or family != declared_family:
+        problems.append(
+            f"Holm family size in the costed result ({family!r}) does not equal the "
+            f"registered family ({declared_family})"
+        )
+
+    ci_low_raw = uncertainty.get("ci_lower")
+    if ci_low_raw is None:
+        ci_low_raw = uncertainty.get("ci95_low")
+    ci_high_raw = uncertainty.get("ci_upper")
+    if ci_high_raw is None:
+        ci_high_raw = uncertainty.get("ci95_high")
+    ci_low = _decimal(ci_low_raw)
+    ci_high = _decimal(ci_high_raw)
+    if ci_low is None or ci_high is None:
+        problems.append("costed uncertainty does not report a numeric interval (ci_lower/ci_upper)")
+    elif ci_high < ci_low:
+        problems.append(f"costed uncertainty interval is inverted ([{ci_low}, {ci_high}])")
+    else:
+        if ci_low <= 0:
+            problems.append(
+                "Holm decision rule not satisfied: the interval "
+                f"[{ci_low}, {ci_high}] does not exclude zero"
+            )
+        if not (ci_low <= net_return <= ci_high):
+            problems.append(
+                f"net_return {net_return} lies outside its reported interval [{ci_low}, {ci_high}]"
+            )
+
+    if alpha is not None and Decimal(0) < alpha < Decimal(1):
+        adjusted = alpha / Decimal(declared_family)
+        p_value = _decimal(uncertainty.get("p_value"))
+        ci_alpha_raw = uncertainty.get("ci_alpha")
+        if ci_alpha_raw is None:
+            ci_alpha_raw = uncertainty.get("alpha")
+        ci_alpha = _decimal(ci_alpha_raw)
+        corrected = (p_value is not None and p_value <= adjusted) or (
+            ci_alpha is not None and ci_alpha <= adjusted
+        )
+        if not corrected:
+            problems.append(
+                "Holm correction not applied: neither p_value nor the interval's "
+                f"alpha is at most the adjusted alpha {adjusted}"
+            )
+    return tuple(problems)
 
 
 def _economic(root: Path) -> DimensionVerdict:
@@ -723,6 +915,39 @@ def _economic(root: Path) -> DimensionVerdict:
         f"dataset role: {prereg_role}; costed net_return: {net_return}",
         "costs include fees, funding and slippage as registered",
     ]
+    declared = verdict_value.upper()
+    outcomes = _accepted_outcomes(prereg)
+    if declared == "PASS":
+        problems = _pass_claim_problems(prereg, costed, net_return)
+        if problems:
+            return _blocked(PromotionDimension.ECONOMIC, problems, present)
+        notes.extend(
+            (
+                "PASS earned by the registered decision rule: net_return > 0, "
+                "trades >= registered minimum, Holm-corrected interval excludes zero",
+                "PASS was not preregistered as an accepted outcome; it is claimed by evidence",
+            )
+        )
+    else:
+        if outcomes is None:
+            return _blocked(
+                PromotionDimension.ECONOMIC,
+                [
+                    "preregistration does not register an accepted_outcomes list; "
+                    f"the declared verdict {declared} cannot be accepted"
+                ],
+                present,
+            )
+        if declared not in outcomes:
+            return _blocked(
+                PromotionDimension.ECONOMIC,
+                [
+                    f"costed verdict {declared} is not an accepted outcome of the "
+                    f"preregistration (accepted: {', '.join(sorted(outcomes))})"
+                ],
+                present,
+            )
+        notes.append(f"declared verdict {declared} is a registered accepted outcome")
     uncertainty = costed.get("uncertainty")
     if isinstance(uncertainty, dict) and uncertainty:
         notes.append(
@@ -733,7 +958,7 @@ def _economic(root: Path) -> DimensionVerdict:
         notes.append("uncertainty: not reported by the costed result")
     return DimensionVerdict(
         dimension=PromotionDimension.ECONOMIC,
-        status=status,
+        status=_COSTED_VERDICTS[declared],
         evidence=present,
         notes=tuple(notes),
     )
