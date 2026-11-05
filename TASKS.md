@@ -16,61 +16,63 @@ resume point for the next session.
 `main` is `0b69fc4` and holds none of the integration work. PR #67
 (`integration/wave1` = `09908af`) and PR #70 (`codex/adaptive-integration` =
 `aab394a`) diverge from `d0430a6` in different directions with overlapping edits
-to `sim_arm.py`; neither is required for this program and neither is merged.
+to `sim_arm.py`; neither was merged or required here.
+
+## Final state — research program closed with NO_EDGE
+
+Seven preregistered mechanisms, all `NO_EDGE` on the development window
+(2025-01-01 → 2025-05-01). Full table and diagnosis: `reports/research/LEDGER.md`
+("Program verdict").
+
+The two beta-free experiments (E-005..E-007) bound every measured gross effect
+within ±8 bps of notional per campaign; the registered cost floor is ~11 bps.
+No mechanism cleared costs. The **holdout 2025-05-01 → 2025-07-01 is sealed and
+unread** (`VALIDATION_DATA_UNSPENT`): no candidate qualified to spend it.
 
 ## Verified engineering state
 
-* Fast suite `pytest -q`: **2851 passed, 72 skipped, 512 deselected**.
-* `mypy src`: clean (259 files). `ruff check src tests tools`: clean except the
-  pre-existing `I001` in `tools/performance/expert_trace.py`.
+* Fast suite `pytest -q`: **2862 passed, 72 skipped, 512 deselected**.
+* `mypy src`: clean. `ruff check src tests tools`: clean (the last pre-existing
+  `I001` in `tools/performance/expert_trace.py` is fixed).
 * Native parity on the frozen BTCUSDT Q1 slice: A/B/C/D decision digests, trade
   digests and net PnL reproduce to six decimals.
 * Research screen defects found and fixed:
   * `screen.load_bars` exposed tape **milliseconds** as `end_ns`; a native
-    nanosecond timestamp compared against it skipped every bar. Now converted,
-    with a regression test (`6929314`).
-  * `screen.evaluate_path` had no slippage or funding. Both are now first-class,
-    reported separately, with the accounting identity checked by tests
-    (`0157fc4`).
-* Shared-account multi-instrument execution is **already implemented**:
-  `v8_next.adapters.portfolio_backtest.run_portfolio_backtest` runs one
-  `BacktestEngine`, one MARGIN/NETTING account, multiple instruments, native
-  funding settlement (verified: two legs, one `balance_total`, 50 settlements
-  fed). The cross-market report's "ten independent accounts" is a limitation of
-  `sim_arm`, not of the repo.
+    nanosecond timestamp compared against it skipped every bar. Converted, with a
+    regression test (`6929314`).
+  * `screen.evaluate_path` had no slippage or funding; both are now first-class,
+    reported separately, with the accounting identity under test (`0157fc4`).
+  * `screen.load_flow` added for aggressive taker-buy share (`b3a312c`).
+* Shared-account multi-instrument execution already exists:
+  `run_portfolio_backtest` runs one engine, one MARGIN/NETTING account, several
+  instruments, native funding settlement — verified with two legs (one
+  `balance_total`, 50 settlements fed).
 
-## Research results (development window, 2025-01-01 → 2025-05-01)
+## Reproduce
 
-| ID | Candidate | Net exp. R | Control | Status |
-|---|---|---:|---:|---|
-| E-001 | bollinger_reversion | −0.123 | −0.044 | NO_EDGE |
-| E-002 | volume_climax_reversal | −0.222 | −0.044 | NO_EDGE |
-| E-003 | liquidity_sweep_reclaim | −0.112 | −0.045 | NO_EDGE |
-| E-004 | funding_extreme_reversion | −0.138 | −0.043 | NO_EDGE |
-| E-005 | cross_sectional_relative_strength | pending | — | PREREGISTERED |
+```bash
+cd /Users/hootie/src/v9-worktrees/edge
+uv run --locked --extra dev pytest -q
+uv run --locked --extra dev python tools/signal_screen.py --candidate all
+uv run --locked --extra dev python tools/cross_sectional_screen.py --mode momentum --sensitivity
+uv run --locked --extra dev python tools/cross_sectional_screen.py --mode flow --control-draws 50
+```
 
-Cross-experiment finding: every single-symbol mechanism produced negative long
-cells and positive short cells in a window with downward alt drift. The 50/50
-random-entry null cannot separate timing from beta, so E-005 is dollar-neutral by
-construction and uses a random two-and-two null at the same bars.
+Tapes are gitignored; symlink or rebuild the ten `research/tape/<symbol>-1h-2025H1`
+directories from the verified archives before running the screens.
 
-## Remaining blockers / known limitations
+## Remaining blockers / limitations
 
 | # | Item | State |
 |---|---|---|
-| 1 | Holdout 2025-05-01 → 2025-07-01 | Sealed; runner refuses without `V9_HOLDOUT_AUTHORIZED=1` after a frozen candidate |
-| 2 | No native strategy consumes raw signals in the shared-account runner | Needed only if a candidate passes dev; `ExpertEnsembleStrategy` is the only multi-instrument strategy today |
-| 3 | Funding charged at entry notional in the screen | Declared limitation; native path settles exactly |
-| 4 | Pre-existing ruff `I001` in `tools/performance/expert_trace.py` | Mechanical, unrelated |
-
-## Active hypothesis
-
-`cross_sectional_relative_strength` (E-005): long the two weakest / short the two
-strongest trailing-24h perpetuals, matched random two-and-two null.
+| 1 | Holdout unread | Sealed by design; unseal only for a frozen `DEV_CANDIDATE` |
+| 2 | No raw-signal strategy in the native shared-account runner | Needed only for a finalist; none exists |
+| 3 | Screen charges funding on entry notional | Declared; the native path settles exactly |
+| 4 | Cross-market `sim_arm` still opens one account per symbol | Its own limitation; `run_portfolio_backtest` is the shared-account path |
 
 ## Next action
 
-Read the E-005 result; record it in the ledger with diagnosis. If it is
-`NO_EDGE`, either test one further mechanism with a different information source
-or stop the research program and report the exhaustion honestly. If it is
-`DEV_CANDIDATE`, freeze it and run the sealed holdout before any native work.
+None inside the current protocol. A future session should only reopen the
+research program with an information source whose gross effect is measured above
+the ~11 bps cost floor, or with the native shared-account runner once a candidate
+exists.
