@@ -16,6 +16,7 @@
     "legs_per_side": 2,
     "lookback_bars": 24,
     "maximum_drawdown_usdt": 28173.51806905905,
+    "mode": "reversal",
     "net_expectancy_r": -0.12501705416438033,
     "net_profit_factor": 0.8214474566571923,
     "positive_symbols": 0,
@@ -41,31 +42,5 @@
     "trades": 2114,
     "treatment_event_mean_r": -0.12220659655628151,
     "win_rate": 0.3273415326395459
-  },
-  "sensitivity": {
-    "L24_k1": {
-      "control_mean_r": -0.03286942200693509,
-      "net_expectancy_r": -0.0266429365022508,
-      "positive_symbols": 4,
-      "trades": 1244
-    },
-    "L24_k3": {
-      "control_mean_r": -0.0417841999705554,
-      "net_expectancy_r": -0.13685474638486816,
-      "positive_symbols": 0,
-      "trades": 2617
-    },
-    "L4_k2": {
-      "control_mean_r": -0.045692076061067614,
-      "net_expectancy_r": -0.06737602523141878,
-      "positive_symbols": 1,
-      "trades": 4962
-    },
-    "L72_k2": {
-      "control_mean_r": -0.043378260253638674,
-      "net_expectancy_r": -0.10408941047671876,
-      "positive_symbols": 4,
-      "trades": 1280
-    }
   }
 }

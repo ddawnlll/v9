@@ -9,7 +9,7 @@
     "status": "NO_EDGE"
   },
   "claim_status": "MODEL_DERIVED_DEV_SCREEN",
-  "code_sha": "95f81fe53dc4f0fe223cc20503bb121a3f875f2e",
+  "code_sha": "fb5d409ddef2edb7c48857220943ec687056b019",
   "control": {
     "distribution_head": [
       -0.0471238201483089,
@@ -43,6 +43,7 @@
     "legs": 2114,
     "legs_per_side": 2,
     "lookback_bars": 24,
+    "mode": "reversal",
     "window": {
       "end_ms": 1746057600000,
       "start_ms": 1735689600000

@@ -209,3 +209,15 @@ economically motivated hypothesis this data has produced with a measured *gross*
 effect larger than the cost drag (+0.0795 vs ~0.055 R), so it is worth one
 preregistered test with its parameters frozen before the holdout is touched.
 
+
+---
+
+## 2026-11-05 — E-006: cross-sectional relative-strength persistence (momentum)
+
+* Preregistration: `reports/research/PREREGISTRATION_momentum.json` (code `ea3ad0d`).
+* Long the two strongest / short the two weakest trailing-24h symbols, on rank
+  transitions, matched random two-and-two null.
+* Disclosed double test: this is the mirror of E-005 on the same window. It is a
+  new hypothesis motivated by E-005's gross measurement, not independent
+  evidence; the sealed holdout is its first confirmatory test.
+* Status: `PREREGISTERED` (results pending).
