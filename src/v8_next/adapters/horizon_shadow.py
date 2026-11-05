@@ -16,7 +16,7 @@ from v8_next.economics.decisions import Opportunity, StanceKind
 from v8_next.experts.cache import FeatureCache
 from v8_next.experts.evidence import EvidenceBundle, ExpertEvidenceV1, _evidence_row
 from v8_next.experts.horizon_profiles import HorizonWitness, observe_multi_horizon
-from v8_next.experts.registry import get_expert
+from v8_next.experts.registry import CANONICAL_28_EXPERTS, get_expert
 from v8_next.telemetry.identity import canonical_digest
 
 
@@ -61,6 +61,7 @@ class MultiHorizonShadowPipeline:
         witnesses = observe_multi_horizon(views=views, frames=frames, context=context,
                                           caches=self._caches, opportunity=opportunity,
                                           readings=readings)
+        _verify_witness_bindings(witnesses, opportunity, cut)
         self.last_witnesses = witnesses
         context_ref = canonical_digest("shadow-multihorizon-evidence-v1", {
             "belief": belief.version_hash, "inputs": [w.context.input_provenance for w in witnesses],
@@ -85,3 +86,23 @@ class MultiHorizonShadowPipeline:
             provenance=context_ref, context_layer_enabled=True,
         )
         return belief, bundle
+
+
+def _verify_witness_bindings(
+    witnesses: tuple[HorizonWitness, ...], opportunity: Opportunity | None, cut: int
+) -> None:
+    """Reject alias, time and opportunity mismatches before building a bundle."""
+    ids = tuple(w.stance.observer_id for w in witnesses)
+    if ids != CANONICAL_28_EXPERTS:
+        raise ValueError("shadow expert identity or order mismatch")
+    expected_id = None if opportunity is None else opportunity.opportunity_id
+    for witness in witnesses:
+        stance = witness.stance
+        if witness.context.profile.expert_id != stance.observer_id or stance.decision_ns != cut:
+            raise ValueError("shadow expert context or time mismatch")
+        if stance.opportunity_id not in (None, expected_id):
+            raise ValueError("shadow witness opportunity mismatch")
+        if stance.kind is not StanceKind.ABSTAIN and (
+            expected_id is None or stance.opportunity_id != expected_id
+        ):
+            raise ValueError("shadow actionable witness has no bound opportunity")

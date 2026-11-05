@@ -80,7 +80,7 @@ from v8_next.domain.observation import (
     build_view,
 )
 from v8_next.domain.positioning import PositioningReading
-from v8_next.economics.decisions import Opportunity, StanceKind, opportunity_at
+from v8_next.economics.decisions import Opportunity, StanceKind, linear_exposure_id, opportunity_at
 from v8_next.economics.grammar import grammar_opportunity
 from v8_next.economics.legality import PositionPresence
 from v8_next.economics.policy import (
@@ -408,6 +408,10 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
     def on_bar(self, bar: Bar) -> None:
         """One closed bar: advance the V9 chain, then act on its decision."""
         if self._horizon_shadow is not None:
+            if getattr(bar, "bar_type", None) != self.bar_type:
+                raise SimArmRefused(
+                    "SHADOW_BAR_TYPE_MISMATCH", "native bar type differs from the subscribed M15 feed"
+                )
             source = self.source_candles.get(int(bar.ts_event))
             if (source is None or source.end_ns != int(bar.ts_event)
                 or source.available_ns != source.end_ns or int(bar.ts_init) != source.end_ns
@@ -455,6 +459,16 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             {Timeframe.H1: view}, instrument_id=str(self.instrument_id), decision_time_ns=cut
         )
         opportunity = self._detect(frame)
+        if self._horizon_shadow is not None and opportunity is not None:
+            if (opportunity.instrument_id != candle.instrument_id
+                    or opportunity.exposure_id != linear_exposure_id(candle.instrument_id)
+                    or opportunity.identity_status != "CANONICAL"
+                    or opportunity.direction not in {"LONG", "SHORT"}
+                    or opportunity.anchor_ns != candle.end_ns
+                    or opportunity.expires_ns <= candle.end_ns
+                    or not opportunity.opportunity_id.strip()):
+                raise SimArmRefused("SHADOW_OPPORTUNITY_UNVERIFIED",
+                                    "grammar episode identity and market binding are required")
         record = self._remember_opportunity(opportunity, candle)
         if self._horizon_shadow is not None:
             belief, bundle = self._horizon_shadow.advance(candle, cut=cut, opportunity=opportunity,
@@ -471,6 +485,11 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 readings=self.readings,
             )
         self._belief = belief
+        if self._horizon_shadow is not None and record is not None:
+            if (opportunity is None or record.lineage_hash != opportunity.opportunity_id
+                    or record.metadata.get("shadow_source_opportunity_id") != opportunity.opportunity_id):
+                raise SimArmRefused("SHADOW_OPPORTUNITY_LINEAGE_MISMATCH",
+                                    "expert opportunity must be bound to the book record")
         supported = record is not None and self._supported(bundle)
         if supported and record is not None:
             self.opportunity_book.update_status(
@@ -532,8 +551,13 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 "executed": outcome,
                 "sim_arm": True,
                 "advisory_only": self._horizon_shadow is not None,
-                **({"shadow_inputs": [
-                    {"expert_id": w.stance.observer_id, "primary": w.context.profile.primary.value,
+                **({"shadow_source_opportunity_id": (
+                    opportunity.opportunity_id if opportunity is not None else None
+                ), "shadow_book_opportunity_id": (
+                    record.opportunity_id if record is not None else None
+                ), "shadow_inputs": [
+                    {"expert_id": w.stance.observer_id, "source_opportunity_id": w.stance.opportunity_id,
+                     "primary": w.context.profile.primary.value,
                      "provenance": w.context.input_provenance, "stance": row.stance.value,
                      "reason": row.reason, "warmup_ok": row.warmup_ok}
                     for w, row in zip(self._horizon_shadow.last_witnesses, bundle.evidence, strict=True)
@@ -630,6 +654,9 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             as_of_time_ns=candle.end_ns,
             valid_until_ns=opportunity.expires_ns,
             status=OpportunityStatus.CANDIDATE,
+            lineage_hash=(opportunity.opportunity_id if self._horizon_shadow is not None else ""),
+            metadata=({"shadow_source_opportunity_id": opportunity.opportunity_id}
+                      if self._horizon_shadow is not None else None),
         )
         self.opportunity_book.insert(record)
         return record

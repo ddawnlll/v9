@@ -88,7 +88,7 @@ def test_native_shadow_rejects_missing_quality_and_late_source_before_any_bookke
 
     config = SimArmConfig(enabled=True, multi_horizon_shadow=True, bar_type_str=TYPE)
     source = candle(0)
-    native = SimpleNamespace(ts_event=source.end_ns, ts_init=source.end_ns)
+    native = SimpleNamespace(bar_type=BarType.from_str(TYPE), ts_event=source.end_ns, ts_init=source.end_ns)
     strategy = AdaptiveSimStrategy(config, source_candles={source.end_ns: source})
     with pytest.raises(SimArmRefused, match="SHADOW_AVAILABILITY_UNPROVEN"):
         strategy.on_bar(native)
@@ -109,10 +109,74 @@ def test_native_shadow_rejects_different_native_prices_before_processing():
     strategy = AdaptiveSimStrategy(config, source_candles={source.end_ns: source},
                                    source_quality={source.end_ns: QualityState.OK})
     price = lambda value: SimpleNamespace(as_decimal=lambda: value)  # noqa: E731
-    native = SimpleNamespace(ts_event=source.end_ns, ts_init=source.end_ns,
+    native = SimpleNamespace(bar_type=BarType.from_str(TYPE), ts_event=source.end_ns, ts_init=source.end_ns,
                              open=price(source.open), high=price(source.high),
                              low=price(source.low), close=price(source.close + 1),
                              volume=price(source.volume))
     with pytest.raises(SimArmRefused, match="SHADOW_SOURCE_BAR_MISMATCH"):
         strategy.on_bar(native)
     assert not strategy.candles
+
+
+@pytest.mark.parametrize("bar_type", [
+    "ETHUSDT-PERP.BINANCE-15-MINUTE-LAST-EXTERNAL",
+    f"{IID}-1-HOUR-LAST-EXTERNAL",
+    f"{IID}-15-MINUTE-MID-EXTERNAL",
+])
+def test_native_shadow_rejects_wrong_native_bar_identity(bar_type):
+    from types import SimpleNamespace
+
+    source = candle(0)
+    config = SimArmConfig(enabled=True, multi_horizon_shadow=True, bar_type_str=TYPE)
+    strategy = AdaptiveSimStrategy(config, source_candles={source.end_ns: source},
+                                   source_quality={source.end_ns: QualityState.OK})
+    price = lambda value: SimpleNamespace(as_decimal=lambda: value)  # noqa: E731
+    spoof = SimpleNamespace(bar_type=BarType.from_str(bar_type), ts_event=source.end_ns,
+                            ts_init=source.end_ns, open=price(source.open), high=price(source.high),
+                            low=price(source.low), close=price(source.close), volume=price(source.volume))
+    with pytest.raises(SimArmRefused, match="SHADOW_BAR_TYPE_MISMATCH"):
+        strategy.on_bar(spoof)
+    assert not strategy.candles and not strategy.arm_decisions
+
+
+def test_book_opportunity_binds_the_grammar_identity():
+    from v8_next.economics.decisions import Opportunity
+
+    source = candle(0)
+    config = SimArmConfig(enabled=True, multi_horizon_shadow=True, bar_type_str=TYPE)
+    strategy = AdaptiveSimStrategy(config, source_candles={source.end_ns: source},
+                                   source_quality={source.end_ns: QualityState.OK})
+    opportunity = Opportunity("grammar-id", "exposure", IID, "LONG", source.end_ns,
+                              source.end_ns + M15_NS)
+    record = strategy._remember_opportunity(opportunity, source)
+    assert record is not None
+    assert record.opportunity_id != opportunity.opportunity_id
+    assert record.lineage_hash == opportunity.opportunity_id
+    assert record.metadata["shadow_source_opportunity_id"] == opportunity.opportunity_id
+
+
+def test_shadow_rejects_witness_identity_and_opportunity_mismatches():
+    from types import SimpleNamespace
+
+    from v8_next.adapters.horizon_shadow import _verify_witness_bindings
+    from v8_next.economics.decisions import Opportunity, StanceKind
+    from v8_next.experts.registry import CANONICAL_28_EXPERTS
+
+    cut = candle(0).end_ns
+    opportunity = Opportunity("grammar-id", "exposure", IID, "LONG", cut, cut + M15_NS)
+    witnesses = tuple(SimpleNamespace(
+        context=SimpleNamespace(profile=SimpleNamespace(expert_id=expert)),
+        stance=SimpleNamespace(observer_id=expert, opportunity_id="grammar-id",
+                               decision_ns=cut, kind=StanceKind.SUPPORT),
+    ) for expert in CANONICAL_28_EXPERTS)
+    _verify_witness_bindings(witnesses, opportunity, cut)
+    altered = list(witnesses)
+    altered[0] = SimpleNamespace(context=witnesses[0].context,
+        stance=SimpleNamespace(observer_id=CANONICAL_28_EXPERTS[0], opportunity_id="wrong",
+                               decision_ns=cut, kind=StanceKind.SUPPORT))
+    with pytest.raises(ValueError, match="opportunity mismatch"):
+        _verify_witness_bindings(tuple(altered), opportunity, cut)
+    with pytest.raises(ValueError, match="identity or order"):
+        _verify_witness_bindings(witnesses[:-1] + witnesses[:1], opportunity, cut)
+    with pytest.raises(ValueError, match="opportunity mismatch"):
+        _verify_witness_bindings(witnesses, None, cut)
