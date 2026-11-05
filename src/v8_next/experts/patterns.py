@@ -57,6 +57,7 @@ class PatternStructure:
     stop_reference: Decimal
 
 
+@per_bar_memo
 def pattern_structures(frame: CausalFrame, variant: str) -> tuple[PatternStructure, ...]:
     if variant not in {"b", "c"}:
         raise ValueError("unsupported pattern retest variant")

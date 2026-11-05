@@ -438,6 +438,9 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
         self._belief: MarketBeliefV1 | None = None
         self._observations: list[Observation] = []
         self._frame: CausalFrame | None = None
+        # Once replay diverges from the prevalidated source order, never infer
+        # that later bars restore the prefix. Use the exact fallback instead.
+        self._source_prefix_intact = True
         # ---- multi-horizon state (RFC 1.4.1 §4.4) ---------------------------
         #: Real bars per horizon. H1 is the execution tape; H4 is aggregated from
         #: complete H1 bars; M15 is only ever the verified intraday tape.
@@ -541,9 +544,26 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
                 }
             )
 
-        frame = frame_at_incremental(
-            self._frame, str(self.instrument_id), int(bar.ts_init), tuple(self.candles)
+        index = len(self.candles) - 1
+        self._source_prefix_intact = (
+            self._source_prefix_intact
+            and index < len(self._ordered_source)
+            and self._ordered_source[index] is candle
         )
+        frame = None
+        if (
+            self._source_prefix_intact
+            and self._frame is not None
+            and len(self._frame.candles) == index
+            and self._source_prefix_df is not None
+        ):
+            frame = extend_causal_frame(
+                self._frame, int(bar.ts_init), candle, self._source_prefix_df
+            )
+        if frame is None:
+            frame = frame_at_incremental(
+                self._frame, str(self.instrument_id), int(bar.ts_init), tuple(self.candles)
+            )
         self._frame = frame
 
         view = self._horizon_view(Timeframe.H1, cut)
@@ -686,7 +706,9 @@ class AdaptiveSimStrategy(ExpertEnsembleStrategy):
             )
         )
         if base:
-            tables[Timeframe.H1] = build_candle_dataframe(base)
+            # The parent strategy already built this exact ordered table.
+            assert self._source_prefix_df is not None
+            tables[Timeframe.H1] = self._source_prefix_df
             if source_candles and len(self.source_candles) == len(base):
                 aggregate = aggregate_to_timeframe(
                     base, Timeframe.H4, source_timeframe=Timeframe.H1

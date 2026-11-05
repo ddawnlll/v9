@@ -71,3 +71,27 @@ def test_large_box_count_is_compact_and_bad_box_rejects():
     assert len(result) == 1 and result[0].steps == 999999999000000
     with pytest.raises(ValueError):
         columns((Decimal(100),), Decimal(0))
+
+
+def test_variants_share_columns_only_within_the_same_bar(monkeypatch):
+    import v8_next.experts.pandf as pandf
+    from v8_next.experts.cache import FeatureCache
+
+    frame = frame_for([104, 100, 105, 100, 106])
+    expected = [pandf_setup(frame, variant) for variant in "abcd"]
+    calls = 0
+    original = pandf._columns_validated
+
+    def counted(closes, box):
+        nonlocal calls
+        calls += 1
+        return original(closes, box)
+
+    monkeypatch.setattr(pandf, "_columns_validated", counted)
+    cache = FeatureCache()
+    with cache.scoped(frame):
+        assert [pandf_setup(frame, variant) for variant in "abcd"] == expected
+        assert calls == 1
+    with cache.scoped(frame):
+        assert pandf_setup(frame, "a") == expected[0]
+        assert calls == 2
