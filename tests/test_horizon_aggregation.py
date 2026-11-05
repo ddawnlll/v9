@@ -89,3 +89,37 @@ def test_m1_to_m15_has_exact_count_and_duplicate_rejected():
     assert len(events) == 1 and len(events[0].source_ids) == 15
     with pytest.raises(ValueError, match="gap"):
         agg.advance(source, processing_ns=source.available_ns, quality=QualityState.OK)
+
+
+@pytest.mark.parametrize("name,value", [
+    ("instrument_id", "ETH"),
+    ("source_duration_ns", MINUTE_NS),
+    ("target_durations_ns", (H4_NS,)),
+])
+def test_configuration_cannot_change_while_window_is_pending(name, value):
+    aggregator = HorizonAggregator("BTC", source_duration_ns=M15_NS,
+                                   target_durations_ns=(H1_NS,))
+    first = bar(0)
+    aggregator.advance(first, processing_ns=first.available_ns, quality=QualityState.OK)
+    with pytest.raises(AttributeError):
+        setattr(aggregator, name, value)
+    # The pending BTC prefix still belongs to the original H1 window.
+    for i in range(1, 4):
+        source = bar(i)
+        events = aggregator.advance(source, processing_ns=source.available_ns,
+                                    quality=QualityState.OK)
+    assert len(events) == 1
+    assert events[0].candle.instrument_id == "BTC"
+    assert events[0].duration_ns == H1_NS
+    assert len(events[0].source_ids) == 4
+
+
+def test_closed_source_must_be_available_by_processing_cut():
+    source = bar(0)
+    with pytest.raises(ValueError, match="before close"):
+        replace(source, available_ns=source.end_ns - 1)
+    aggregator = HorizonAggregator("BTC", source_duration_ns=M15_NS,
+                                   target_durations_ns=(H1_NS,))
+    with pytest.raises(ValueError, match="unavailable"):
+        aggregator.advance(source, processing_ns=source.end_ns - 1, quality=QualityState.OK)
+    assert aggregator.pending_counts == {H1_NS: 0}

@@ -54,12 +54,27 @@ class HorizonAggregator:
             or any(target not in _ALLOWED_TARGET_DURATIONS or target <= source_duration_ns
                    or target % source_duration_ns for target in target_durations_ns)):
             raise ValueError("invalid target durations")
-        self.instrument_id = instrument_id
-        self.source_duration_ns = source_duration_ns
-        self.target_durations_ns = tuple(sorted(target_durations_ns))
+        self._instrument_id = instrument_id
+        self._source_duration_ns = source_duration_ns
+        self._target_durations_ns = tuple(sorted(target_durations_ns))
         self._pending: dict[int, list[Candle]] = {duration: [] for duration in self.target_durations_ns}
         self._last_end_ns: int | None = None
         self._last_processing_ns: int | None = None
+
+    @property
+    def instrument_id(self) -> str:
+        """Instrument fixed for the lifetime of the pending windows."""
+        return self._instrument_id
+
+    @property
+    def source_duration_ns(self) -> int:
+        """Source cadence fixed for the lifetime of the pending windows."""
+        return self._source_duration_ns
+
+    @property
+    def target_durations_ns(self) -> tuple[int, ...]:
+        """Target cadences fixed for the lifetime of the pending windows."""
+        return self._target_durations_ns
 
     @property
     def pending_counts(self) -> dict[int, int]:
