@@ -162,3 +162,19 @@ confirmatory evidence of a cross-sectional edge.
   significant.
 * **Adaptive management reduces net value out of sample** (D − C = −654.25, 4/10),
   contradicting the BTC development measurement (+34.04) that motivated this study.
+
+---
+
+## Metric definitions
+
+| Metric | Definition |
+|---|---|
+| Net PnL | Native NautilusTrader account balance delta, `final − 10,000 USDT`, including commissions and booked funding |
+| Net R (per campaign) | Closed-campaign realized PnL ÷ `entry_notional × bracket_stop_pct (0.02)`, i.e. loss at the initial 2 % stop is −1 R |
+| Max drawdown | Peak-to-trough on the **realized closed-campaign equity curve**, before mark-to-market of any position open at cutoff. An open position does not create a drawdown point in this measure |
+| Hit rate | Share of closed campaigns with positive realized PnL |
+| Profit factor | Sum of positive closed-campaign PnL ÷ absolute sum of negative closed-campaign PnL |
+| Exposure / time in market | Sum of closed-campaign holding durations ÷ 4,344 H1-window hours |
+| Holding time | Close event time − open event time for each closed campaign; open positions are excluded from the mean/median |
+| Return % | Net PnL ÷ 10,000, per independent book; the aggregate percentage is the sum over ten books ÷ 100,000 |
+| Break-even added cost | Reference net PnL ÷ one-way traded notional × 10,000, in basis points per side |
