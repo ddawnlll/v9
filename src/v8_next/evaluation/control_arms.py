@@ -74,7 +74,6 @@ GATE_TOO_FEW_DRAWS = "TOO_FEW_DRAWS"
 GATE_P_RESOLUTION_INSUFFICIENT = "P_RESOLUTION_INSUFFICIENT"
 GATE_INSIDE_CONTROL_SPREAD = "INSIDE_CONTROL_SPREAD"
 GATE_P_ABOVE_ALPHA = "P_ABOVE_ALPHA"
-GATE_NONPOSITIVE_DELTA = "NONPOSITIVE_DELTA"
 GATE_OUTSIDE_CONTROL_DISTRIBUTION = "OUTSIDE_CONTROL_DISTRIBUTION"
 
 MATCH_FIELDS = (
@@ -795,8 +794,9 @@ def _evaluate(
             return comparison(
                 ControlVerdict.NOT_RUN,
                 GATE_TREATMENT_NOT_MEASURED,
-                "the treatment arm carries no measured per-campaign net R; there is "
-                "nothing to place inside the control distribution",
+                "the treatment arm carries no measured per-campaign net R (or no "
+                "per-campaign samples); there is nothing to place inside the control "
+                "distribution",
             )
         # A regime bucket with zero measured campaigns is a known count, not an
         # unmeasured arm: it is a sufficiency failure, not an absence of data.
@@ -871,15 +871,6 @@ def _evaluate(
             empirical_p=empirical_p,
             delta=delta,
         )
-    if delta is None or delta <= 0.0:
-        return comparison(
-            ControlVerdict.NO_EDGE,
-            GATE_NONPOSITIVE_DELTA,
-            "treatment does not exceed the control mean",
-            percentile_rank=percentile_rank,
-            empirical_p=empirical_p,
-            delta=delta,
-        )
     return comparison(
         ControlVerdict.PASS,
         GATE_OUTSIDE_CONTROL_DISTRIBUTION,
@@ -905,7 +896,12 @@ def _require_shared_measurement_basis(treatment: ArmResult, arm: ArmResult) -> N
         raise ControlArmMismatch(str(exc), field="provenance", code="CONTROL_ARM_MISMATCH") from exc
     left = arm.provenance
     right = treatment.provenance
-    assert left is not None and right is not None  # guaranteed by the guard above
+    if left is None or right is None:  # defensive: the guard above already refused
+        raise ControlArmMismatch(
+            "a control arm and the treatment must both declare provenance",
+            field="provenance",
+            code="PROVENANCE_ABSENT",
+        )
     fee_fields = ("fee_model", "maker_fee", "taker_fee")
     mismatched = tuple(name for name in fee_fields if getattr(left, name) != getattr(right, name))
     if mismatched:
@@ -946,8 +942,8 @@ def compare_to_controls(
     require_specs_match(treatment_spec, controls.spec)
 
     samples = tuple(treatment.net_r_samples)
-    measured = treatment.costed and treatment.net_r is not None and bool(samples)
-    if not measured:
+    net_r = treatment.net_r
+    if not treatment.costed or net_r is None or not samples:
         # An unmeasured (or uncosted) treatment is NOT_RUN whatever the controls
         # hold: naming the absence is the whole result, and no default is invented.
         return _evaluate(
@@ -962,6 +958,23 @@ def compare_to_controls(
             spec_digest=controls.spec.digest,
             arm_kind=controls.arm_kind,
             empty_gate=GATE_CONTROL_ARMS_ABSENT,
+        )
+
+    expected_net_r = sum(samples) / len(samples)
+    if abs(net_r - expected_net_r) > 1e-9 * max(1.0, abs(expected_net_r)):
+        raise ControlArmRefusal(
+            f"treatment net R {net_r} disagrees with the mean of its "
+            f"{len(samples)} per-campaign samples ({expected_net_r}); the headline "
+            "number is not the measured one",
+            field="net_r",
+            code="INCONSISTENT_TREATMENT_NET_R",
+        )
+    if treatment.trades is not None and treatment.trades != len(samples):
+        raise ControlArmRefusal(
+            f"treatment declares {treatment.trades} trades but publishes "
+            f"{len(samples)} per-campaign samples",
+            field="trades",
+            code="INCONSISTENT_TREATMENT_TRADES",
         )
 
     if controls.exposure_budget is not None and len(samples) != controls.exposure_budget:
@@ -990,7 +1003,7 @@ def compare_to_controls(
 
     return _evaluate(
         treatment_arm_id=treatment.arm_id,
-        treatment_net_r=treatment.net_r,
+        treatment_net_r=net_r,
         treatment_campaigns=len(samples),
         distribution=controls.distribution,
         alpha=alpha,
@@ -1113,6 +1126,14 @@ def compare_by_regime(
         )
 
     lookup = regime_lookup(labels)
+    missing = sorted({campaign.bar_index for campaign in campaigns} - set(lookup))
+    if missing:
+        raise ControlArmRefusal(
+            f"campaign entry bars {missing[:5]} carry no regime label; an unlabelled "
+            "campaign cannot be bucketed",
+            field="labels",
+            code="REGIME_LABEL_RANGE",
+        )
     counts = regime_counts(labels)
     overall = compare_to_controls(
         treatment,

@@ -481,6 +481,18 @@ def test_absent_treatment_is_not_run_with_the_reason() -> None:
     assert result.treatment_net_r is None
 
 
+def test_treatment_headline_must_match_its_samples() -> None:
+    battery = _battery(seed=7)
+    doctored = replace(_treatment(samples=tuple(5.0 for _ in range(BUDGET))), net_r=50.0)
+    with pytest.raises(ControlArmRefusal) as raised:
+        compare_to_controls(doctored, battery, treatment_spec=_spec())
+    assert raised.value.code == "INCONSISTENT_TREATMENT_NET_R"
+    miscounted = replace(_treatment(samples=tuple(5.0 for _ in range(BUDGET))), trades=BUDGET + 1)
+    with pytest.raises(ControlArmRefusal) as counted:
+        compare_to_controls(miscounted, battery, treatment_spec=_spec())
+    assert counted.value.code == "INCONSISTENT_TREATMENT_TRADES"
+
+
 def test_uncosted_treatment_is_not_run() -> None:
     battery = _battery(seed=7)
     treatment = _treatment(samples=tuple(0.5 for _ in range(BUDGET)), costed=False)
@@ -758,6 +770,14 @@ def test_regime_report_refuses_out_of_range_bars() -> None:
             treatment, outside, battery, labels, treatment_spec=_spec(), min_campaigns=5
         )
     assert raised.value.code == "REGIME_LABEL_RANGE"
+    # A sparse label sequence must not silently drop a campaign from every bucket.
+    sparse = tuple(label for label in labels if label.index != campaigns[1].bar_index)
+    with pytest.raises(ControlArmRefusal) as sparse_raised:
+        compare_by_regime(
+            treatment, campaigns, battery, sparse, treatment_spec=_spec(), min_campaigns=5
+        )
+    assert sparse_raised.value.code == "REGIME_LABEL_RANGE"
+    assert "carry no regime label" in sparse_raised.value.message
 
 
 # --------------------------------------------------------------------------- #
