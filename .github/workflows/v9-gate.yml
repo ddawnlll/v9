@@ -1,0 +1,51 @@
+name: V9 gate
+
+# Machine verification for every push and pull request. The fast suite is the
+# documented default (`-m "not slow"` from pyproject addopts); the slow tape and
+# native-engine tests are deliberately excluded here and remain an explicit,
+# separately-invoked tier.
+
+on:
+  push:
+    branches:
+      - integration/**
+      - wave*/**
+      - fix/**
+  pull_request:
+
+concurrency:
+  group: v9-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sync locked environment
+        run: uv sync --locked --extra dev
+
+      - name: Ruff
+        run: uv run --locked --extra dev ruff check src tests
+
+      - name: Mypy
+        run: uv run --locked --extra dev mypy src
+
+      - name: Fast test suite
+        run: uv run --locked --extra dev pytest -q
+
+      - name: Evidence summary
+        if: always()
+        run: |
+          echo "head=$(git rev-parse HEAD)"
+          echo "suite=pytest -q (fast loop, slow deselected by pyproject addopts)"
