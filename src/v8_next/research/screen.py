@@ -73,7 +73,14 @@ def load_bars(
     start_ms: int | None = None,
     end_ms: int | None = None,
 ) -> list[Bar]:
-    """Load closed kline bars for one instrument from a multitape JSONL file."""
+    """Load closed kline bars for one instrument from a multitape JSONL file.
+
+    The tape records ``event_time`` in milliseconds; ``Bar.end_ns`` is the true
+    nanosecond close instant, so a bar can be compared directly with a native
+    timestamp (``Position.ts_opened``, ``FundingRateUpdate.ts_event``). Mixing
+    the two units silently skipped every bar, which is why the conversion is
+    explicit here and not left to callers.
+    """
     bars: list[Bar] = []
     with open(tape_path, encoding="utf-8") as handle:
         for line in handle:
@@ -95,7 +102,7 @@ def load_bars(
                 continue
             bars.append(
                 Bar(
-                    end_ns=int(row["event_time"]),
+                    end_ns=int(row["event_time"]) * NS_PER_MS,
                     open=float(payload["open"]),
                     high=float(payload["high"]),
                     low=float(payload["low"]),

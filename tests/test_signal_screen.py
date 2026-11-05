@@ -158,3 +158,39 @@ def test_unknown_candidate_and_parameter_are_refused() -> None:
     bars = _bars([(100, 101, 99, 100, 1)] * 30)
     with pytest.raises(ValueError, match="unknown parameters"):
         signals.build_signals("bollinger_reversion", bars, nonsense=1.0)
+
+
+def test_tape_timestamps_and_funding_share_one_unit(tmp_path) -> None:
+    """The tape records ms; the screen must expose ns so funding can be attributed."""
+    tape = tmp_path / "tape.jsonl"
+
+    def kline(open_ms: int, close_ms: int) -> str:
+        return (
+            '{"channel":"kline","instrument":"BTCUSDT","event_time":%d,'
+            '"payload":{"open":100,"high":101,"low":99,"close":100,"volume":1,'
+            '"open_time_ms":%d,"close_time_ms":%d,"closed":true}}'
+            % (close_ms + 1, open_ms, close_ms)
+        )
+
+    def funding(funding_ms: int) -> str:
+        return (
+            '{"channel":"funding","instrument":"BTCUSDT","event_time":%d,'
+            '"payload":{"funding_time_ms":%d,"funding_rate":"0.001"}}'
+            % (funding_ms, funding_ms)
+        )
+
+    tape.write_text(
+        "\n".join(
+            [
+                kline(0, 3_600_000 - 1),
+                kline(3_600_000, 7_200_000 - 1),
+                funding(4_000_000),
+            ]
+        ),
+        encoding="utf-8",
+    )
+    bars = screen.load_bars(tape, instrument="BTCUSDT")
+    settlements = screen.load_funding(tape, instrument="BTCUSDT")
+    assert bars[0].end_ns == 3_600_000 * 1_000_000
+    assert settlements == ((4_000_000 * 1_000_000, 0.001),)
+    assert bars[0].end_ns < settlements[0][0] <= bars[1].end_ns
