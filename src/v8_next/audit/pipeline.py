@@ -322,27 +322,58 @@ def assign_campaign_ids(run_dir: Path) -> int:
     events = read_events(path)
     opened = [e for e in events if e["event_type"] == "POSITION_OPENED"]
     open_sequences = [int(e["sequence_number"]) for e in opened]
-    open_time_to_campaign = {
-        int(e["event_time_ns"]): index + 1 for index, e in enumerate(opened)
-    }
+    open_by_campaign = {index + 1: event for index, event in enumerate(opened)}
     forward_types = {
         "ORDER_SUBMITTED",
         "ORDER_ACCEPTED",
         "ORDER_FILLED",
         "ADMISSION_ACCEPTED",
     }
+
+    def _is_entry_event(event: dict[str, Any]) -> bool:
+        client_id = str(event.get("client_order_id") or "")
+        return event["event_type"].startswith("ADMISSION") or client_id.endswith("-1")
+
     for event in events:
         campaign = bisect_right(open_sequences, int(event["sequence_number"]))
-        if campaign in open_time_to_campaign.values() and event["event_type"] in forward_types:
-            client_id = str(event.get("client_order_id") or "")
-            if open_time_to_campaign.get(int(event["event_time_ns"])) == campaign + 1 and (
-                client_id.endswith("-1") or event["event_type"].startswith("ADMISSION")
-            ):
+        next_open = open_by_campaign.get(campaign + 1)
+        if (
+            next_open is not None
+            and event["event_type"] in forward_types
+            and _is_entry_event(event)
+        ):
+            open_decision = str(next_open.get("decision_id") or "")
+            event_decision = str(event.get("decision_id") or "")
+            # Exact identity wins when both sides carry it. Otherwise the entry
+            # leg may only be attributed to the next campaign when it did not
+            # occur after that campaign opened (no timestamp inference beyond
+            # the event ordering).
+            same_decision = bool(
+                open_decision and event_decision and open_decision == event_decision
+            )
+            same_or_earlier = int(event["event_time_ns"]) <= int(
+                next_open["event_time_ns"]
+            )
+            if same_decision or (not open_decision and same_or_earlier):
                 campaign += 1
         if campaign:
             event["campaign_id"] = f"C{campaign:04d}"
         else:
             event.pop("campaign_id", None)
+
+    # Native order rows carry the producer's decision id but no campaign. The
+    # admission row is the single authority for the campaign a decision belongs
+    # to, so propagate that identity to every row naming the same decision.
+    decision_campaign: dict[str, str] = {}
+    for event in events:
+        decision = str(event.get("decision_id") or "")
+        row_campaign = str(event.get("campaign_id") or "")
+        if decision and row_campaign:
+            decision_campaign.setdefault(decision, row_campaign)
+    for event in events:
+        mapped_campaign = decision_campaign.get(str(event.get("decision_id") or ""))
+        if mapped_campaign is not None:
+            event["campaign_id"] = mapped_campaign
     tmp = path.with_suffix(".jsonl.tmp")
     with tmp.open("w", encoding="utf-8", newline="\n") as handle:
         for event in events:

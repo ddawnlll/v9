@@ -246,6 +246,16 @@ class ExpertEnsembleStrategy(Strategy):
         self.order_events: list[dict[str, Any]] = []
         self.opened_positions: list[dict[str, Any]] = []
         self.closed_positions: list[dict[str, Any]] = []
+        #: Explicit ledger joins. Native order callbacks carry only a client order
+        #: id (and, after a fill, a position id), so the strategy records the V9/V8
+        #: decision and opportunity that created each order/position. The audit
+        #: pipeline joins native rows by these ids instead of guessing from time.
+        self._decision_by_client_id: dict[str, str] = {}
+        self._opportunity_by_client_id: dict[str, str] = {}
+        self._decision_by_position_id: dict[str, str] = {}
+        self._opportunity_by_position_id: dict[str, str] = {}
+        self._pending_entry_decision_id: str | None = None
+        self._pending_entry_opportunity_id: str | None = None
         # Pending TWAP child slices: dicts with side/quantity/bracket/prices.
         self.pending_twap: list[dict[str, Any]] = []
         #: Research-only stop-management state, keyed by native position id.
@@ -462,23 +472,26 @@ class ExpertEnsembleStrategy(Strategy):
                 tp_price=sl["tp_price"],
             )
             self.submit_order_list(order_list)
+            self._bind_entry_identity(
+                order_list, sl.get("decision_id"), sl.get("opportunity_id")
+            )
         elif sl["entry_order_type"] == OrderType.LIMIT:
-            self.submit_order(
-                self.order_factory.limit(
-                    instrument_id=self.instrument_id,
-                    order_side=sl["side"],
-                    quantity=qty,
-                    price=sl["entry_price"],
-                )
+            order = self.order_factory.limit(
+                instrument_id=self.instrument_id,
+                order_side=sl["side"],
+                quantity=qty,
+                price=sl["entry_price"],
             )
+            self.submit_order(order)
+            self._bind_entry_identity(order, sl.get("decision_id"), sl.get("opportunity_id"))
         else:
-            self.submit_order(
-                self.order_factory.market(
-                    instrument_id=self.instrument_id,
-                    order_side=sl["side"],
-                    quantity=qty,
-                )
+            order = self.order_factory.market(
+                instrument_id=self.instrument_id,
+                order_side=sl["side"],
+                quantity=qty,
             )
+            self.submit_order(order)
+            self._bind_entry_identity(order, sl.get("decision_id"), sl.get("opportunity_id"))
         if record is not None:
             self.opportunity_book.update_status(record.opportunity_id, OpportunityStatus.ADMITTED)
         return f"TWAP_CHILD_{sl['done']}/{sl['total']}"
@@ -824,6 +837,9 @@ class ExpertEnsembleStrategy(Strategy):
         # 6. Execute Native Orders via NautilusTrader OrderFactory
         action = "NO_ACTION"
         sizing_mode = "FLAT"
+        #: Entry client order id captured at submission; the ORDER_SUBMITTED
+        #: ledger row carries it so native order/fill rows can join the decision.
+        submitted_entry_client_id: str | None = None
         # Drain one pending TWAP child even when this bar carries no supported
         # opportunity: children continue a scheduled parent. A drained bar emits
         # only the child (parent gate below is skipped for it).
@@ -1074,6 +1090,8 @@ class ExpertEnsembleStrategy(Strategy):
                                     for idx, s in enumerate(slices[1:], start=2):
                                         self.pending_twap.append(
                                             {
+                                                "decision_id": f"D{candle.end_ns}",
+                                                "opportunity_id": entry_opportunity_id,
                                                 "side": side,
                                                 "quantity": s,
                                                 "bracket": True,
@@ -1100,6 +1118,9 @@ class ExpertEnsembleStrategy(Strategy):
                                 tp_price=tp_price,
                             )
                             self.submit_order_list(order_list)
+                            submitted_entry_client_id = self._bind_entry_identity(
+                                order_list, f"D{candle.end_ns}", entry_opportunity_id
+                            )
                             # Protection lifecycle is recorded at submission: the
                             # native accept event does not always expose the child
                             # order type, so inferring protection from fills alone
@@ -1193,6 +1214,8 @@ class ExpertEnsembleStrategy(Strategy):
                                     for idx, s in enumerate(slices[1:], start=2):
                                         self.pending_twap.append(
                                             {
+                                                "decision_id": f"D{candle.end_ns}",
+                                                "opportunity_id": entry_opportunity_id,
                                                 "side": side,
                                                 "quantity": s,
                                                 "bracket": False,
@@ -1217,6 +1240,9 @@ class ExpertEnsembleStrategy(Strategy):
                                         )
                                     twap_tag = f"TWAP_PARENT_1/{len(slices)}_"
                             self.submit_order(submit_order)
+                            submitted_entry_client_id = self._bind_entry_identity(
+                                submit_order, f"D{candle.end_ns}", entry_opportunity_id
+                            )
                             if record is not None:
                                 self.opportunity_book.update_status(
                                     record.opportunity_id, OpportunityStatus.ADMITTED
@@ -1249,6 +1275,7 @@ class ExpertEnsembleStrategy(Strategy):
                     decision_id=f"D{candle.end_ns}",
                     action=action,
                     intent_id=f"D{candle.end_ns}",
+                    client_order_id=submitted_entry_client_id,
                     order_linkage="INTENT_ONLY (submit return value not exposed; native ids follow)",
                 )
             elif action in {"POSITION_OCCUPIED"}:
@@ -1391,6 +1418,35 @@ class ExpertEnsembleStrategy(Strategy):
         except Exception:  # pragma: no cover - observation must not break trading
             return
 
+    def _bind_entry_identity(
+        self,
+        orders: Any,
+        decision_id: str | None,
+        opportunity_id: str | None,
+    ) -> str | None:
+        """Attach the entry decision to submitted order ids; return the first id.
+
+        This is the producer half of the P0 ledger join. It is deliberately
+        additive: no order is created or changed here, and a missing decision id
+        leaves the maps untouched (the pipeline then reports an unjoined row).
+        """
+        if not decision_id:
+            return None
+        items = orders if isinstance(orders, (list, tuple)) else [orders]
+        first: str | None = None
+        for order in items:
+            client_id = str(getattr(order, "client_order_id", "") or "")
+            if not client_id:
+                continue
+            first = first or client_id
+            self._decision_by_client_id[client_id] = decision_id
+            if opportunity_id:
+                self._opportunity_by_client_id[client_id] = opportunity_id
+        if first is not None:
+            self._pending_entry_decision_id = decision_id
+            self._pending_entry_opportunity_id = opportunity_id
+        return first
+
     def on_order_event(self, event: Any) -> None:
         """Track native order state transitions."""
         record: dict[str, Any] = {
@@ -1432,6 +1488,20 @@ class ExpertEnsembleStrategy(Strategy):
                     record["price"] = str(order_price)
                 elif trigger_price is not None:
                     record["price"] = str(trigger_price)
+        client_id = record["client_order_id"]
+        position_id = record["position_id"]
+        decision_id = (
+            self._decision_by_client_id.get(client_id)
+            or self._decision_by_position_id.get(position_id)
+            or self._pending_entry_decision_id
+        )
+        opportunity_id = (
+            self._opportunity_by_client_id.get(client_id)
+            or self._opportunity_by_position_id.get(position_id)
+            or self._pending_entry_opportunity_id
+        )
+        record["decision_id"] = decision_id or ""
+        record["opportunity_id"] = opportunity_id or ""
         self.order_events.append(record)
         from v8_next.audit.forensic import ORDER_EVENT_TYPES
 
@@ -1450,6 +1520,8 @@ class ExpertEnsembleStrategy(Strategy):
                 quantity=record["quantity"],
                 filled_qty=record["filled_qty"],
                 reason=record["reason"],
+                decision_id=record["decision_id"] or None,
+                opportunity_id=record["opportunity_id"] or None,
                 native_event_class=record["event_type"],
             )
             # Bracket children are the only orders whose client id ends in -2
@@ -1481,6 +1553,8 @@ class ExpertEnsembleStrategy(Strategy):
                         reason=record["reason"] or (
                             "FILLED" if mapped == "ORDER_FILLED" else None
                         ),
+                        decision_id=record["decision_id"] or None,
+                        opportunity_id=record["opportunity_id"] or None,
                         native_event_class=record["event_type"],
                     )
 
@@ -1495,6 +1569,14 @@ class ExpertEnsembleStrategy(Strategy):
             "event_ns": getattr(event, "ts_event", 0),
         }
         self.opened_positions.append(record)
+        decision_id = self._pending_entry_decision_id
+        opportunity_id = self._pending_entry_opportunity_id
+        opened_position_id = str(record.get("position_id") or "")
+        if opened_position_id:
+            if decision_id:
+                self._decision_by_position_id[opened_position_id] = decision_id
+            if opportunity_id:
+                self._opportunity_by_position_id[opened_position_id] = opportunity_id
         if self._d4_lifecycle is not None and record["position_id"]:
             side = str(record.get("side") or "").upper()
             direction = "LONG" if side.endswith("LONG") else "SHORT"
@@ -1514,8 +1596,12 @@ class ExpertEnsembleStrategy(Strategy):
             side=record["side"],
             quantity=record["quantity"],
             avg_px_open=record["avg_px_open"],
+            decision_id=decision_id,
+            opportunity_id=opportunity_id,
             linkage_note="decision_id resolved by audit pipeline from entry fill timestamp",
         )
+        self._pending_entry_decision_id = None
+        self._pending_entry_opportunity_id = None
 
     def on_position_closed(self, event: Any) -> None:
         """Track closed native position and realized PnL."""
@@ -1528,6 +1614,9 @@ class ExpertEnsembleStrategy(Strategy):
             "event_ns": getattr(event, "ts_event", 0),
         }
         self.closed_positions.append(record)
+        closed_position_id = str(record.get("position_id") or "")
+        decision_id = self._decision_by_position_id.get(closed_position_id)
+        opportunity_id = self._opportunity_by_position_id.get(closed_position_id)
         self._audit(
             "POSITION_CLOSED",
             int(record["event_ns"] or 0),
@@ -1536,6 +1625,8 @@ class ExpertEnsembleStrategy(Strategy):
             realized_pnl=record["realized_pnl"],
             realized_return=record["realized_return"],
             avg_px_close=record["avg_px_close"],
+            decision_id=decision_id,
+            opportunity_id=opportunity_id,
         )
 
 
